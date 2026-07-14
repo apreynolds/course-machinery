@@ -1,0 +1,277 @@
+#!/usr/bin/env bash
+# build-pdfs — compile course .tex files into PDFs with latexmk
+# Usage: build-pdfs [FILE.tex ...]
+#
+# With no arguments, compiles every *.tex file in the current directory.
+# Each source FILE.tex produces FILE.pdf.
+#
+# Output directory via an OUTDIR file: if the current directory contains a
+# file named OUTDIR (or .OUTDIR), a directory path on its own line (a leading ~
+# is expanded) redirects the PDF there instead of alongside the source. By
+# default the build goes straight to that directory (no local copy); add a line
+# reading BOTH to instead build locally AND copy the PDF to the destination,
+# keeping both. Blank lines and #-comment lines are ignored, and the path and
+# BOTH keyword may appear in either order. If the path is missing or is not a
+# directory, build-pdfs warns and builds locally. OUTDIR takes precedence over
+# .OUTDIR if both exist. (COPY, a songsheets synonym for BOTH, is intentionally
+# not recognised here yet.)
+#
+# Cloud mirror via a top-level .CLOUDDIR file: when the build directory has no
+# OUTDIR/.OUTDIR of its own, build-pdfs looks upward for a .CLOUDDIR (at the
+# repo top level, found the way .latexmkrc finds .course-machinery). It names a
+# base directory that mirrors the repo tree, so a source built in
+# REPO/integrals/lectures ships to BASE/integrals/lectures. The mirror sub-
+# directory is created if absent (unlike OUTDIR, which must already exist), but
+# the base itself must exist — otherwise (e.g. the cloud is unmounted) build-
+# pdfs warns and builds locally rather than scattering a stray tree. Same file
+# format as OUTDIR (a path plus an optional BOTH line). Precedence per build
+# directory: OUTDIR/.OUTDIR, else .CLOUDDIR, else local.
+#
+# Views via a magic comment: a `%! views: ...' line in the leading comment block
+# of a source (before \documentclass) requests extra PDFs. One view is wired up:
+#   solutions -> also build FILE-SOLUTIONS.pdf, with \def\ShowSolutions{}
+#                injected so the `test' class shows \solution{...} content that
+#                the student build omits. Any other view name warns and is skipped.
+# View PDFs follow the same OUTDIR / BOTH handling as the default build.
+#
+# Auxiliary files (.aux/.log/etc.) go to a per-directory folder under
+# ~/.cache/latexmk/ so they clutter neither the repo nor the output directory.
+# Relies on the repo's .latexmkrc to put .course-machinery on TEXINPUTS.
+
+set -uo pipefail
+
+usage() {
+  # Reprint the header block (line 2 to the first blank line), stripping the
+  # leading "# ", so -h stays in sync with the comment above.
+  sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+case "${1:-}" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+esac
+
+# Resolve the output directory from an OUTDIR / .OUTDIR file in the current
+# directory. On success echoes two lines — the mode (MOVE or BOTH) then the
+# validated destination path; echoes nothing when the caller should build
+# locally: no file, no usable path, or a path that is missing / not a directory
+# (the last two warn). MOVE (default): the PDF is written straight to the
+# destination. BOTH: build locally AND copy the PDF to the destination. Blank
+# and #-comment lines are ignored, and the BOTH keyword / path may appear in
+# either order. OUTDIR wins over .OUTDIR if both exist. (COPY, a songsheets
+# synonym for BOTH, is intentionally not recognised here yet.)
+read_outdir() {
+  local f line trimmed lower path="" mode="MOVE"
+  for f in OUTDIR .OUTDIR; do
+    [[ -f $f ]] && break
+  done
+  [[ -f $f ]] || return 0          # neither file exists -> build locally
+
+  while IFS= read -r line || [[ -n $line ]]; do
+    # Trim surrounding whitespace (covers a trailing CR too).
+    trimmed=${line#"${line%%[![:space:]]*}"}
+    trimmed=${trimmed%"${trimmed##*[![:space:]]}"}
+    [[ -z $trimmed || ${trimmed:0:1} == "#" ]] && continue   # blank / comment
+    lower=${trimmed,,}
+    if [[ $lower == both ]]; then
+      mode="BOTH"                  # keep a local copy too
+      continue
+    fi
+    [[ -z $path ]] && path=$trimmed  # first non-keyword line = path
+  done <"$f"
+
+  if [[ -z $path ]]; then
+    echo "build-pdfs: $f has no directory path, building locally" >&2
+    return 0
+  fi
+  path=${path/#\~/$HOME}           # expand a leading ~
+  if [[ ! -d $path ]]; then
+    echo "build-pdfs: $f path '$path' is not a directory, building locally" >&2
+    return 0
+  fi
+  printf '%s\n%s\n' "$mode" "$path"
+}
+
+# Resolve the output directory from a top-level .CLOUDDIR file, used only when
+# the build directory has no OUTDIR/.OUTDIR of its own. Walks up from the cwd to
+# the nearest ancestor holding a .CLOUDDIR (the repo top level, the way
+# .latexmkrc finds .course-machinery) and reads a base directory from it (same
+# format as OUTDIR: first non-comment line is the path, a leading ~ expands, an
+# optional BOTH line keeps a local copy too). The PDF ships to the base with the
+# cwd's repo-relative path appended, so REPO/integrals/lectures mirrors to
+# BASE/integrals/lectures. That mirror sub-directory is created if missing, but
+# the base itself must exist — if it doesn't, warn and build locally rather than
+# materialising a stray tree. Output contract matches read_outdir: two lines
+# (mode, path) or nothing.
+read_clouddir() {
+  local root=$PWD f base="" mode="MOVE" line trimmed lower rel dest
+  while [[ $root != / && ! -f $root/.CLOUDDIR ]]; do
+    root=$(dirname -- "$root")
+  done
+  f=$root/.CLOUDDIR
+  [[ -f $f ]] || return 0          # no .CLOUDDIR anywhere above -> build locally
+
+  while IFS= read -r line || [[ -n $line ]]; do
+    trimmed=${line#"${line%%[![:space:]]*}"}
+    trimmed=${trimmed%"${trimmed##*[![:space:]]}"}
+    [[ -z $trimmed || ${trimmed:0:1} == "#" ]] && continue   # blank / comment
+    lower=${trimmed,,}
+    if [[ $lower == both ]]; then
+      mode="BOTH"                  # keep a local copy too
+      continue
+    fi
+    [[ -z $base ]] && base=$trimmed  # first non-keyword line = base path
+  done <"$f"
+
+  if [[ -z $base ]]; then
+    echo "build-pdfs: $f has no directory path, building locally" >&2
+    return 0
+  fi
+  base=${base/#\~/$HOME}           # expand a leading ~
+  if [[ ! -d $base ]]; then
+    echo "build-pdfs: .CLOUDDIR base '$base' is not a directory, building locally" >&2
+    return 0
+  fi
+
+  # Mirror the cwd's path relative to the repo root under the base.
+  rel=${PWD#"$root"}; rel=${rel#/}
+  dest=$base${rel:+/$rel}
+  if ! mkdir -p -- "$dest"; then
+    echo "build-pdfs: could not create .CLOUDDIR path '$dest', building locally" >&2
+    return 0
+  fi
+  printf '%s\n%s\n' "$mode" "$dest"
+}
+
+# Read requested views from a source's leading magic-comment block. Recognises
+# lines of the form `%! views: a, b, c' (flexible spacing) and echoes one view
+# token per line. Scanning stops at the first line that is neither blank nor a
+# `%'-comment, so only the leading block (before \documentclass) is consulted.
+read_views() {
+  local file=$1 line val tok toks
+  while IFS= read -r line; do
+    # First real (non-blank, non-comment) line ends the magic-comment block.
+    if [[ -n $line && ${line#\%} == "$line" ]]; then
+      break
+    fi
+    if [[ $line =~ ^%![[:space:]]*views[[:space:]]*:[[:space:]]*(.*)$ ]]; then
+      val=${BASH_REMATCH[1]}
+      IFS=',' read -ra toks <<<"$val"
+      for tok in "${toks[@]}"; do
+        # Trim surrounding whitespace.
+        tok=${tok#"${tok%%[![:space:]]*}"}
+        tok=${tok%"${tok##*[![:space:]]}"}
+        [[ -n $tok ]] && printf '%s\n' "$tok"
+      done
+    fi
+  done <"$file"
+}
+
+# Build a view of a document: inject a \def before \input to flip a class toggle,
+# writing to a distinct -jobname so the view lands at its own PDF. Forced with -g
+# because the source is unchanged, so latexmk's up-to-date check would otherwise
+# skip the rebuild. The -pdflatex override reproduces the default invocation with
+# the \def prepended (hence the nested quoting).
+#   $1 jobname  $2 source  $3 auxdir  $4 jobname suffix
+#   $5 injected TeX  $6 -outdir path (empty for a local build)
+compile_view() {
+  local jobname=$1 src=$2 auxdir=$3 suffix=$4 inject=$5 movedir=$6
+  latexmk -pdf -g -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} -jobname="$jobname$suffix" \
+    -pdflatex="pdflatex %O -interaction=nonstopmode \"$inject \\input{%S}\"" \
+    "$src"
+}
+
+# Build one .tex file. Runs in a subshell so the cd stays local to this build.
+build_file() {
+  local src=$1 dir base jobname auxdir outinfo mode outdir movedir view varaux
+  dir=$(dirname -- "$src")
+  base=$(basename -- "$src")
+  jobname=${base%.tex}
+
+  (
+    # Compile in the source's own directory so the PDF lands next to the source
+    # (latexmk's out-dir defaults to cwd) and the .latexmkrc there is picked up.
+    cd "$dir" || exit
+    auxdir="$HOME/.cache/latexmk/${PWD##*/}-$jobname"
+    mkdir -p "$auxdir" || exit
+
+    # Output directory: an OUTDIR/.OUTDIR file here can redirect the PDF, else a
+    # top-level .CLOUDDIR mirrors it to the cloud (see header). Both echo two
+    # lines (mode, path) or nothing, with OUTDIR/.OUTDIR taking precedence. MOVE
+    # (default): -outdir writes the PDF straight to the destination. BOTH: build
+    # locally (out-dir defaults to cwd), then copy the PDF to the destination.
+    # movedir carries the -outdir path for the MOVE case only, so BOTH keeps its
+    # local build.
+    mode=""; outdir=""; movedir=""
+    outinfo=$(read_outdir)
+    [[ -n $outinfo ]] || outinfo=$(read_clouddir)
+    if [[ -n $outinfo ]]; then
+      { read -r mode; read -r outdir; } <<<"$outinfo"
+      if [[ $mode == BOTH ]]; then
+        echo "    -> outdir: $outdir (local copy kept)"
+      else
+        movedir="$outdir"
+        echo "    -> outdir: $outdir"
+      fi
+    fi
+
+    latexmk -pdf -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} "$base" || exit
+    echo "    ok: $jobname.pdf"
+    if [[ $mode == BOTH ]]; then
+      cp -- "$jobname.pdf" "$outdir/" || exit
+    fi
+
+    # Extra views requested via `%! views: ...' in the source's leading comment.
+    # Each view gets its own aux dir (so it never clobbers the main build's log)
+    # and follows the same MOVE/BOTH output handling as the default build above.
+    for view in $(read_views "$base"); do
+      case $view in
+        solutions)
+          varaux="$HOME/.cache/latexmk/${PWD##*/}-$jobname-SOLUTIONS"
+          mkdir -p "$varaux" || exit
+          compile_view "$jobname" "$base" "$varaux" "-SOLUTIONS" "\\def\\ShowSolutions{}" "$movedir" || exit
+          echo "    + $jobname-SOLUTIONS.pdf (solutions)"
+          if [[ $mode == BOTH ]]; then cp -- "$jobname-SOLUTIONS.pdf" "$outdir/" || exit; fi
+          ;;
+        *)
+          echo "build-pdfs: view '$view' not yet supported, skipping" >&2
+          ;;
+      esac
+    done
+  )
+}
+
+# Collect the files to build: explicit arguments, or every *.tex in cwd.
+if [[ $# -gt 0 ]]; then
+  files=("$@")
+else
+  shopt -s nullglob
+  files=(*.tex)
+  shopt -u nullglob
+fi
+
+if [[ ${#files[@]} -eq 0 ]]; then
+  echo "build-pdfs: no .tex files found" >&2
+  exit 1
+fi
+
+failed=()
+for src in "${files[@]}"; do
+  if [[ ! -f $src ]]; then
+    echo "build-pdfs: skipping '$src' (not a file)" >&2
+    failed+=("$src")
+    continue
+  fi
+  echo "==> $src"
+  if ! build_file "$src"; then
+    echo "build-pdfs: FAILED on '$src'" >&2
+    failed+=("$src")
+  fi
+done
+
+if [[ ${#failed[@]} -gt 0 ]]; then
+  echo "build-pdfs: ${#failed[@]} of ${#files[@]} failed: ${failed[*]}" >&2
+  exit 1
+fi
