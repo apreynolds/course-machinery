@@ -108,6 +108,25 @@
 \newcommand*{\liningnums}[1]{{\LibertinusSerifTLF #1}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MEASURE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Width of the lowercase alphabet in the body font. It is a property of the
+% typeface, and it can only be measured once the fonts above are loaded -- which
+% is why it lives here rather than in a class. Classes set their textwidth from
+% it: 2.6\alphabet is the classic readable measure, ~66 characters per line.
+%
+% Expressing the RULE rather than a frozen length is the point. A hardcoded
+% textwidth silently stops tracking the measure the moment the font or size
+% changes -- which is exactly what happened to the inherited 6.382in (derived
+% for newtx at 14pt; we are Libertinus now).
+%
+% Safe to measure here, in the preamble: a class \LoadClass'es before it
+% \RequirePackage's this, so \normalfont is already the real body font at the
+% real base size. Verified at 14pt -- preamble and body measure identically.
+\newlength{\alphabet}
+\settowidth{\alphabet}{\normalfont abcdefghijklmnopqrstuvwxyz}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TYPEFACE-DEPENDENT STUFF
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \course{1013} -> MATH 1013, in sans. The \sffamily is load-bearing, not
