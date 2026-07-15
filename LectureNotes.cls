@@ -29,6 +29,10 @@
 \RequirePackage{import}
 \RequirePackage{graphicx}
 
+% Problem files carry a \ProblemMeta{...} block, so every class that imports one
+% has to define it. Prints nothing unless \ShowProblemMeta is defined.
+\RequirePackage{ProblemMeta}
+
 % No [osf] -- figures here are information; keep them lining.
 % Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs,
 % and defines \alphabet (measured in the real body font -- so it must come
