@@ -1,4 +1,4 @@
-\ProvidesClass{test}[2026/07/10]
+\ProvidesClass{Test}[2026/07/10]
 
 \LoadClass{article}
 

@@ -30,7 +30,7 @@
 # Views via a magic comment: a `%! views: ...' line in the leading comment block
 # of a source (before \documentclass) requests extra PDFs. One view is wired up:
 #   solutions -> also build FILE-SOLUTIONS.pdf, with \def\ShowSolutions{}
-#                injected so the `test' class shows \solution{...} content that
+#                injected so the `Test' class shows \solution{...} content that
 #                the student build omits. Any other view name warns and is skipped.
 # View PDFs follow the same OUTDIR / BOTH handling as the default build.
 #

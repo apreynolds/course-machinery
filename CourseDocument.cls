@@ -1,4 +1,4 @@
-\ProvidesClass{coursedoc}[2026/07/10]
+\ProvidesClass{CourseDocument}[2026/07/10]
 
 \LoadClass{article}
 

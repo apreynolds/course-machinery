@@ -1,4 +1,4 @@
-\ProvidesClass{lecturenote}[2026/07/10]
+\ProvidesClass{LectureNotes}[2026/07/10]
 
 \LoadClass{article}
 
