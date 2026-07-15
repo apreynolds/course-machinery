@@ -1,0 +1,43 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{Titling}[2026/07/15 Shared title block for course documents]
+
+% \subtitle + \maketitle, shared by LectureNotes.cls and CourseDocument.cls.
+% The two 10x3 originals were structurally identical -- title / subtitle /
+% "Updated <date>" -- and differed only in colour, a timestamp, and an
+% instructor marker. Those three are hooks below; the structure is here, once.
+%
+% Test.cls deliberately does NOT load this. An assessment opens with
+% \AssessmentTitle -- a NAME/ID box on an empty pagestyle -- which is a
+% different artefact, not a styled title.
+
+% Both originals loaded datetime2 identically, and it is \@date's formatter,
+% so it belongs with the title block rather than in either class.
+\RequirePackage[en-GB]{datetime2}
+\DTMlangsetup[en-GB]{ord=raise,monthyearsep={,\space}}
+
+\newcommand*{\subtitle}[1]{\gdef\@subtitle{#1}}
+\newcommand*{\@subtitle}{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PER-CLASS HOOKS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Defaults are plain: no colour, no timestamp, no marker. A class overrides with
+% \renewcommand.
+%
+% \TitleColor is a STYLE hook (e.g. \color{HeadingColor}), NOT a colour name.
+% That is deliberate: it keeps this file free of any xcolor dependency, since
+% only CourseDocument.cls colours anything.
+\providecommand{\TitleColor}{}
+\providecommand{\TitleStamp}{}  % follows the date, e.g. \space at \DTMcurrenttime
+\providecommand{\TitleMarker}{} % follows the stamp; the seam for the -INSTRUCTOR
+                                % view's "Instructor Copy" flag, once
+                                % \InstructorNote exists (see NOTE.md items 3/4)
+
+\def\maketitle{%
+  \vspace*{1em}%
+  \par{\huge\bfseries\sffamily\TitleColor\@title}%
+  \vspace{0.5em}%
+  \par{\Large\sffamily\@subtitle}%
+  \par{\small\itshape Updated \@date\TitleStamp\TitleMarker}%
+  \vspace{0.5em}%
+}
