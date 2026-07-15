@@ -1,0 +1,62 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{Hyperlinks}[2026/07/15 hyperref (loaded last) + back-to-top anchor]
+
+% hyperref for the course classes, plus the anchor a back-to-top link jumps to.
+%
+% Requires the loading class to have done, before \ProcessOptions:
+%     \PassOptionsToPackage{dvipsnames}{xcolor}
+% (named colours below need it, and xcolor's options must be set before anything
+% else pulls xcolor in).
+
+\RequirePackage{etoolbox} % \AtEndPreamble
+\RequirePackage{xcolor}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PER-CLASS HOOKS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Same pattern as Titling.sty: defaults are the plain/lecture ones; a class
+% overrides with \renewcommand before \begin{document}. They are read inside the
+% \AtEndPreamble block below, i.e. late, so an override anywhere in the class or
+% the document's preamble still wins.
+\providecommand{\LinkColor}{black}
+\providecommand{\UrlColor}{RoyalBlue}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HYPERREF -- LOADED LAST
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% hyperref patches a great deal of LaTeX (\ref, sectioning, \tableofcontents,
+% amsthm...), so anything loaded AFTER it can silently undo those patches. It
+% must therefore load after every package the DOCUMENT loads, not merely after
+% this class -- which is what \AtEndPreamble gives and \AtEndOfClass does not.
+% (10x3 had it both ways: its LectureNotes used \AtEndPreamble and was right; its
+% CourseDocument used \AtEndOfClass and was wrong.)
+\AtEndPreamble{%
+  \RequirePackage{hyperref}%
+  \hypersetup{%
+    colorlinks    = true,%
+    linkcolor     = \LinkColor,%
+    citecolor     = black,%
+    urlcolor      = \UrlColor,%
+    pdfstartview  = Fit,%
+    pdfmenubar    = true,%
+    pdftoolbar    = true,%
+    bookmarksopen = false,%
+  }%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BACK-TO-TOP ANCHOR
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The destination a back-to-top link jumps to: the very top of the body, which is
+% also where a \tableofcontents sits when the document has one.
+%
+% Emitted at \AtBeginDocument -- deliberately, not earlier: \hypertarget needs
+% hyperref, which does not exist until the \AtEndPreamble above has run, and
+% \AtEndPreamble fires before any \AtBeginDocument hook.
+%
+% \BackToTopLink{<stuff>} wraps its argument in the jump. Kept separate from any
+% styling so the caller decides what the link looks like -- LectureNotes uses a
+% grey arrow in the projector footer; nothing else uses it yet.
+\newcommand{\TopAnchorName}{CourseTop}
+\AtBeginDocument{\hypertarget{\TopAnchorName}{}}
+\newcommand{\BackToTopLink}[1]{\hyperlink{\TopAnchorName}{#1}}
