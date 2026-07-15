@@ -1,5 +1,12 @@
 \ProvidesClass{CourseDocument}[2026/07/10]
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newif\ifLegalPaper
+\DeclareOption{legalpaper}{\LegalPapertrue}
+\DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
+
 % Options must reach xcolor before any other package loads it.
 \PassOptionsToPackage{dvipsnames}{xcolor}
 \ProcessOptions\relax
@@ -10,9 +17,34 @@
 \RequirePackage{graphicx}
 
 % [osf] -- prose-heavy documents get old-style figures in body text.
-% Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
+% Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs,
+% and defines \alphabet (measured in the real body font -- so it must come
+% after \LoadClass, and the geometry below must come after it).
 \RequirePackage[osf]{Typefaces}
 \RequirePackage{Titling}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GEOMETRY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The measure rule is the DEFAULT here. 10x3 hid it behind a `nicemargins'
+% option that only its two most polished documents passed; without it you get
+% article's stock 1in margins, i.e. ~90 characters a line, well past readable.
+%
+% legalpaper first: \paperwidth must be settled before the marginparwidth
+% \dimexpr below reads it.
+\RequirePackage{geometry}
+\ifLegalPaper
+  \geometry{legalpaper}
+\fi
+
+\geometry{textwidth=2.6\alphabet}
+\geometry{head=15pt}
+\if@twoside
+  \geometry{hmarginratio={2:3}}
+\else
+  \geometry{hmarginratio={1:1}}
+\fi
+\geometry{marginparwidth=0.7\dimexpr\paperwidth-1.0in-\hoffset-\oddsidemargin-\textwidth\relax}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % COLOURS
