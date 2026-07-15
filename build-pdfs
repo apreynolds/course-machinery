@@ -28,11 +28,19 @@
 # directory: OUTDIR/.OUTDIR, else .CLOUDDIR, else local.
 #
 # Views via a magic comment: a `%! views: ...' line in the leading comment block
-# of a source (before \documentclass) requests extra PDFs. One view is wired up:
+# of a source (before \documentclass) requests extra PDFs. Two views are wired up:
 #   solutions -> also build FILE-SOLUTIONS.pdf, with \def\ShowSolutions{}
 #                injected so the `Test' class shows \solution{...} content that
-#                the student build omits. Any other view name warns and is skipped.
+#                the student build omits.
+#   projector -> also build FILE-PROJECTOR.pdf, with \def\ProjectorView{}
+#                injected so the `LectureNotes' class switches to the room copy
+#                (17pt, wider text, tighter top margin) instead of the handout.
+# Any other view name warns and is skipped. A third view, instructor, is designed
+# but NOT wired: the class has nothing to read the flag with yet.
 # View PDFs follow the same OUTDIR / BOTH handling as the default build.
+#
+# NB the class reads these as \ifdefined, so the same source builds both ways
+# with no option at the call site -- see LectureNotes.cls / Test.cls.
 #
 # Auxiliary files (.aux/.log/etc.) go to a per-directory folder under
 # ~/.cache/latexmk/ so they clutter neither the repo nor the output directory.
@@ -234,6 +242,13 @@ build_file() {
           compile_view "$jobname" "$base" "$varaux" "-SOLUTIONS" "\\def\\ShowSolutions{}" "$movedir" || exit
           echo "    + $jobname-SOLUTIONS.pdf (solutions)"
           if [[ $mode == BOTH ]]; then cp -- "$jobname-SOLUTIONS.pdf" "$outdir/" || exit; fi
+          ;;
+        projector)
+          varaux="$HOME/.cache/latexmk/${PWD##*/}-$jobname-PROJECTOR"
+          mkdir -p "$varaux" || exit
+          compile_view "$jobname" "$base" "$varaux" "-PROJECTOR" "\\def\\ProjectorView{}" "$movedir" || exit
+          echo "    + $jobname-PROJECTOR.pdf (projector)"
+          if [[ $mode == BOTH ]]; then cp -- "$jobname-PROJECTOR.pdf" "$outdir/" || exit; fi
           ;;
         *)
           echo "build-pdfs: view '$view' not yet supported, skipping" >&2
