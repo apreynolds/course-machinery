@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+# find-problems — search the problem bank by its \ProblemMeta metadata
+# Usage: find-problems [--topic PAT] [--tag PAT] [--difficulty PAT]
+#                      [--source PAT] [--untagged] [--vocab] [--import]
+#                      [DIR ...]
+#
+# Reads the \ProblemMeta{...} block out of every .tex file under each DIR
+# (default: the current directory, recursively) and reports the files that
+# match. With no filters, reports every file that has a block.
+#
+# Filters (all optional, combined with AND):
+#   --topic PAT       match a topic
+#   --tag PAT         match a tag
+#   --difficulty PAT  match the difficulty
+#   --source PAT      match the source
+#
+# PAT is an extended regular expression, matched case-insensitively against each
+# comma-separated item in turn -- so `--topic power' finds `power-rule', and
+# `--topic '^power-rule$'' matches only that. A filter for a key a file does not
+# set never matches, so --difficulty basic will not report untagged files.
+#
+# Other modes:
+#   --untagged  invert: list .tex files with NO \ProblemMeta block at all, i.e.
+#               the backlog of problems still to be tagged.
+#   --vocab     ignore filters and instead print the tag/topic vocabulary in
+#               use, with counts. This is the antidote to a bank where half the
+#               problems say `integration' and half say `integrals' -- read it
+#               before inventing a new tag.
+#   --import    print matches as \import lines ready to paste into a document,
+#               instead of the default listing.
+#
+# Output (default) is one block per match: the path, then its metadata.
+#
+# The parser is textual and deliberately simple: it wants one key per line
+# inside the block, with the value braced, as ProblemMeta.sty's own header asks
+# for. A block reflowed onto one line still compiles but will not be seen here.
+
+set -uo pipefail
+
+usage() {
+  # Reprint the header block (line 2 to the first blank line), stripping the
+  # leading "# ", so -h stays in sync with the comment above. Same trick as
+  # build-pdfs.
+  sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ARGUMENTS
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+topic="" tag="" difficulty="" source=""
+mode="list"          # list | vocab | import | untagged
+dirs=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h | --help)   usage; exit 0 ;;
+    --topic)       topic=${2:?--topic needs a pattern};      shift 2 ;;
+    --tag)         tag=${2:?--tag needs a pattern};          shift 2 ;;
+    --difficulty)  difficulty=${2:?--difficulty needs a pattern}; shift 2 ;;
+    --source)      source=${2:?--source needs a pattern};    shift 2 ;;
+    --vocab)       mode="vocab";    shift ;;
+    --import)      mode="import";   shift ;;
+    --untagged)    mode="untagged"; shift ;;
+    -*)            echo "find-problems: unknown option: $1" >&2
+                   echo "Try 'find-problems --help'." >&2
+                   exit 2 ;;
+    *)             dirs+=("$1"); shift ;;
+  esac
+done
+
+[[ ${#dirs[@]} -eq 0 ]] && dirs=(".")
+
+for d in "${dirs[@]}"; do
+  if [[ ! -d $d ]]; then
+    echo "find-problems: not a directory: $d" >&2
+    exit 2
+  fi
+done
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# READING A BLOCK
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Prints one "key<TAB>value" line per key found in the file's \ProblemMeta
+# block, or nothing at all if the file has no block. Everything downstream
+# works off this, so the parsing rules live in exactly one place.
+read_meta() {
+  awk '
+    # The block opens on the line carrying \ProblemMeta{ ...
+    /\\ProblemMeta[[:space:]]*\{/ { inblock = 1; next }
+
+    # ... and closes at the first line starting with a brace.
+    inblock && /^[[:space:]]*\}/ { inblock = 0; next }
+
+    inblock {
+      line = $0
+
+      # Strip trailing LaTeX comments, but not an escaped \% inside a value.
+      # Park the escaped ones under a byte that cannot occur in a .tex source,
+      # cut at the first surviving %, then put them back.
+      gsub(/\\%/, "\001", line)
+      sub(/%.*$/, "", line)
+      gsub(/\001/, "\\%", line)
+
+      # A key line looks like:  name = {value},
+      if (match(line, /^[[:space:]]*[A-Za-z]+[[:space:]]*=/)) {
+        key = line
+        sub(/[[:space:]]*=.*$/, "", key)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+
+        val = line
+        sub(/^[^=]*=[[:space:]]*/, "", val)   # drop up to and including the =
+        sub(/,[[:space:]]*$/, "", val)        # drop the trailing comma
+        gsub(/^\{|\}$/, "", val)              # drop the surrounding braces
+        gsub(/\\#/, "#", val)                 # \# is how you must write # in TeX
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+
+        printf "%s\t%s\n", key, val
+      }
+    }
+  ' "$1"
+}
+
+# Pull one key out of a block dump (as produced by read_meta).
+field() {
+  local dump=$1 key=$2
+  printf '%s\n' "$dump" | awk -F'\t' -v k="$key" '$1 == k { print $2; exit }'
+}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# MATCHING
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Does any comma-separated item in $1 match the ERE in $2? An empty pattern
+# means "no filter asked for", which matches everything -- including files that
+# do not set the key at all.
+csv_matches() {
+  local list=$1 pattern=$2 item
+  [[ -z $pattern ]] && return 0
+  local IFS=,
+  for item in $list; do
+    item="${item#"${item%%[![:space:]]*}"}"     # trim leading whitespace
+    item="${item%"${item##*[![:space:]]}"}"     # trim trailing whitespace
+    [[ -z $item ]] && continue
+    if [[ ${item,,} =~ ${pattern,,} ]]; then return 0; fi
+  done
+  return 1
+}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# WALK
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# -print0 / read -d '' so paths with spaces survive. Aux and build output never
+# live beside the sources here, but .git might, so prune it.
+files=()
+while IFS= read -r -d '' f; do
+  files+=("$f")
+done < <(find "${dirs[@]}" -name .git -prune -o -type f -name '*.tex' -print0 | sort -z)
+
+matches=()
+declare -A meta_of=()
+
+for f in "${files[@]}"; do
+  dump=$(read_meta "$f")
+
+  if [[ $mode == untagged ]]; then
+    [[ -z $dump ]] && matches+=("$f")
+    continue
+  fi
+
+  [[ -z $dump ]] && continue          # no block -> not part of the bank
+
+  csv_matches "$(field "$dump" topics)"     "$topic"      || continue
+  csv_matches "$(field "$dump" tags)"       "$tag"        || continue
+  csv_matches "$(field "$dump" difficulty)" "$difficulty" || continue
+  csv_matches "$(field "$dump" source)"     "$source"     || continue
+
+  matches+=("$f")
+  meta_of["$f"]=$dump
+done
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# REPORT
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+case $mode in
+  vocab)
+    # Counts across every block found, per key. Filters are ignored: the point
+    # is to see the whole vocabulary before adding to it.
+    for key in topics tags difficulty; do
+      echo "$key:"
+      for f in "${matches[@]}"; do
+        field "${meta_of[$f]}" "$key" | tr ',' '\n'
+      done | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' \
+           | sort | uniq -c | sort -rn | sed 's/^/  /'
+      echo
+    done
+    ;;
+
+  import)
+    # \import wants the directory and the file as separate arguments, and the
+    # paths are relative to the importing document -- which this script cannot
+    # know. So these are relative to the search root and will usually need a
+    # ../ or two; paste and adjust.
+    for f in "${matches[@]}"; do
+      printf '\\import{%s/}{%s}\n' "$(dirname "$f")" "$(basename "$f")"
+    done
+    ;;
+
+  untagged)
+    printf '%s\n' "${matches[@]}"
+    echo >&2
+    echo "${#matches[@]} file(s) with no \\ProblemMeta block." >&2
+    ;;
+
+  list)
+    for f in "${matches[@]}"; do
+      echo "$f"
+      printf '%s\n' "${meta_of[$f]}" | sed 's/^/    /; s/\t/: /'
+      echo
+    done
+    echo "${#matches[@]} match(es)." >&2
+    ;;
+esac
