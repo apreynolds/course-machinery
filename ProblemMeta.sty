@@ -1,0 +1,110 @@
+\ProvidesPackage{ProblemMeta}[2026/07/15 Greppable, printable problem metadata]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% WHY THIS EXISTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The problem bank is one problem per file, pulled into documents with \import.
+% So the question "which problems do I have about the chain rule?" has to be
+% answerable WITHOUT running LaTeX -- nothing has \input those files yet at the
+% moment you are deciding what to put on the test. That rules out any scheme
+% where the metadata only exists once TeX has read it.
+%
+% Hence: the metadata is a literal block that a script can read straight off
+% disk, and this package's only job is to ALSO make it typeset. Both readers see
+% the same source, so they cannot disagree.
+%
+%   \ProblemMeta{
+%     topics     = {differentiation, power-rule},
+%     tags       = {polynomial, routine},
+%     difficulty = {basic},
+%     source     = {Stewart 3.1},
+%   }
+%
+% Keep ONE KEY PER LINE, values braced. The companion script (find-problems)
+% parses the block textually, line by line; reflowing it onto a single line
+% still compiles fine but makes the problem invisible to the script. That is the
+% one way to get the two readers out of step, so it is worth the discipline.
+%
+% Nothing prints by default -- a student never sees this. Pass
+% \def\ShowProblemMeta{} to get the metadata in the margin instead (the same
+% idiom Test.cls uses for \ShowSolutions, so build-pdfs can inject it as a view).
+%
+% All keys are optional; an omitted or empty key prints nothing at all.
+%
+% NB `#' is special to LaTeX, so a source like `Stewart 3.1 #7' must be written
+% `Stewart 3.1 \#7'. find-problems knows this and reports it back without the
+% backslash.
+
+\RequirePackage{keyval}
+\RequirePackage{etoolbox}
+
+% Black/Gray/Red are dvipsnames names. CourseDocument.cls already passes the
+% option; this repeats it so the package still works if loaded on its own. It is
+% a no-op when xcolor is loaded already, so it cannot cause an option clash.
+\PassOptionsToPackage{dvipsnames}{xcolor}
+\RequirePackage{xcolor}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COLOURS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Named once, per the house rule -- so the margin block can be recoloured here
+% rather than in five places below.
+\colorlet{ProblemMetaColor}{Black!60}
+\colorlet{ProblemMetaAlert}{Red}
+\colorlet{ProblemMetaFaint}{Gray}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% KEYS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Each key just stores into a macro. Defaults are empty, so an omitted key is
+% not an error.
+\newcommand{\PM@topics}{}
+\newcommand{\PM@tags}{}
+\newcommand{\PM@difficulty}{}
+\newcommand{\PM@source}{}
+\newcommand{\PM@id}{}
+
+\define@key{ProblemMeta}{topics}    {\renewcommand{\PM@topics}{#1}}
+\define@key{ProblemMeta}{tags}      {\renewcommand{\PM@tags}{#1}}
+\define@key{ProblemMeta}{difficulty}{\renewcommand{\PM@difficulty}{#1}}
+\define@key{ProblemMeta}{source}    {\renewcommand{\PM@source}{#1}}
+\define@key{ProblemMeta}{id}        {\renewcommand{\PM@id}{#1}}
+
+% Cleared before every block. Without this, a file that omits `source' would
+% silently inherit the previous problem's source when several are imported into
+% one document -- a wrong answer rather than an error, which is the worst kind.
+\newcommand{\PM@reset}{%
+  \renewcommand{\PM@topics}{}%
+  \renewcommand{\PM@tags}{}%
+  \renewcommand{\PM@difficulty}{}%
+  \renewcommand{\PM@source}{}%
+  \renewcommand{\PM@id}{}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DISPLAY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newif\ifproblemmeta
+\ifdefined\ShowProblemMeta \problemmetatrue \fi
+
+% One labelled line, skipped entirely when its value is empty.
+\newcommand{\PM@line}[2]{%
+  \ifdefempty{#2}{}{{\bfseries #1}\nobreakspace #2\par}%
+}
+
+\newcommand{\ProblemMeta}[1]{%
+  \PM@reset
+  \setkeys{ProblemMeta}{#1}%
+  \ifproblemmeta
+    \marginpar{%
+      \footnotesize\ttfamily\raggedright
+      \color{ProblemMetaColor}%
+      \PM@line{topics}{\PM@topics}%
+      \PM@line{tags}{\PM@tags}%
+      {\color{ProblemMetaAlert}\PM@line{difficulty}{\PM@difficulty}}%
+      \PM@line{source}{\PM@source}%
+      {\color{ProblemMetaFaint}\PM@line{id}{\PM@id}}%
+    }%
+  \fi
+  \ignorespaces
+}
