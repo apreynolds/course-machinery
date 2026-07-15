@@ -1,5 +1,9 @@
 \ProvidesClass{CourseDocument}[2026/07/10]
 
+% Options must reach xcolor before any other package loads it.
+\PassOptionsToPackage{dvipsnames}{xcolor}
+\ProcessOptions\relax
+
 \LoadClass{article}
 
 \RequirePackage{import}
@@ -8,6 +12,67 @@
 % [osf] -- prose-heavy documents get old-style figures in body text.
 % Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
 \RequirePackage[osf]{Typefaces}
+\RequirePackage{Titling}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COLOURS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 10x3 wrote `Black!20!OliveGreen' inline in four places (title, three headings,
+% hyperref linkcolor), so the identity colour could not be changed in one place.
+% Named once here instead.
+\RequirePackage{xcolor}
+\colorlet{CourseIdentity}{OliveGreen}
+\colorlet{HeadingColor}{Black!20!CourseIdentity}
+\colorlet{TitleColour}{Black!40!CourseIdentity}
+
+% Titling hooks: this is the class that colours, and the one that stamps a time.
+\renewcommand{\TitleColor}{\color{TitleColour}}
+\renewcommand{\TitleStamp}{\space at \DTMcurrenttime}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SECTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% usage: \titleformat{command}[shape]{format}{label}{sep}{before-code}[after-code]
+% usage: \titlespacing*{command}{left}{before-sep}{after-sep}[right-sep]
+\RequirePackage{titlesec}
+\setcounter{secnumdepth}{3}
+
+\titleformat{\section}[block]
+  {\LARGE\sffamily\bfseries\color{HeadingColor}}{\thesection.}{0.3em}{}
+\titlespacing*{\section}
+  {0pt}{6ex plus 1ex minus .2ex}{3ex plus .2ex}
+
+\titleformat{\subsection}[block]
+  {\Large\sffamily\bfseries\color{HeadingColor}}{\thesubsection}{0.5em}{}
+\titlespacing*{\subsection}
+  {0pt}{4.5ex plus 1ex minus .2ex}{2ex plus .2ex}
+
+\titleformat{\subsubsection}[block]
+  {\sffamily\bfseries\itshape\color{HeadingColor}}{\thesubsubsection}{0.5em}{}
+\titlespacing*{\subsubsection} % 10x3 said \subsection here -- copy-paste bug, so
+  {0pt}{4.5ex plus 1ex minus .2ex}{2ex plus .2ex} % subsubsec spacing never applied
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HEADERS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Two named styles, neither activated -- deliberate, matching 10x3. \maketitle
+% runs before the document picks a style, so the title page stays on `plain';
+% defaulting to `myfancy' here would put a running head on it. Documents do:
+%   \maketitle  \pagestyle{toc}  \tableofcontents  \newpage  \pagestyle{myfancy}
+\RequirePackage{fancyhdr}
+
+\fancypagestyle{myfancy}{%
+  \renewcommand{\headrulewidth}{0.4pt}%
+  \fancyhf{}%
+  \fancyhead[R]{{\scshape\nouppercase{\leftmark}}}%
+  \fancyfoot[C]{\thepage}%
+}
+
+\fancypagestyle{toc}{%
+  \renewcommand{\headrulewidth}{0pt}%
+  \fancyhf{}%
+  \fancyfoot[C]{\thepage}%
+}
 
 % TEMPORARY, testing purposes only
 \usepackage[english]{babel}
