@@ -30,6 +30,18 @@
 \renewcommand{\TitleStamp}{\space at \DTMcurrenttime}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PARAGRAPHS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Blank line between paragraphs instead of an indent -- one paragraph-boundary
+% signal, not two. Default skip (.5\baselineskip plus 2pt).
+%
+% Loaded BEFORE titlesec, as 10x3 did. parskip patches LaTeX's \@startsection at
+% load time and titlesec's own machinery at \AtBeginDocument, so it compensates
+% for the \parskip that would otherwise double up after every heading. Those
+% patches fail SILENTLY (a \typeout, not a warning) -- see NOTE.md "Paragraphs".
+\RequirePackage{parskip}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SECTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % usage: \titleformat{command}[shape]{format}{label}{sep}{before-code}[after-code]

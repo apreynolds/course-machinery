@@ -16,6 +16,19 @@
 % -INSTRUCTOR view's "Instructor Copy" flag will hang.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PARAGRAPHS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% skip=1em, deliberately airier than parskip's default (.5\baselineskip plus 2pt)
+% -- 10x3 chose this for lectures alone. Reads as a pedagogical call (room to
+% annotate, legible at a distance), not a typographic one; it is also the trade
+% against the display-math argument, since parskip weakens the
+% continuation-vs-new-paragraph cue after a display. Keep knowingly.
+%
+% Loaded BEFORE titlesec, as 10x3 did. See CourseDocument.cls / NOTE.md
+% "Paragraphs" on the silent-patch hazard.
+\RequirePackage[skip=1em]{parskip}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SECTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % usage: \titleformat{command}[shape]{format}{label}{sep}{before-code}[after-code]

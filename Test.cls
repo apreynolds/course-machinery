@@ -9,6 +9,11 @@
 % Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
 \RequirePackage{Typefaces}
 
+% Blank line between paragraphs instead of an indent. Default skip; assessments
+% are structured questions rather than continuous prose, so the indent signal
+% has little to do here. No Titling -- an assessment opens with a NAME/ID box.
+\RequirePackage{parskip}
+
 % --- solutions view toggle --------------------------------------------------
 % Off by default (the student build). build-pdfs turns it on for the -SOLUTIONS
 % twin by injecting  \def\ShowSolutions{}  on the command line before the
