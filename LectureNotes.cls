@@ -9,6 +9,10 @@
 \newif\ifProjector
 \DeclareOption{projector}{\Projectortrue}
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{extarticle}}
+
+% Options must reach xcolor before any other package loads it (Hyperlinks needs
+% the dvipsnames names for link colours).
+\PassOptionsToPackage{dvipsnames}{xcolor}
 \ProcessOptions\relax
 
 % Same shape as Test.cls's \ShowSolutions: build-pdfs' view loop can inject
@@ -31,6 +35,11 @@
 % after \LoadClass, and the geometry below must come after it).
 \RequirePackage{Typefaces}
 \RequirePackage{Titling}
+\RequirePackage{Hyperlinks}
+
+% No \TitleColor override: lecture headings stay black. Colour is for course
+% documents only -- lectures sit with assessments on the "clear, not fancy" side.
+% \LinkColor/\UrlColor likewise keep Hyperlinks' plain defaults (black/RoyalBlue).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GEOMETRY
@@ -128,11 +137,25 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Lectures want no running head at all -- just a page number, and not even that
 % on the projector copy: it is scrolled on screen and never collated, so a page
-% number is noise. \fancyhf{} clears every field; only the handout puts one back.
+% number is noise. \fancyhf{} clears every field; each view puts back only what
+% it wants.
 \RequirePackage{fancyhdr}
 \renewcommand{\headrulewidth}{0pt}
 \fancyhf{}
-\ifProjector\else
+
+\ifProjector
+  % Back-to-top arrow, bottom right of every page. The projector copy is scrolled
+  % rather than paged, so a way back to the top earns its keep -- and grey keeps
+  % it from competing with the content when projected.
+  %
+  % The FOOTER is the whole trick. songsheets' equivalent (MyLeadsheets.sty's
+  % \MyLStochint) emits into the text body, so it needs \pagegoal/\pagetotal
+  % arithmetic and a fit test to avoid forcing an extra page -- and a full page
+  % silently gets no link. A footer is reserved space: every page, no arithmetic,
+  % cannot overflow.
+  \definecolor{TopLinkGray}{gray}{0.5}
+  \fancyfoot[R]{\BackToTopLink{\textcolor{TopLinkGray}{\large$\uparrow$}}}
+\else
   \fancyfoot[C]{\small\thepage}
 \fi
 \pagestyle{fancy}
