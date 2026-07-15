@@ -22,6 +22,7 @@
 % after \LoadClass, and the geometry below must come after it).
 \RequirePackage[osf]{Typefaces}
 \RequirePackage{Titling}
+\RequirePackage{Hyperlinks}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GEOMETRY
@@ -60,6 +61,11 @@
 % Titling hooks: this is the class that colours, and the one that stamps a time.
 \renewcommand{\TitleColor}{\color{TitleColour}}
 \renewcommand{\TitleStamp}{\space at \DTMcurrenttime}
+
+% Hyperlinks hooks: internal links pick up the identity colour, as 10x3 had it
+% (it wrote Black!20!OliveGreen inline here too -- same four-places problem).
+\renewcommand{\LinkColor}{HeadingColor}
+\renewcommand{\UrlColor}{Black!20!RoyalBlue}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PARAGRAPHS
