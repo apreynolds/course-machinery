@@ -126,11 +126,15 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HEADERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Lectures want no running head at all -- just a page number.
+% Lectures want no running head at all -- just a page number, and not even that
+% on the projector copy: it is scrolled on screen and never collated, so a page
+% number is noise. \fancyhf{} clears every field; only the handout puts one back.
 \RequirePackage{fancyhdr}
 \renewcommand{\headrulewidth}{0pt}
 \fancyhf{}
-\fancyfoot[C]{\small\thepage}
+\ifProjector\else
+  \fancyfoot[C]{\small\thepage}
+\fi
 \pagestyle{fancy}
 
 % TEMPORARY, testing purposes only
