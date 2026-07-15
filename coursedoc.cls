@@ -4,7 +4,10 @@
 
 \RequirePackage{import}
 \RequirePackage{graphicx}
-\RequirePackage{amsmath}
+
+% [osf] -- prose-heavy documents get old-style figures in body text.
+% Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
+\RequirePackage[osf]{Typefaces}
 
 % TEMPORARY, testing purposes only
 \usepackage[english]{babel}

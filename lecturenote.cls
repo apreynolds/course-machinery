@@ -4,7 +4,10 @@
 
 \RequirePackage{import}
 \RequirePackage{graphicx}
-\RequirePackage{amsmath}
+
+% No [osf] -- figures here are information; keep them lining.
+% Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
+\RequirePackage{Typefaces}
 
 % TEMPORARY, testing purposes only
 \usepackage[english]{babel}

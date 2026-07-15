@@ -4,7 +4,10 @@
 
 \RequirePackage{import}
 \RequirePackage{graphicx}
-\RequirePackage{amsmath}
+
+% No [osf] -- assessments must read clearly and standardly; figures stay lining.
+% Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
+\RequirePackage{Typefaces}
 
 % --- solutions view toggle --------------------------------------------------
 % Off by default (the student build). build-pdfs turns it on for the -SOLUTIONS
