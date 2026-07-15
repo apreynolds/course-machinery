@@ -1,14 +1,54 @@
 \ProvidesClass{LectureNotes}[2026/07/10]
 
-\LoadClass{article} % TODO: extarticle + 14/17pt -- the parked layout conversation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% [projector] -- the copy shown in the room: bigger type, tighter top margin.
+% Default is the handout (students, pre-class). The option is named for the
+% -PROJECTOR view so the class option and the built file agree.
+\newif\ifProjector
+\DeclareOption{projector}{\Projectortrue}
+\DeclareOption*{\PassOptionsToClass{\CurrentOption}{extarticle}}
+\ProcessOptions\relax
+
+% Same shape as Test.cls's \ShowSolutions: build-pdfs' view loop can inject
+% \def\ProjectorView{} before \documentclass is read, so the view needs no class
+% option at the call site. (Build arms still unwired -- see NOTE.md.)
+\ifdefined\ProjectorView \Projectortrue \fi
+
+\ifProjector
+  \LoadClass[17pt]{extarticle}
+\else
+  \LoadClass[14pt]{extarticle}
+\fi
 
 \RequirePackage{import}
 \RequirePackage{graphicx}
 
 % No [osf] -- figures here are information; keep them lining.
-% Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
+% Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs,
+% and defines \alphabet (measured in the real body font -- so it must come
+% after \LoadClass, and the geometry below must come after it).
 \RequirePackage{Typefaces}
 \RequirePackage{Titling}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GEOMETRY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% textwidth follows the measure rule rather than a frozen length; see Typefaces.
+% At 14pt this gives ~6.31in (the inherited hardcode was 6.382in, derived for a
+% font we no longer use); at 17pt it re-derives on its own.
+\RequirePackage{geometry}
+\geometry{letterpaper}
+\ifProjector
+  % Room copy: no marginpar, top margin tightened to buy vertical space.
+  \geometry{top=0.25in, bottom=0.75in, textwidth=2.6\alphabet}
+\else
+  % Handout: left margin fixed, remainder falls to the right and carries the
+  % marginpar column.
+  \geometry{top=0.5in, bottom=0.75in, left=0.5in,
+            textwidth=2.6\alphabet, marginparwidth=1.3in}
+\fi
 
 % No \TitleColor override: lecture headings stay black. Colour is for course
 % documents only -- lectures sit with assessments on the "clear, not fancy" side.
