@@ -5,3 +5,7 @@
 \RequirePackage{import}
 \RequirePackage{graphicx}
 \RequirePackage{amsmath}
+
+% TEMPORARY, testing purposes only
+\usepackage[english]{babel}
+\usepackage[math]{blindtext}
