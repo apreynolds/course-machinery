@@ -1,0 +1,118 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{Typefaces}[2026/07/15 Shared typeface stack for course documents]
+
+% The Libertinus stack. Every course class loads this and nothing else
+% font-related, so the typefaces are chosen once, here.
+%
+% Assembled from two sources that each had half the answer:
+%   5create/latex/fonts/1-libertinus.tex  -- osf body text, sans \course, mathalpha
+%   math10x3 custom-cls-sty/CourseDocument.cls -- sans pinned to lining
+% Neither combined them; the combination is what's below.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% One knob: old-style figures in serif body text.
+%   [osf]   coursedoc  -- prose-heavy (syllabus, TA info); osf belongs here
+%   default lecturenote, test -- figures are information; keep them lining
+\newif\ifTypefaces@osf
+\DeclareOption{osf}{\Typefaces@osftrue}
+\DeclareOption{lining}{\Typefaces@osffalse}
+\ProcessOptions\relax
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PRECONDITIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% In CourseDocument.cls these arrived implicitly, via \RequirePackage[most]{tcolorbox}
+% sitting above the font block. Nothing here may rely on that accident.
+\RequirePackage{amsmath}   % must precede amsthm, which newtxmath's `amsthm' option loads below
+\RequirePackage{etoolbox}  % \AtBeginEnvironment, used under FIGURES
+
+\RequirePackage[T1]{fontenc}
+
+\let\CheckCommand\providecommand % silences a microtype warning: https://tex.stackexchange.com/q/511711
+\RequirePackage[tracking=true]{microtype}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TYPEFACE SELECTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SERIF:
+\RequirePackage[
+  semibold,
+  lining,  % the DEFAULT figure style; [osf] flips body text below, after the math font
+  serif,   % prevents loading sans serif (biolinum)
+  tt=false % prevents loading mono
+]{libertinus}
+
+% SANS:
+% `sflining' is deliberate and NOT tied to the [osf] option: it is the sole
+% control of sans figures, and \course renders in sans. See FIGURES below.
+\RequirePackage[
+  sf, sflining, scaled=0.85 % roughly halfway between matching lowercase x (0.8) and uppercase X (0.9)
+]{merriweather}
+
+% TELETYPE:
+\RequirePackage[
+  scale=0.96
+]{newtxtt}
+
+% MATH:
+% `libertinus' switches newtxmath off its own Times-like glyphs to ones matching
+% the serif above (newtxmath.sty:221). `amsthm' makes newtxmath \RequirePackage
+% amsthm itself, at the one point in its load where the order is right
+% (newtxmath.sty:285) -- so classes must NOT load amsthm themselves.
+\RequirePackage[
+  libertinus, libaltvw, liby,
+  amsthm,
+  nosymbolsc, cmbraces, smallerops, timesmathacc, upint,
+  scaled=1.0
+]{newtxmath}
+
+% Fancier math alphabets: \mathcal, \mathscr, \mathfrak, \mathbb.
+% `mathalpha' is the current name for what used to be `mathalfa' -- same package,
+% renamed by its author; the old 10x3 classes load it under the legacy name.
+% stixtwoplain/stixtwofancy keep \mathcal and \mathscr visually distinct.
+\RequirePackage[
+  scr=stixtwofancy, scrscaled=1.02,
+  cal=stixtwoplain, calscaled=1.02,
+  frak=stixtwo,     frakscaled=1.05,
+  bb=ams
+]{mathalpha}
+
+\RequirePackage{bm} % after every math font is set up; spacing is better this way
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FIGURES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Figures appear in four places. They look interlinked but each has exactly one
+% independent control, and only the first varies by document type:
+%
+%   serif body prose  -- \useosf, i.e. the [osf] option           <- the only knob
+%   sans (headings, \course) -- merriweather's sflining/sfoldstyle, fixed lining
+%   math              -- newtxmath's `libertinus' option; always tabular lining
+%   tabular           -- the \AtBeginEnvironment hook below; always lining
+%
+% \useosf CANNOT reach the sans: it only renews \sfdefault when libertinus' own
+% sans is loaded (libertinus-type1.sty:204-206), which the `serif' option above
+% prevents. That independence is what keeps \course lining under [osf].
+\ifTypefaces@osf
+  \useosf % serif only; must come after the math font is loaded
+\fi
+
+% Tables want tabular lining figures even when body prose is osf. Harmless when
+% it isn't. Only needs the opening hook -- the switch is local to the group, so
+% no matching \AtEndEnvironment is required.
+\AtBeginEnvironment{tabular}{\LibertinusSerifTLF}
+
+\renewcommand*{\oldstylenums}[1]{{\LibertinusSerifOsF #1}}
+\newcommand*{\liningnums}[1]{{\LibertinusSerifTLF #1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TYPEFACE-DEPENDENT STUFF
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \course{1013} -> MATH 1013, in sans. The \sffamily is load-bearing, not
+% decorative: it routes the numerals through merriweather, which is pinned to
+% lining, so course numbers stay lining even in an [osf] document.
+\newcommand{\course}[2][MATH]{%
+  {\sffamily #1 #2}%
+}
