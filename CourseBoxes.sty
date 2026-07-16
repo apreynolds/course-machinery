@@ -1,0 +1,125 @@
+\ProvidesPackage{CourseBoxes}[2026/07/16 declared-number theorem boxes + asides]
+
+%%% ===========================================================================
+%%% CourseBoxes -- tcolorbox-styled theorem-like environments in two families:
+%%%
+%%%   TEXT RESULTS (category A) -- things that live in the primary TEXT and carry
+%%%     the number the text gives them. The number is DECLARED (typed), not
+%%%     counted: \begin{theorem}{2.1.3}[Power Rule]. \label/\ref work, but no
+%%%     LaTeX counter is involved, so the machinery is numbering-scheme-agnostic
+%%%     -- a shared-counter text, a separate-counter text, and a skip-heavy text
+%%%     all just work, because nothing here counts. (See NOTE.md item 5.)
+%%%
+%%%   ASIDES (category B) -- MY pedagogical interjections (Key Idea, Tip,
+%%%     Caution). Unnumbered, and deliberately NOT \label-able: references point
+%%%     at the primary text, not at my notes. A stray \label fails LOUD (prints
+%%%     "[unlabelled aside]") rather than silently grabbing the section number.
+%%%
+%%% This file ships the FACTORY plus a UNIVERSAL default vocabulary. Text-specific
+%%% names (Key Idea, Axiom, ...) are declared per-course in a small course-vocab
+%%% file \input from the master's preamble -- NOT here (this is the shared
+%%% submodule; a single text's vocabulary is not shared).
+%%%
+%%% CONTRACT (load order):
+%%%   - amsthm must ALREADY be loaded. In our classes newtxmath's [amsthm] option
+%%%     owns that (via Typefaces), so REQUIRE CourseBoxes AFTER Typefaces and do
+%%%     NOT let it pull amsthm in (that would refight the load-order fixed in
+%%%     "Fonts").
+%%%   - hyperref must be loaded by the time a box is USED (for \phantomsection).
+%%%     Hyperlinks.sty defers it to \AtEndPreamble, which is in time -- the boxes
+%%%     are only ever used in the body.
+%%% ===========================================================================
+
+\RequirePackage[most]{tcolorbox}     % \tcolorboxenvironment, enhanced, breakable
+
+%%% --- Colours (named once; house rule). Harvested from 10x3. -----------------
+%%% "named" needs dvipsnames, which the class passes to xcolor before it loads.
+\definecolor{ThmColor}{named}{Gray}        % text results: understated grey rule
+\definecolor{NoteColor}{named}{RoyalBlue}  % asides: Key Idea / Tip
+\definecolor{CautionColor}{named}{Red}     % asides: Caution
+
+%%% --- tcolorbox styles (named once; the extension point). --------------------
+%%% A course-vocab file references these by name, so restyling every Theorem in
+%%% the course is a one-line edit here.
+\tcbset{
+  cb/textresult/.style={          % category A: thin grey L-rule, textbook-quiet
+    enhanced, breakable, frame hidden, colback=white,
+    sharp corners, top=6pt, left=8pt, right=8pt,
+    borderline west ={0.5pt}{0pt}{ThmColor},
+    borderline north={0.5pt}{0pt}{ThmColor},
+  },
+  cb/note/.style={                % category B: solid blue box (Key Idea / Tip)
+    enhanced, breakable, colback=NoteColor!4, colframe=NoteColor,
+    sharp corners, boxrule=2pt,
+  },
+  cb/caution/.style={             % category B: solid red box (Caution)
+    enhanced, breakable, colback=CautionColor!4, colframe=CautionColor,
+    sharp corners, boxrule=2pt,
+  },
+}
+
+%%% --- amsthm head styles (the DECLARED trick). -------------------------------
+%%% Head spec {\thmname{#1}\thmnote{ #3}} omits the number slot (#2) entirely --
+%%% there is no counter to print -- and renders the note bare (no parens). The
+%%% wrapper puts "num (name)" in the note. Two variants differ ONLY in body font:
+%%% cbthm = italic (theorems/props/lemmas/corollaries), cbdefn = upright
+%%% (definitions/examples/remarks). cbaside = the unnumbered aside head.
+\newtheoremstyle{cbthm}
+  {\topsep}{\topsep}{\itshape}{}{\bfseries}{.}
+  {5pt plus 1pt minus 1pt}{\thmname{#1}\thmnote{ #3}}
+\newtheoremstyle{cbdefn}
+  {\topsep}{\topsep}{}{}{\bfseries}{.}
+  {5pt plus 1pt minus 1pt}{\thmname{#1}\thmnote{ #3}}
+\newtheoremstyle{cbaside}
+  {\topsep}{\topsep}{}{}{\sffamily\bfseries}{.}
+  {.5em}{\thmname{#1}}
+
+%%% --- The factories ----------------------------------------------------------
+%%% \NewTextResult[amsthm-style]{env}{Display Name}{tcb style}
+%%%   Default style is cbdefn (upright); pass [cbthm] for an italic-bodied result.
+%%%   Call site: \begin{env}{number}[optional name].
+%%%
+%%% Mechanics (verified in numbering-tcolorbox-MWE.tex): \phantomsection and the
+%%% \@currentlabel assignment run in the BEGIN CODE, before \begin{cb@env}, i.e.
+%%% OUTSIDE the tcolorbox -- which is exactly why layout (tcolorbox) and mechanics
+%%% (the label) do not interfere.
+\NewDocumentCommand{\NewTextResult}{O{cbdefn} m m m}{%
+  \theoremstyle{#1}%
+  \newtheorem*{cb@#2}{#3}%                 % base: starred = no counter
+  \tcolorboxenvironment{cb@#2}{#4}%        % box the base
+  \NewDocumentEnvironment{#2}{m o}{%
+    \phantomsection
+    \protected@edef\@currentlabel{##1}%    % \label will record the typed number
+    \IfValueTF{##2}{\begin{cb@#2}[##1 (##2)]}{\begin{cb@#2}[##1]}%
+  }{%
+    \end{cb@#2}%
+  }%
+}
+
+%%% \NewAside{env}{Display Name}{tcb style}
+%%%   Unnumbered. The sentinel \@currentlabel makes a stray \label print
+%%%   "[unlabelled aside]" -- loud, not the silent section-number leak.
+\NewDocumentCommand{\NewAside}{m m m}{%
+  \theoremstyle{cbaside}%
+  \newtheorem*{cb@#1}{#2}%
+  \tcolorboxenvironment{cb@#1}{#3}%
+  \NewDocumentEnvironment{#1}{}{%
+    \protected@edef\@currentlabel{[unlabelled aside]}%
+    \begin{cb@#1}%
+  }{%
+    \end{cb@#1}%
+  }%
+}
+
+%%% --- Universal default vocabulary -------------------------------------------
+%%% Present in every text; not course-specific, so it ships here. A course adds
+%%% only its text-specific extras in course-vocab (Key Idea, Axiom, ...).
+\NewTextResult[cbthm]{theorem}    {Theorem}    {cb/textresult}
+\NewTextResult[cbthm]{proposition}{Proposition}{cb/textresult}
+\NewTextResult[cbthm]{lemma}      {Lemma}      {cb/textresult}
+\NewTextResult[cbthm]{corollary}  {Corollary}  {cb/textresult}
+\NewTextResult      {definition} {Definition} {cb/textresult}
+\NewTextResult      {example}    {Example}    {cb/textresult}
+\NewTextResult      {remark}     {Remark}     {cb/textresult}
+
+\endinput
