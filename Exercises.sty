@@ -1,0 +1,134 @@
+\ProvidesPackage{Exercises}[2026/07/16 problem/solution environments + the solutions toggle]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% WHAT THIS IS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The roll-your-own exercise system -- the homegrown answer to NOTE.md item 4,
+% built instead of resurrecting xsim. It provides:
+%
+%   \begin{problem} ... \end{problem}     numbered, cross-referenceable
+%   \begin{solution} ... \end{solution}   printed only in the solutions build
+%   \importproblem[POINTS]{DIR}{FILE}      \import a problem, points set HERE
+%
+% plus the \ifsolutions toggle that drives the solution environment. Deliberately
+% small: a counter, two environments, one conditional, one import wrapper -- all
+% LaTeX primitives, none of xsim's expensive machinery. See NOTE.md item 4 for
+% why that boundary is safe.
+%
+% SELF-CONTAINED ON PURPOSE. This is the ESSENTIAL package -- problem sets with
+% optionally-printed solutions, the thing the course cannot be taught without.
+% It does NOT depend on ProblemMeta.sty (the tagging, which is nice-to-have): if
+% ProblemMeta broke or were removed, everything here still works. The class loads
+% the two separately. As a final safety, the \AtBeginDocument stub below lets a
+% problem file that still contains a \ProblemMeta{...} block compile even when
+% ProblemMeta is absent -- the block is silently swallowed.
+%
+% VOCABULARY NOTE: the package is "Exercises" (NOTE.md's name for the system),
+% but the author-facing environment is \begin{problem} -- the word the content
+% already uses and the one Patrick is accustomed to. The mismatch is intentional.
+
+\RequirePackage{environ}       % \NewEnviron: capture a body to conditionally emit
+\RequirePackage{etoolbox}      % \ifdefempty
+\RequirePackage{import}        % \import, wrapped by \importproblem
+
+% Own the colour dependency rather than borrowing ProblemMeta's -- this package
+% must stand alone. dvipsnames for the named colour below; consistent with the
+% option ProblemMeta and the classes pass, so no clash.
+\PassOptionsToPackage{dvipsnames}{xcolor}
+\RequirePackage{xcolor}
+
+% If ProblemMeta is not loaded, make \ProblemMeta a no-op that swallows its
+% argument, so problem files carrying a metadata block still compile. Deferred to
+% \AtBeginDocument so it is order-independent: if ProblemMeta IS loaded (before or
+% after this package), its real definition already exists and \providecommand
+% does nothing; problem files are only read in the body, so the stub is in place
+% in time either way.
+\AtBeginDocument{\providecommand{\ProblemMeta}[1]{}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SOLUTIONS TOGGLE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Off by default (the student build). build-pdfs injects \def\ShowSolutions{} on
+% the command line for the -SOLUTIONS twin (see its `%! views: solutions').
+%
+% This lived in Test.cls as scaffolding. Moved here so it is SHARED: a problem
+% file that carries its own \begin{solution} can now be \import-ed into a LECTURE
+% (LectureNotes) as well as a test, which it could not when only Test.cls knew
+% the machinery. That was NOTE.md item 4's open gap; this closes it.
+\newif\ifsolutions
+\ifdefined\ShowSolutions \solutionstrue \fi
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% POINTS (set at import time, NOT in the problem file)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% A problem has no intrinsic point value -- it is worth 5 on one assessment, 7 on
+% another. So points are EXTRINSIC: specified where the problem is imported, not
+% stored with it. (Contrast ProblemMeta's tags/difficulty, which ARE intrinsic
+% and live in the file.) \importproblem stashes the value; the problem
+% environment prints it and clears it, so it attaches to exactly one problem and
+% never leaks to the next.
+\newcommand{\CurrentProblemPoints}{}
+
+% How the points render next to the heading. Stylable in one place; the eventual
+% target is the quarry's margin \fbox, but an inline marker is enough for now.
+% (Singular/plural -- "1 points" -- is left as a later polish, as the quarry did
+% via translations.)
+\newcommand{\ProblemPointsFormat}[1]{\quad\textnormal{\normalfont(#1\ points)}}
+
+% \importproblem[POINTS]{DIR}{FILE} -- \import with a point value attached here.
+% Bare \import still works and yields no marker (e.g. a lecture, ungraded). The
+% trailing reset is a safety net for the odd file that sets no problem to consume
+% the value; normally the environment below has already cleared it.
+\newcommand{\importproblem}[3][]{%
+  \gdef\CurrentProblemPoints{#1}%
+  \import{#2}{#3}%
+  \gdef\CurrentProblemPoints{}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PROBLEM
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% A run-in bold heading "Problem N." then the body, matching the content's
+% existing \textbf{Problem.} style but numbered, with the import-time points (if
+% any) after it. \refstepcounter (not \stepcounter) so \label inside a problem
+% points at the problem: \ref gives its number.
+%
+% The counter is flat and document-wide: each import of a problem file steps it,
+% so a set of five imported problems numbers 1..5. To restart numbering per
+% section, a document can \counterwithin{problem}{section}; to reset equation
+% numbers per problem, \counterwithin{equation}{problem} -- neither is imposed
+% here (they surprise as often as they help).
+%
+% The end code clears the points globally (\gdef): \import does not group its
+% contents, but clearing globally is robust regardless and enforces consume-once.
+\newcounter{problem}
+
+\newenvironment{problem}{%
+  \par\refstepcounter{problem}%
+  \noindent\textbf{Problem \theproblem.}%
+  \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
+  \quad\ignorespaces
+}{\par\gdef\CurrentProblemPoints{}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SOLUTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ForestGreen is a dvipsnames colour. Green reads as "answer" and stays clear of
+% the OliveGreen course identity used for headings. Named once here so it can be
+% retuned in one place.
+\colorlet{SolutionColor}{ForestGreen}
+
+% \NewEnviron captures the whole body as \BODY. When solutions are OFF we simply
+% never emit \BODY -- the clean way to drop an environment's contents, and the
+% same pattern IfThenBoxes.sty already uses for its solution-only boxes. A plain
+% \newenvironment with \ifsolutions...\fi wrapped around the delimiters is
+% fragile (the body is still scanned, and the \fi lands in the wrong group); this
+% is not.
+\NewEnviron{solution}{%
+  \ifsolutions
+    \par\smallskip
+    \noindent{\bfseries\color{SolutionColor}Solution.}\quad\ignorespaces
+    \BODY
+    \par
+  \fi
+}
