@@ -45,6 +45,12 @@
 \RequirePackage{Titling}
 \RequirePackage{Hyperlinks}
 
+% Theorem/definition boxes + pedagogical asides. AFTER Typefaces: it pulls in
+% tcolorbox (which would drag amsmath in) but amsthm/amsmath are already loaded by
+% newtxmath, so the load-order fixed in "Fonts" holds. Requires hyperref (for
+% \phantomsection) only at box-use time, which Hyperlinks' \AtEndPreamble supplies.
+\RequirePackage{CourseBoxes}
+
 % No \TitleColor override: lecture headings stay black. Colour is for course
 % documents only -- lectures sit with assessments on the "clear, not fancy" side.
 % \LinkColor/\UrlColor likewise keep Hyperlinks' plain defaults (black/RoyalBlue).
