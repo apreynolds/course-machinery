@@ -29,8 +29,12 @@
 \RequirePackage{import}
 \RequirePackage{graphicx}
 
-% Problem files carry a \ProblemMeta{...} block, so every class that imports one
-% has to define it. Prints nothing unless \ShowProblemMeta is defined.
+% The exercise system. Two independent packages, essential first:
+%   Exercises  -- \begin{problem}/\begin{solution} + the solutions toggle. A
+%                 lecture imports problem files too, and they may carry solutions.
+%   ProblemMeta -- greppable topic/tag metadata. Nice-to-have; removable on its
+%                 own (Exercises no longer depends on it) without breaking builds.
+\RequirePackage{Exercises}
 \RequirePackage{ProblemMeta}
 
 % No [osf] -- figures here are information; keep them lining.
