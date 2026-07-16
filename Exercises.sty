@@ -9,6 +9,7 @@
 %   \begin{problem} ... \end{problem}     numbered, cross-referenceable
 %   \begin{solution} ... \end{solution}   printed only in the solutions build
 %   \importproblem[POINTS]{DIR}{FILE}      \import a problem, points set HERE
+%   \printtotalpoints                      the summed points of the assessment
 %
 % plus the \ifsolutions toggle that drives the solution environment. Deliberately
 % small: a counter, two environments, one conditional, one import wrapper -- all
@@ -30,6 +31,7 @@
 \RequirePackage{environ}       % \NewEnviron: capture a body to conditionally emit
 \RequirePackage{etoolbox}      % \ifdefempty
 \RequirePackage{import}        % \import, wrapped by \importproblem
+\RequirePackage{totcount}      % \newtotcounter/\total: two-pass sum for \printtotalpoints
 
 % Own the colour dependency rather than borrowing ProblemMeta's -- this package
 % must stand alone. dvipsnames for the named colour below; consistent with the
@@ -71,9 +73,19 @@
 
 % How the points render next to the heading. Stylable in one place; the eventual
 % target is the quarry's margin \fbox, but an inline marker is enough for now.
-% (Singular/plural -- "1 points" -- is left as a later polish, as the quarry did
-% via translations.)
-\newcommand{\ProblemPointsFormat}[1]{\quad\textnormal{\normalfont(#1\ points)}}
+% \ifnum picks "point" vs "points" -- which is also why points must be an INTEGER
+% (see \importproblem): \ifnum and the \addtocounter into the total both need one.
+\newcommand{\ProblemPointsFormat}[1]{%
+  \quad\textnormal{\normalfont(#1\ \ifnum#1=1 point\else points\fi)}}
+
+% The assessment total. \newtotcounter registers a normal counter that totcount
+% writes to the .aux at end-of-document; \total reads back the PREVIOUS run's
+% final value, so \printtotalpoints is correct even at the TOP of the page (the
+% usual "worth N points" line). First compile shows "??" and warns "Rerun ...";
+% the aux changes, so latexmk reruns on its own. The counter is fed in the
+% problem environment below, not here, so it counts problems that actually print.
+\newtotcounter{totalpoints}
+\newcommand{\printtotalpoints}{\total{totalpoints}}
 
 % \importproblem[POINTS]{DIR}{FILE} -- \import with a point value attached here.
 % Bare \import still works and yields no marker (e.g. a lecture, ungraded). The
@@ -103,10 +115,17 @@
 % contents, but clearing globally is robust regardless and enforces consume-once.
 \newcounter{problem}
 
+% The points guard does double duty: when a value is present it both adds it to
+% the running total (\addtocounter is global, so it survives \import's grouping
+% and each problem contributes once) and prints the marker. A file that declares
+% no points contributes 0 and shows nothing.
 \newenvironment{problem}{%
   \par\refstepcounter{problem}%
   \noindent\textbf{Problem \theproblem.}%
-  \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
+  \ifdefempty{\CurrentProblemPoints}{}{%
+    \addtocounter{totalpoints}{\CurrentProblemPoints}%
+    \ProblemPointsFormat{\CurrentProblemPoints}%
+  }%
   \quad\ignorespaces
 }{\par\gdef\CurrentProblemPoints{}}
 
