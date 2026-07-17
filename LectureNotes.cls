@@ -51,11 +51,11 @@
 % \phantomsection) only at box-use time, which Hyperlinks' \AtEndPreamble supplies.
 \RequirePackage{CourseBoxes}
 
-% Instructor-only annotation layer (\InstructorNote / InstructorComment /
-% \MarginComment) + the \ifinstructornotes flag the "Instructor Copy" marker below
-% rides on. AFTER Typefaces (it pulls in tcolorbox); self-loads tcolorbox, so it
-% does not depend on CourseBoxes' copy.
-\RequirePackage{Annotations}
+% Instructor-only notes layer (\InstructorInline / InstructorBox / \InstructorMargin)
+% + the \ifinstructornotes flag the "Instructor Copy" marker below rides on. AFTER
+% Typefaces (it pulls in tcolorbox); self-loads tcolorbox, so it does not depend on
+% CourseBoxes' copy.
+\RequirePackage{InstructorNotes}
 
 % No \TitleColor override: lecture headings stay black. Colour is for course
 % documents only -- lectures sit with assessments on the "clear, not fancy" side.
@@ -80,10 +80,10 @@
 \fi
 
 % \TitleMarker hangs the -INSTRUCTOR "Instructor Copy" flag. It rides on the SAME
-% \ifinstructornotes layer flag (via \InstructorNote's own gate), so no separate
-% view flag exists: on a student build \InstructorNote expands to nothing and the
+% \ifinstructornotes layer flag (via \InstructorInline's own gate), so no separate
+% view flag exists: on a student build \InstructorInline expands to nothing and the
 % marker is empty; on an instructor build it renders the violet chip.
-\renewcommand{\TitleMarker}{\space\InstructorNote{\normalsize\bfseries Instructor Copy}}
+\renewcommand{\TitleMarker}{\space\InstructorInline{\normalsize\bfseries Instructor Copy}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PARAGRAPHS
