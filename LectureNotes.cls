@@ -79,11 +79,9 @@
             textwidth=2.6\alphabet, marginparwidth=1.3in}
 \fi
 
-% \TitleMarker hangs the -INSTRUCTOR "Instructor Copy" flag. It rides on the SAME
-% \ifinstructornotes layer flag (via \InstructorInline's own gate), so no separate
-% view flag exists: on a student build \InstructorInline expands to nothing and the
-% marker is empty; on an instructor build it renders the violet chip.
-\renewcommand{\TitleMarker}{\space\InstructorInline{\normalsize\bfseries Instructor Copy}}
+% No \TitleMarker override: the instructor-copy signal is now the page-edge frame
+% (InstructorNotes.sty, gated on \ifinstructornotes) -- an ever-present marker on
+% every page rather than a one-time title stamp.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PARAGRAPHS
