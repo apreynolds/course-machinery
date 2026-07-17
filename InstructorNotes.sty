@@ -9,10 +9,10 @@
 %%% (Named InstructorNotes, matching the flag it owns, \ShowInstructorNotes --
 %%% NOT "Annotations", which reads as pencil mark-up of the notes on a tablet.)
 %%%
-%%% Why a shared .sty and not a class macro: \maketitle (Titling.sty) is a caller
-%%% -- it hangs an "Instructor Copy" marker off \InstructorInline -- and Titling is
-%%% shared by LectureNotes + CourseDocument, so these macros cannot live inside a
-%%% single class.
+%%% Why a shared .sty (loaded by LectureNotes + CourseDocument, not a class macro):
+%%% both lectures and course documents carry instructor-only content -- notes-to-self,
+%%% co-teacher asides -- and both want the instructor-copy page frame below. (Test.cls,
+%%% an assessment, has neither yet.)
 %%%
 %%% VIEW MODEL: a "view" is a bundle of content layers. This package owns ONE
 %%% layer, flag \ShowInstructorNotes. The build's `instructor' view injects the
@@ -76,5 +76,30 @@
   \fi
   \ignorespaces
 }
+
+%%% --- "Instructor copy" page frame -------------------------------------------
+%%% A thin violet frame inset from every page edge, with a small bottom-centre
+%%% "Instructor copy" tab sitting on the frame line. This REPLACES a title stamp
+%%% (seen only on page 1) and a diagonal watermark (which fights the content): an
+%%% ever-present, low-distraction marker. Drawn via eso-pic's shipout background
+%%% -- NO tikz, so no remember-picture two-pass -- and loaded ONLY for the
+%%% instructor view, so student builds never pull eso-pic in.
+\ifinstructornotes
+  \RequirePackage{eso-pic}
+  % --- TWEAK HERE: the two knobs for the instructor-copy frame ----------------
+  \newcommand\InstructorFrameInset{2mm}% gap from the page edge to the frame
+  \newcommand\InstructorFrameRule{2mm}%  frame line thickness
+  \AddToShipoutPictureBG{%
+    \put(\LenToUnit{\InstructorFrameInset},\LenToUnit{\InstructorFrameInset}){%
+      \color{InstructorInk}\linethickness{\InstructorFrameRule}%
+      \framebox(\LenToUnit{\dimexpr\paperwidth-\InstructorFrameInset-\InstructorFrameInset\relax},%
+                \LenToUnit{\dimexpr\paperheight-\InstructorFrameInset-\InstructorFrameInset\relax}){}%
+    }%
+    \put(\LenToUnit{.5\paperwidth},\LenToUnit{\InstructorFrameInset}){%
+      \makebox(0,0){\colorbox{white}{%
+        \color{InstructorInk}\sffamily\bfseries\footnotesize\,Instructor copy\,}}%
+    }%
+  }%
+\fi
 
 \endinput
