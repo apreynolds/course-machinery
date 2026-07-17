@@ -53,11 +53,16 @@
 
 %%% --- block note: a slate SIDE-BAR note. No title box, no tt (reserved for
 %%% problem metadata). A wide slate bar sits in the LEFT MARGIN -- drawn by the
-%%% overlay, so the box body keeps text width and aligns with the prose -- with
-%%% "note" rotated 90 inside it. \NewEnviron so the body is DROPPED when off.
-%%% NB the rotated word needs box HEIGHT to sit against: a very short note leaves
-%%% it cramped. Bar width is 6mm (the node xshift is half that); tune to taste.
-\NewEnviron{InstructorBox}{%
+%%% overlay, so the box body keeps text width and aligns with the prose -- with a
+%%% word rotated 90 inside it. \NewEnviron so the body is DROPPED when off.
+%%%   \begin{InstructorBox}          -> the bar reads "note"    (teaching cue)
+%%%   \begin{InstructorBox}[marking] -> the bar reads "marking" (grading guidance)
+%%% Same slate for both: the WORD differentiates, not the colour (slate == staff /
+%%% behind-the-scenes, one meaning). The word is centred on the box height via the
+%%% overlay (which adds no height), so a very SHORT box with a LONG word can spill
+%%% top/bottom -- moot in practice ("marking" notes run a few lines). Bar width 6mm;
+%%% the node xshift is half that.
+\NewEnviron{InstructorBox}[1][note]{%
   \ifinstructornotes
     \begin{tcolorbox}[enhanced, breakable, parbox=false,
       frame hidden, boxrule=0pt, sharp corners,
@@ -67,7 +72,7 @@
         \fill[InstructorInk]
           ([xshift=-6mm]frame.south west) rectangle (frame.north west);
         \node[white, rotate=90, font=\sffamily\bfseries\scriptsize]
-          at ([xshift=-3mm]frame.west) {note};
+          at ([xshift=-3mm]frame.west) {#1};
       }]
       \sffamily\BODY
     \end{tcolorbox}%
