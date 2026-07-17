@@ -154,19 +154,19 @@
 
 %%% --- Shared pedagogical asides (MY voice, consistent course-to-course) -------
 %%% These are the instructor's interjections, not the text's, so they ship here
-%%% (shared) rather than in course-vocab. Each carries a fontawesome glyph in its
-%%% head, which inherits the head colour and is the colour-independent cue.
+%%% (shared) rather than in course-vocab. A fontawesome glyph in the head inherits
+%%% the head colour and is the colour-independent cue -- kept on Caution / Your Turn
+%%% / Prepwork, dropped on Check In and Takeaway.
 \NewAside[cbcaution]{caution} {\faExclamationTriangle\ Caution}{cb/caution}
-\NewAside[cbnote]   {checkin} {\faClipboardCheck\ Check In}    {cb/note}
-\NewAside[cbnote]   {takeaway}{\faKey\ Takeaway}               {cb/note}
+\NewAside[cbnote]   {checkin} {Check In}                       {cb/note}
+\NewAside[cbnote]   {takeaway}{Takeaway}                       {cb/note}
 \NewAside[cbnote]   {yourturn}{\faPenFancy\ Your Turn}         {cb/note}
 \NewAside[cbnote]   {prepwork}{\faBookOpen\ Prepwork}          {cb/note}
 
 %%% Tip -- a shared aside with an OPTIONAL audience tier. \begin{tip} is neutral;
-%%% [surviving] / [thriving] set BOTH the "for the <tier>" suffix AND an expressive
-%%% face -- one switch, both cues. Built by hand (not via \NewAside) because the
-%%% head text varies per call: \cb@tiphead holds icon+word+suffix and is set in the
-%%% begin-code, so amsthm expands it late, at head-render time.
+%%% [surviving] / [thriving] append "for the <tier>" to the head. Built by hand
+%%% (not via \NewAside) because the head text varies per call: \cb@tiphead is set
+%%% in the begin-code, so amsthm expands it late, at head-render time.
 \def\cb@survkey{surviving}
 \def\cb@thrivkey{thriving}
 \providecommand\cb@tiphead{Tip}          % safe default if cb@tip is used bare
@@ -175,10 +175,10 @@
 \tcolorboxenvironment{cb@tip}{cb/tip}
 \NewDocumentEnvironment{tip}{O{}}{%
   \protected@edef\@currentlabel{[unlabelled aside]}%
-  \def\cb@tiphead{\faLightbulb\ Tip}%                       neutral: lightbulb
+  \def\cb@tiphead{Tip}%
   \def\cb@aud{#1}%
-  \ifx\cb@aud\cb@survkey  \def\cb@tiphead{\faSmileBeam\ Tip for the surviving}\fi
-  \ifx\cb@aud\cb@thrivkey \def\cb@tiphead{\faGrinStars\ Tip for the thriving}\fi
+  \ifx\cb@aud\cb@survkey  \def\cb@tiphead{Tip for the surviving}\fi
+  \ifx\cb@aud\cb@thrivkey \def\cb@tiphead{Tip for the thriving}\fi
   \begin{cb@tip}%
 }{%
   \end{cb@tip}%
