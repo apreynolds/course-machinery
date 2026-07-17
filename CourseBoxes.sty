@@ -31,12 +31,20 @@
 %%% ===========================================================================
 
 \RequirePackage[most]{tcolorbox}     % \tcolorboxenvironment, enhanced, breakable
+\RequirePackage{fontawesome5}        % topic glyphs + expressive faces (pdflatex-safe,
+                                     % monochrome, inherit surrounding colour). NOT
+                                     % wasysym: that redefines math symbols newtxmath
+                                     % owns. Colour emoji would need lualatex; we don't.
 
-%%% --- Colours (named once; house rule). Harvested from 10x3. -----------------
+%%% --- Colours (named once; house rule). PROVISIONAL -- the colour-blind-safe
+%%% palette is still an open conversation; these are placeholders so the icons can
+%%% be judged. Red/blue/orange is already the safe backbone; the icons below are
+%%% the colour-independent channel that make the orange-next-to-red pair robust.
 %%% "named" needs dvipsnames, which the class passes to xcolor before it loads.
 \definecolor{ThmColor}{named}{Gray}        % text results: understated grey rule
-\definecolor{NoteColor}{named}{RoyalBlue}  % asides: Key Idea / Tip
-\definecolor{CautionColor}{named}{Red}     % asides: Caution
+\definecolor{NoteColor}{named}{RoyalBlue}  % informational asides (blue family)
+\definecolor{CautionColor}{named}{Red}     % Caution -- the lone alarm colour
+\definecolor{TipColor}{HTML}{E69F00}       % Tips -- Okabe-Ito orange
 
 %%% --- tcolorbox styles (named once; the extension point). --------------------
 %%% A course-vocab file references these by name, so restyling every Theorem in
@@ -54,6 +62,10 @@
   },
   cb/caution/.style={             % category B: solid red box (Caution)
     enhanced, breakable, colback=CautionColor!4, colframe=CautionColor,
+    sharp corners, boxrule=2pt,
+  },
+  cb/tip/.style={                 % category B: solid orange box (Tip tiers)
+    enhanced, breakable, colback=TipColor!6, colframe=TipColor,
     sharp corners, boxrule=2pt,
   },
 }
@@ -86,6 +98,9 @@
   {.5em}{\thmname{#1}\thmnote{ #3}}
 \newtheoremstyle{cbcaution}
   {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{CautionColor}}{.}
+  {.5em}{\thmname{#1}\thmnote{ #3}}
+\newtheoremstyle{cbtip}
+  {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{TipColor}}{.}
   {.5em}{\thmname{#1}\thmnote{ #3}}
 
 %%% --- The factories ----------------------------------------------------------
@@ -136,5 +151,37 @@
 \NewTextResult      {definition} {Definition} {cb/textresult}
 \NewTextResult      {example}    {Example}    {cb/textresult}
 \NewTextResult      {remark}     {Remark}     {cb/textresult}
+
+%%% --- Shared pedagogical asides (MY voice, consistent course-to-course) -------
+%%% These are the instructor's interjections, not the text's, so they ship here
+%%% (shared) rather than in course-vocab. Each carries a fontawesome glyph in its
+%%% head, which inherits the head colour and is the colour-independent cue.
+\NewAside[cbcaution]{caution} {\faExclamationTriangle\ Caution}{cb/caution}
+\NewAside[cbnote]   {checkin} {\faClipboardCheck\ Check In}    {cb/note}
+\NewAside[cbnote]   {takeaway}{\faKey\ Takeaway}               {cb/note}
+\NewAside[cbnote]   {yourturn}{\faPenFancy\ Your Turn}         {cb/note}
+\NewAside[cbnote]   {prepwork}{\faBookOpen\ Prepwork}          {cb/note}
+
+%%% Tip -- a shared aside with an OPTIONAL audience tier. \begin{tip} is neutral;
+%%% [surviving] / [thriving] set BOTH the "for the <tier>" suffix AND an expressive
+%%% face -- one switch, both cues. Built by hand (not via \NewAside) because the
+%%% head text varies per call: \cb@tiphead holds icon+word+suffix and is set in the
+%%% begin-code, so amsthm expands it late, at head-render time.
+\def\cb@survkey{surviving}
+\def\cb@thrivkey{thriving}
+\providecommand\cb@tiphead{Tip}          % safe default if cb@tip is used bare
+\theoremstyle{cbtip}
+\newtheorem*{cb@tip}{\cb@tiphead}
+\tcolorboxenvironment{cb@tip}{cb/tip}
+\NewDocumentEnvironment{tip}{O{}}{%
+  \protected@edef\@currentlabel{[unlabelled aside]}%
+  \def\cb@tiphead{\faLightbulb\ Tip}%                       neutral: lightbulb
+  \def\cb@aud{#1}%
+  \ifx\cb@aud\cb@survkey  \def\cb@tiphead{\faSmileBeam\ Tip for the surviving}\fi
+  \ifx\cb@aud\cb@thrivkey \def\cb@tiphead{\faGrinStars\ Tip for the thriving}\fi
+  \begin{cb@tip}%
+}{%
+  \end{cb@tip}%
+}
 
 \endinput
