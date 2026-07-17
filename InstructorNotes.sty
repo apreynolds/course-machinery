@@ -39,17 +39,15 @@
 %%% but 10.4:1 on white AND carries white text at 10.4:1; !8 is the pale fill.
 \definecolor{InstructorInk}{HTML}{4B2E83}
 
-%%% --- inline note: on-line violet chip, dark-violet text on a pale wash -------
-%%% NB an inline \tcbox does NOT line-break; keep inline notes short (a few words).
-%%% For anything longer, use InstructorBox (block) or \InstructorMargin.
+%%% --- inline note: a WRAPPING violet run-in (no box, so it breaks across lines).
+%%% Prefer InstructorBox / \InstructorMargin in general: a box or a margin note is
+%%% unmistakable at a glance, whereas an inline run-in blends into the prose. Reach
+%%% for inline only for a quick in-flow aside; anything you'll want to FIND again
+%%% belongs in a box or the margin.
+%%% (No \ignorespaces here, unlike the box/margin: this is running text, and eating
+%%% the trailing space would fuse the note into the next word when the layer is on.)
 \newcommand\InstructorInline[1]{%
-  \ifinstructornotes
-    \tcbox[on line, left=1pt, right=1pt, top=1pt, bottom=1pt,
-      boxrule=0.3mm, arc=0mm, outer arc=0mm,
-      colframe=InstructorInk, colback=InstructorInk!8, coltext=InstructorInk]%
-      {\sffamily #1}%
-  \fi
-  \ignorespaces
+  \ifinstructornotes{\sffamily\color{InstructorInk}#1}\fi
 }
 
 %%% --- block note: titled breakable box; white "instructor" on a violet bar,
