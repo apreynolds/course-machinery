@@ -29,10 +29,9 @@
 % only CourseDocument.cls colours anything.
 \providecommand{\TitleColor}{}
 \providecommand{\TitleStamp}{}  % follows the date, e.g. \space at \DTMcurrenttime
-\providecommand{\TitleMarker}{} % follows the stamp; the seam the -INSTRUCTOR view's
-                                % "Instructor Copy" flag hangs on. LectureNotes +
-                                % CourseDocument \renewcommand it to \InstructorInline
-                                % (from InstructorNotes.sty), which self-gates.
+\providecommand{\TitleMarker}{} % follows the stamp; a free title hook, nobody
+                                % overrides it now (the instructor-copy signal moved
+                                % to the page-edge frame in InstructorNotes.sty).
 
 \def\maketitle{%
   \vspace*{1em}%
