@@ -24,6 +24,12 @@
 \RequirePackage{Titling}
 \RequirePackage{Hyperlinks}
 
+% Instructor-only annotation layer, shared with LectureNotes. AFTER Typefaces:
+% this is where tcolorbox now legitimately enters this class (below the font
+% block, per the "Fonts" load order). Gives \maketitle's \TitleMarker an
+% \InstructorNote to hang the "Instructor Copy" flag on (override below).
+\RequirePackage{Annotations}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GEOMETRY
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -61,6 +67,8 @@
 % Titling hooks: this is the class that colours, and the one that stamps a time.
 \renewcommand{\TitleColor}{\color{TitleColour}}
 \renewcommand{\TitleStamp}{\space at \DTMcurrenttime}
+% Instructor copy marker -- empty on a student build (\InstructorNote self-gates).
+\renewcommand{\TitleMarker}{\space\InstructorNote{\normalsize\bfseries Instructor Copy}}
 
 % Hyperlinks hooks: internal links pick up the identity colour, as 10x3 had it
 % (it wrote Black!20!OliveGreen inline here too -- same four-places problem).
