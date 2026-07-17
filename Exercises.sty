@@ -10,8 +10,8 @@
 %   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
 %   \begin{solution} ... \end{solution}   printed only in the solutions build
 %   \begin{hint} ... \end{hint}           printed only in the hints build
-%   \begin{choices} / \begin{oneparchoices}   lettered MC options (stacked/inline);
-%     \choice{}  \choice[correct]{}           key boxed only in the solutions build
+%   \begin{choices}[stacked|onepar|grid]   lettered MC options in that layout;
+%     \choice{}  \choice[correct]{}        key boxed only in the solutions build
 %   \importproblem[points=5, ...]{DIR}{FILE}  \import a problem; keyval options:
 %                                             points= / nocount / hint / nohint
 %                                             ([5] alone is shorthand for points=5)
@@ -307,10 +307,11 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % An MC question is NOT a separate problem type -- it is a normal \begin{problem}
 % (numbered, points via \importproblem, filterable via \ProblemMeta tags) whose
-% body carries a choices list. Two layouts:
+% body carries a choices list. ONE environment, three layouts via an optional arg:
 %
-%   \begin{choices} ... \end{choices}          one option per line (long options)
-%   \begin{oneparchoices} ... \end{oneparchoices}   options inline (short: Even/Odd)
+%   \begin{choices}          one option per line   (default; long options)
+%   \begin{choices}[onepar]  options inline         (short: Even/Odd/Neither/Both)
+%   \begin{choices}[grid]    a \ChoicesGridCols-wide grid, row-major (default 2)
 %
 %   \begin{problem}
 %     What is the domain of ...?
@@ -324,11 +325,19 @@
 % Options are lettered (A), (B), .... A \choice is marked the key by the optional
 % argument -- \choice[correct]{...} -- so swapping which option is correct is an
 % in-place edit, no command rename. (Any value in the bracket means "key"; the
-% word `correct' is just the readable spelling.) The key is highlighted ONLY in a
+% word `correct' is just the readable spelling.) The key is boxed ONLY in a
 % solutions build (gated by \ifsolutions, the same toggle as \begin{solution}), so
-% the answer never leaks; several may be marked (select-all-that-apply). Braced
-% option (matching the quarry's \Answer{}) lets the box wrap the option cleanly.
+% the answer never leaks; several may be marked (select-all-that-apply).
+%
+% The grid is built from \parbox cells laid with \hfill/\par, NOT a tabular: a
+% macro (\choice) that emits alignment tokens & / \\ from inside conditionals
+% breaks both tabular and tabularray (they scan for those tokens); \hfill and \par
+% are safe in conditionals, need no table package, and still wrap long options.
 \newcounter{choice}
+\newcommand{\ChoicesGridCols}{2}   % columns in [grid]; \renewcommand to change
+\newcount\choice@col               % column position within the current grid row
+\newlength{\choice@gridwidth}
+\newcommand{\choice@layout}{stacked}
 
 % How the key is boxed in a solutions build: a tight green frame + light fill
 % (matching the quarry's \Answer{} box), via \fcolorbox so no tcolorbox is needed.
@@ -339,40 +348,60 @@
   {\setlength{\fboxrule}{0.2mm}\fcolorbox{SolutionColor}{SolutionColor!8}{#1}}%
 }
 
-% One \choice, two layouts. \ifchoice@inline (set by each environment) picks the
-% label emission: a list \item for the vertical `choices', or an inline "(A)~"
-% with a \qquad separator before every option after the first for `oneparchoices'.
-% The optional [correct] routes the option through \CorrectChoiceFormat in a
-% solutions build; otherwise it prints plain.
-\newif\ifchoice@inline
+% Shared: render option text, boxed iff this \choice is the key AND solutions on.
+% \choice resolves correctness (from the optional arg) into \choice@iscorrect,
+% then hands the text to the current layout's emitter.
+\newcommand{\choice@iscorrect}{0}
+\newcommand{\choice@content}[1]{%
+  \ifdefstring{\choice@iscorrect}{1}%
+    {\ifsolutions\CorrectChoiceFormat{#1}\else#1\fi}{#1}%
+}
 \NewDocumentCommand{\choice}{o m}{%
   \stepcounter{choice}%
-  \ifchoice@inline
-    \choice@sep(\Alph{choice})~%
-    \let\choice@sep\qquad
-  \else
-    \item[(\Alph{choice})]%
+  \IfNoValueTF{#1}{\def\choice@iscorrect{0}}{\def\choice@iscorrect{1}}%
+  \csname choice@@\choice@layout\endcsname{#2}%
+}
+
+% Per-layout emitters (each gets the option text as #1).
+\newcommand{\choice@@stacked}[1]{\item[(\Alph{choice})]\choice@content{#1}}
+\newcommand{\choice@@onepar}[1]{%
+  \choice@sep(\Alph{choice})~\choice@content{#1}\let\choice@sep\qquad}
+% Grid: separator BEFORE each cell (safe: \hfill / \par\nobreak, never & / \\).
+\newcommand{\choice@@grid}[1]{%
+  \ifnum\choice@col=0 \else
+    \ifnum\choice@col<\numexpr\ChoicesGridCols\relax
+      \hfill
+    \else
+      \global\choice@col=0 \par\nobreak
+    \fi
   \fi
-  \IfNoValueTF{#1}{#2}{\ifsolutions\CorrectChoiceFormat{#2}\else#2\fi}%
+  \ifnum\choice@col=0 \noindent\fi
+  \parbox[t]{\choice@gridwidth}{(\Alph{choice})~\choice@content{#1}}%
+  \global\advance\choice@col1
 }
 
-\newenvironment{choices}{%
-  \par\choice@inlinefalse\setcounter{choice}{0}%
+% Per-layout environment begin/end, dispatched by the optional argument.
+\newcommand{\choices@begin@stacked}{%
   \list{}{%
-    \setlength{\leftmargin}{2.5em}%
-    \setlength{\labelwidth}{2em}%
-    \setlength{\labelsep}{0.5em}%
-    \setlength{\itemsep}{0.2ex}%
-    \setlength{\topsep}{0.4\baselineskip}%
-  }%
-}{%
-  \endlist
+    \setlength{\leftmargin}{2.5em}\setlength{\labelwidth}{2em}%
+    \setlength{\labelsep}{0.5em}\setlength{\itemsep}{0.2ex}%
+    \setlength{\topsep}{0.4\baselineskip}}%
 }
+\newcommand{\choices@end@stacked}{\endlist}
+\newcommand{\choices@begin@onepar}{\let\choice@sep\empty\noindent\ignorespaces}
+\newcommand{\choices@end@onepar}{\par}
+\newcommand{\choices@begin@grid}{%
+  \global\choice@col=0
+  \setlength{\choice@gridwidth}{\dimexpr\linewidth/\ChoicesGridCols - 1.5em\relax}%
+  \par}
+\newcommand{\choices@end@grid}{\par}
 
-\newenvironment{oneparchoices}{%
-  \par\choice@inlinetrue\setcounter{choice}{0}%
-  \let\choice@sep\empty
-  \noindent\ignorespaces
+\NewDocumentEnvironment{choices}{O{stacked}}{%
+  \par\setcounter{choice}{0}%
+  \@ifundefined{choices@begin@#1}%
+    {\PackageError{Exercises}{Unknown choices layout `#1'}%
+       {Use one of: stacked, onepar, grid.}}%
+    {\def\choice@layout{#1}\csname choices@begin@#1\endcsname}%
 }{%
-  \par
+  \csname choices@end@\choice@layout\endcsname
 }
