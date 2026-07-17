@@ -13,6 +13,8 @@
 %   \begin{choices}[stacked|onepar|grid]   lettered MC options in that layout;
 %     \choice{}  \choice[correct]{}        key boxed only in the solutions build
 %     \graphchoice[correct]{FILE}          a graph option (label beside, centred)
+%   \begin{matching} \leftitem[X]{} \rightcolumn \rightitem{}   two-column matching;
+%     \leftgraph[X]{FILE} \rightgraph{FILE}     match shown inline in solutions
 %   \importproblem[points=5, ...]{DIR}{FILE}  \import a problem; keyval options:
 %                                             points= / nocount / hint / nohint
 %                                             ([5] alone is shorthand for points=5)
@@ -428,4 +430,72 @@
   \IfNoValueTF{#1}%
     {\choice{\graphchoice@box{#2}}}%
     {\choice[#1]{\graphchoice@box{#2}}}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MATCHING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Like MC, a matching question is a normal \begin{problem} whose body is a
+% \begin{matching}: a LEFT column of items numbered (1),(2),... and a RIGHT column
+% lettered (A),(B),..., with a wide gap for students to draw connecting lines.
+% \rightcolumn splits the two. Items may be text (\leftitem/\rightitem) or graphs
+% (\leftgraph/\rightgraph, which reuse \graphchoice's sizing + centring):
+%
+%   \begin{problem}
+%     Match each graph with the phrase that best describes it.
+%     \begin{matching}
+%       \leftgraph[C]{graph-1}    % this left item's match is right item C
+%       \leftgraph[A]{graph-2}
+%       \rightcolumn
+%       \rightitem{Concave up}    % (A)
+%       \rightitem{Concave down}  % (B)
+%       ...
+%     \end{matching}
+%   \end{problem}
+%
+% The answer is intrinsic, like \choice[correct]: a left item names its match in
+% the optional argument. In a SOLUTIONS build that match is shown inline next to
+% the item ("(1) [graph] $\to$ C"), gated by \ifsolutions -- deliberately NO drawn
+% arrows (they are only aesthetic and would force a TikZ dependency + a two-pass
+% compile). Left/right counts may differ (distractors). Tunables: \MatchColWidth
+% (each column; the remainder is the gap), \MatchItemSep, \MatchKeyFormat.
+%
+% Two columns are two side-by-side \minipage[t]s; \rightcolumn ends the left one
+% and opens the right (raw \minipage/\endminipage so the split can straddle it).
+\newcounter{matchleft}
+\newcounter{matchright}
+\newlength{\match@colwidth}
+\newcommand{\MatchColWidth}{0.38\linewidth}
+\newcommand{\MatchItemSep}{2ex}
+\newcommand{\MatchKeyFormat}[1]{\;{\bfseries\color{SolutionColor}$\to$#1}}
+
+% The match annotation rides on the NUMBER label -- "(1) -> C" -- not after the
+% content, so it always fits even when the content is a column-filling graph
+% (where trailing text would wrap below it).
+\NewDocumentCommand{\leftitem}{o m}{%
+  \par\stepcounter{matchleft}%
+  \noindent(\arabic{matchleft})%
+  \IfNoValueF{#1}{\ifsolutions\MatchKeyFormat{#1}\fi}%
+  \quad #2%
+  \par\vspace{\MatchItemSep}%
+}
+\NewDocumentCommand{\rightitem}{m}{%
+  \par\stepcounter{matchright}%
+  \noindent(\Alph{matchright})\quad #1%
+  \par\vspace{\MatchItemSep}%
+}
+\NewDocumentCommand{\leftgraph}{o m}{%
+  \IfNoValueTF{#1}%
+    {\leftitem{\graphchoice@box{#2}}}%
+    {\leftitem[#1]{\graphchoice@box{#2}}}%
+}
+\newcommand{\rightgraph}[1]{\rightitem{\graphchoice@box{#1}}}
+
+\newcommand{\rightcolumn}{\endminipage\hfill\minipage[t]{\match@colwidth}}
+\newenvironment{matching}{%
+  \par\setcounter{matchleft}{0}\setcounter{matchright}{0}%
+  \setlength{\match@colwidth}{\MatchColWidth}%
+  \par\noindent\minipage[t]{\match@colwidth}%
+}{%
+  \endminipage\par
 }
