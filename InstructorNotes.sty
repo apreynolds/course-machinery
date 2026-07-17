@@ -29,9 +29,17 @@
 \RequirePackage{environ}           % \NewEnviron: drop a block's body when off
 \RequirePackage{marginnote}        % \marginnote: margin placement without floating
 
-%%% --- The layer flag (same idiom as Exercises.sty / ProblemMeta.sty) ---------
+%%% --- The layer flags (same idiom as Exercises.sty / ProblemMeta.sty) --------
+%%% TWO visibility tiers among staff notes (decided 2026-07-18, "merge, sometimes-
+%%% private"): \ShowInstructorNotes gates the DEFAULT staff notes (visible to the
+%%% instructor AND, in future, the marker); \ShowPrivateNotes gates the PRIVATE
+%%% ones (candid asides -- instructor only). The instructor view sets BOTH; a
+%%% marker view (Problems thread, not built) will set only \ShowInstructorNotes,
+%%% so private drops out while staff notes stay.
 \newif\ifinstructornotes
 \ifdefined\ShowInstructorNotes \instructornotestrue \fi
+\newif\ifprivatenotes
+\ifdefined\ShowPrivateNotes \privatenotestrue \fi
 
 %%% --- Colour (named once; house rule). SLATE, not a hue: instructor/marker
 %%% content is "editorial / behind the scenes", so a neutral value reads right and
@@ -51,33 +59,35 @@
   \ifinstructornotes{\sffamily\color{InstructorInk}#1}\fi
 }
 
-%%% --- block note: a slate SIDE-BAR note. No title box, no tt (reserved for
-%%% problem metadata). A wide slate bar sits in the LEFT MARGIN -- drawn by the
-%%% overlay, so the box body keeps text width and aligns with the prose -- with a
-%%% word rotated 90 inside it. \NewEnviron so the body is DROPPED when off.
-%%%   \begin{InstructorBox}          -> the bar reads "note"    (teaching cue)
-%%%   \begin{InstructorBox}[marking] -> the bar reads "marking" (grading guidance)
-%%% Same slate for both: the WORD differentiates, not the colour (slate == staff /
-%%% behind-the-scenes, one meaning). The word is centred on the box height via the
-%%% overlay (which adds no height), so a very SHORT box with a LONG word can spill
-%%% top/bottom -- moot in practice ("marking" notes run a few lines). Bar width 6mm;
-%%% the node xshift is half that.
-\NewEnviron{InstructorBox}[1][note]{%
-  \ifinstructornotes
-    \begin{tcolorbox}[enhanced, breakable, parbox=false,
-      frame hidden, boxrule=0pt, sharp corners,
-      colback=InstructorInk!8,
-      left=8pt, right=8pt, top=8pt, bottom=8pt,
-      overlay={%
-        \fill[InstructorInk]
-          ([xshift=-6mm]frame.south west) rectangle (frame.north west);
-        \node[white, rotate=90, font=\sffamily\bfseries\scriptsize]
-          at ([xshift=-3mm]frame.west) {#1};
-      }]
-      \sffamily\BODY
-    \end{tcolorbox}%
-  \fi
+%%% --- slate SIDE-BAR notes. No title box, no tt (reserved for problem metadata).
+%%% A wide slate bar sits in the LEFT MARGIN -- drawn by the overlay, so the box
+%%% body keeps text width and aligns with the prose -- with a word rotated 90
+%%% inside it. THREE environments, one look; the WORD differentiates, not the
+%%% colour (slate == staff / behind-the-scenes, one meaning):
+%%%   \begin{InstructorBox}          -> "note"    staff  (teaching cue)
+%%%   \begin{InstructorBox}[marking] -> "marking" staff  (grading guidance)
+%%%   \begin{InstructorPrivate}      -> "private" INSTRUCTOR-ONLY (candid; a marker
+%%%                                     copy suppresses it -- gated on \ifprivatenotes)
+%%% \NewEnviron so the body is DROPPED when the tier's flag is off. The word is
+%%% centred on the box height via the overlay (which adds no height), so a very
+%%% SHORT box with a LONG word can spill -- moot in practice. Bar 6mm; node xshift
+%%% is half that.
+\newcommand\instr@sidebar[1]{% #1 = the rotated bar word; body is \BODY
+  \begin{tcolorbox}[enhanced, breakable, parbox=false,
+    frame hidden, boxrule=0pt, sharp corners,
+    colback=InstructorInk!8,
+    left=8pt, right=8pt, top=8pt, bottom=8pt,
+    overlay={%
+      \fill[InstructorInk]
+        ([xshift=-6mm]frame.south west) rectangle (frame.north west);
+      \node[white, rotate=90, font=\sffamily\bfseries\scriptsize]
+        at ([xshift=-3mm]frame.west) {#1};
+    }]
+    \sffamily\BODY
+  \end{tcolorbox}%
 }
+\NewEnviron{InstructorBox}[1][note]{\ifinstructornotes\instr@sidebar{#1}\fi}
+\NewEnviron{InstructorPrivate}[1][private]{\ifprivatenotes\instr@sidebar{#1}\fi}
 
 %%% --- margin note: slate bold sans in the margin (unified with the layer) -----
 \newcommand\InstructorMargin[1]{%
