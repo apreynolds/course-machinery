@@ -12,6 +12,7 @@
 %   \begin{hint} ... \end{hint}           printed only in the hints build
 %   \begin{choices}[stacked|onepar|grid]   lettered MC options in that layout;
 %     \choice{}  \choice[correct]{}        key boxed only in the solutions build
+%     \graphchoice[correct]{FILE}          a graph option (label beside, centred)
 %   \importproblem[points=5, ...]{DIR}{FILE}  \import a problem; keyval options:
 %                                             points= / nocount / hint / nohint
 %                                             ([5] alone is shorthand for points=5)
@@ -41,6 +42,7 @@
 \RequirePackage{totcount}      % \newtotcounter/\total: two-pass sum for \printtotalpoints
 \RequirePackage{keyval}        % \importproblem's [key=value] options
 \RequirePackage{xstring}       % \IfInteger: lone-number back-compat for \importproblem
+\RequirePackage{graphicx}      % \includegraphics, wrapped by \graphchoice (MC graphs)
 
 % Own the colour dependency rather than borrowing ProblemMeta's -- this package
 % must stand alone. dvipsnames for the named colour below; consistent with the
@@ -404,4 +406,26 @@
     {\def\choice@layout{#1}\csname choices@begin@#1\endcsname}%
 }{%
   \csname choices@end@\choice@layout\endcsname
+}
+
+% \graphchoice[correct]{FILE} -- a \choice whose content is a GRAPH, for a
+% [grid] of graphs. It (1) sizes the image to the column minus room for the "(A)"
+% label, so the label sits BESIDE the graph without overflowing, and (2) vertically
+% aligns the graph against the label per \GraphChoiceValign: c=middle (default,
+% the least ambiguous), t=label at the graph's top, b=label at its bottom. The
+% alignment lives here, on the graph, NOT on the grid -- so a grid of plain text
+% \choice options keeps its correct baseline alignment. Middle is just a raisebox:
+% centre the image on the label's baseline. Restyle width/alignment in one place.
+\newcommand{\GraphChoiceValign}{c}
+\newcommand{\graphchoice@raise}[1]{%
+  \ifdefstring{\GraphChoiceValign}{t}{\raisebox{-\height}{#1}}{%
+    \ifdefstring{\GraphChoiceValign}{b}{#1}{\raisebox{-0.5\height}{#1}}}%
+}
+\newcommand{\graphchoice@box}[1]{%
+  \graphchoice@raise{\includegraphics[width=\dimexpr\linewidth-2.4em\relax]{#1}}%
+}
+\NewDocumentCommand{\graphchoice}{o m}{%
+  \IfNoValueTF{#1}%
+    {\choice{\graphchoice@box{#2}}}%
+    {\choice[#1]{\graphchoice@box{#2}}}%
 }
