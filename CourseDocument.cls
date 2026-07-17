@@ -58,9 +58,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 10x3 wrote `Black!20!OliveGreen' inline in four places (title, three headings,
 % hyperref linkcolor), so the identity colour could not be changed in one place.
-% Named once here instead.
+% Named once here instead. Moved OFF green (was OliveGreen): green now means
+% "solutions / not for students" (SolutionColor in Exercises.sty), so a
+% student-facing course document must not read as green. Mahogany is the rich
+% brownish-red replacement.
 \RequirePackage{xcolor}
-\colorlet{CourseIdentity}{OliveGreen}
+\colorlet{CourseIdentity}{Mahogany}
 \colorlet{HeadingColor}{Black!20!CourseIdentity}
 \colorlet{TitleColour}{Black!40!CourseIdentity}
 

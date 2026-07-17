@@ -33,13 +33,14 @@
 \newif\ifinstructornotes
 \ifdefined\ShowInstructorNotes \instructornotestrue \fi
 
-%%% --- Colour (named once; house rule). WCAG-fixed: dvipsnames Lavender is
-%%% 2.09:1 on white (fails even large-bold), and white-on-Lavender is also 2.09:1.
-%%% InstructorInk #4B2E83 is a deep violet -- still unmistakably "lavender family",
-%%% but 10.4:1 on white AND carries white text at 10.4:1; !8 is the pale fill.
-\definecolor{InstructorInk}{HTML}{4B2E83}
+%%% --- Colour (named once; house rule). SLATE, not a hue: instructor/marker
+%%% content is "editorial / behind the scenes", so a neutral value reads right and
+%%% competes with none of the student palette (red/blue/orange) or green=solutions.
+%%% #334155 is a blue-slate (nudged blue so it isn't the plain Gray of the theorem
+%%% rule); 10.4:1 on white AND carries white text at 10.4:1; !8 is the pale fill.
+\definecolor{InstructorInk}{HTML}{334155}
 
-%%% --- inline note: a WRAPPING violet run-in (no box, so it breaks across lines).
+%%% --- inline note: a WRAPPING slate run-in (no box, so it breaks across lines).
 %%% Prefer InstructorBox / \InstructorMargin in general: a box or a margin note is
 %%% unmistakable at a glance, whereas an inline run-in blends into the prose. Reach
 %%% for inline only for a quick in-flow aside; anything you'll want to FIND again
@@ -50,7 +51,7 @@
   \ifinstructornotes{\sffamily\color{InstructorInk}#1}\fi
 }
 
-%%% --- block note: titled breakable box; white "instructor" on a violet bar,
+%%% --- block note: titled breakable box; white "instructor" on a slate bar,
 %%% black body (a long note wants maximum legibility; the frame + bar carry the
 %%% signal). \NewEnviron so the body is genuinely DROPPED when the layer is off.
 \NewEnviron{InstructorBox}{%
@@ -69,7 +70,7 @@
   \fi
 }
 
-%%% --- margin note: dark-violet bold sans in the margin (unified with the layer)
+%%% --- margin note: slate bold sans in the margin (unified with the layer) -----
 \newcommand\InstructorMargin[1]{%
   \ifinstructornotes
     \marginnote{\color{InstructorInk}\sffamily\bfseries\raggedright #1}%
@@ -78,7 +79,7 @@
 }
 
 %%% --- "Instructor copy" page frame -------------------------------------------
-%%% A thin violet frame inset from every page edge, with a small bottom-centre
+%%% A slate frame just inside every page edge, with a small bottom-centre
 %%% "Instructor copy" tab sitting on the frame line. This REPLACES a title stamp
 %%% (seen only on page 1) and a diagonal watermark (which fights the content): an
 %%% ever-present, low-distraction marker. Drawn via eso-pic's shipout background
@@ -87,8 +88,8 @@
 \ifinstructornotes
   \RequirePackage{eso-pic}
   % --- TWEAK HERE: the two knobs for the instructor-copy frame ----------------
-  \newcommand\InstructorFrameInset{2mm}% gap from the page edge to the frame
-  \newcommand\InstructorFrameRule{2mm}%  frame line thickness
+  \newcommand\InstructorFrameInset{2.5mm}% gap from the page edge to the frame
+  \newcommand\InstructorFrameRule{1.5mm}%  frame line thickness
   \AddToShipoutPictureBG{%
     \put(\LenToUnit{\InstructorFrameInset},\LenToUnit{\InstructorFrameInset}){%
       \color{InstructorInk}\linethickness{\InstructorFrameRule}%
