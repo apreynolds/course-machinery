@@ -67,8 +67,8 @@
 % Titling hooks: this is the class that colours, and the one that stamps a time.
 \renewcommand{\TitleColor}{\color{TitleColour}}
 \renewcommand{\TitleStamp}{\space at \DTMcurrenttime}
-% Instructor copy marker -- empty on a student build (\InstructorInline self-gates).
-\renewcommand{\TitleMarker}{\space\InstructorInline{\normalsize\bfseries Instructor Copy}}
+% No \TitleMarker override: the instructor-copy signal is the page-edge frame
+% (InstructorNotes.sty), not a title stamp.
 
 % Hyperlinks hooks: internal links pick up the identity colour, as 10x3 had it
 % (it wrote Black!20!OliveGreen inline here too -- same four-places problem).
