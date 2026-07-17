@@ -44,7 +44,11 @@
 \definecolor{ThmColor}{named}{Gray}        % text results: understated grey rule
 \definecolor{NoteColor}{named}{RoyalBlue}  % informational asides (blue family)
 \definecolor{CautionColor}{named}{Red}     % Caution -- the lone alarm colour
-\definecolor{TipColor}{HTML}{E69F00}       % Tips -- Okabe-Ito orange
+\definecolor{TipColor}{HTML}{E69F00}       % Tips -- Okabe-Ito orange (frame + fill)
+\definecolor{TipTextColor}{HTML}{B36B00}   % Tips -- darker orange for HEAD TEXT only:
+                                           % #E69F00 as text is 2.25:1 on white (fails
+                                           % WCAG); #B36B00 is 4.18:1. Light fill, dark
+                                           % text -- the frame/fill stay TipColor.
 
 %%% --- tcolorbox styles (named once; the extension point). --------------------
 %%% A course-vocab file references these by name, so restyling every Theorem in
@@ -100,7 +104,7 @@
   {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{CautionColor}}{.}
   {.5em}{\thmname{#1}\thmnote{ #3}}
 \newtheoremstyle{cbtip}
-  {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{TipColor}}{.}
+  {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{TipTextColor}}{.}
   {.5em}{\thmname{#1}\thmnote{ #3}}
 
 %%% --- The factories ----------------------------------------------------------
