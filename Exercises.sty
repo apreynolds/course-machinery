@@ -10,8 +10,9 @@
 %   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
 %   \begin{solution} ... \end{solution}   printed only in the solutions build
 %   \begin{hint} ... \end{hint}           printed only in the hints build
-%   \importproblem[POINTS]{DIR}{FILE}      \import a problem, points set HERE
-%   \importproblem*[POINTS]{DIR}{FILE}     ... shown but NOT added to the total
+%   \importproblem[points=5, ...]{DIR}{FILE}  \import a problem; keyval options:
+%                                             points= / nocount / hint / nohint
+%                                             ([5] alone is shorthand for points=5)
 %   \printtotalpoints                      the summed points of the assessment
 %
 % plus the independent \ifsolutions / \ifhints toggles that drive those two
@@ -33,9 +34,11 @@
 % already uses and the one Patrick is accustomed to. The mismatch is intentional.
 
 \RequirePackage{environ}       % \NewEnviron: capture a body to conditionally emit
-\RequirePackage{etoolbox}      % \ifdefempty
+\RequirePackage{etoolbox}      % \ifdefempty, \ifdefstring
 \RequirePackage{import}        % \import, wrapped by \importproblem
 \RequirePackage{totcount}      % \newtotcounter/\total: two-pass sum for \printtotalpoints
+\RequirePackage{keyval}        % \importproblem's [key=value] options
+\RequirePackage{xstring}       % \IfInteger: lone-number back-compat for \importproblem
 
 % Own the colour dependency rather than borrowing ProblemMeta's -- this package
 % must stand alone. dvipsnames for the named colour below; consistent with the
@@ -83,7 +86,7 @@
 \newcommand{\CurrentProblemPoints}{}
 
 % Whether the current problem's points count toward the total. "1" = counted
-% (the default); "0" = shown but off the books. Set by the star form of
+% (the default); "0" = shown but off the books. Set by the `nocount' key of
 % \importproblem, read (and reset) in the problem environment alongside points.
 % Serves two cases with one mechanism: BONUS questions (extra, so out of the
 % denominator) and CHOOSE-1-OF-N pairs (mark all but one of the alternatives
@@ -91,6 +94,14 @@
 % NOT alter the printed marker -- "choose one" pairs must still read "(10 points)"
 % on both, and which case it is (bonus vs. choose) is carried by exam prose.
 \newcommand{\CurrentProblemCounts}{1}
+
+% Per-problem override of the hints toggle, set by \importproblem's hint/nohint
+% keys and read by the hint environment. Three states: "inherit" (the default --
+% follow the document's \ifhints), "on" (force this problem's hint to show even in
+% a no-hints build -- e.g. a few worked examples on a test), "off" (suppress even
+% in a hints build). The global \ifhints view stays the document default; this is
+% the per-import override layered on top, so both frameworks coexist.
+\newcommand{\CurrentProblemHint}{inherit}
 
 % How the points render next to the heading. Stylable in one place; the eventual
 % target is the quarry's margin \fbox, but an inline marker is enough for now.
@@ -108,22 +119,39 @@
 \newtotcounter{totalpoints}
 \newcommand{\printtotalpoints}{\total{totalpoints}}
 
-% \importproblem[POINTS]{DIR}{FILE} -- \import with a point value attached here.
-% The STARRED form \importproblem*[POINTS]{DIR}{FILE} shows the points but keeps
-% them out of the total (bonus / choose-1-of-N; see \CurrentProblemCounts above).
-% Bare \import still works and yields no marker (e.g. a lecture, ungraded). The
-% trailing resets are a safety net for the odd file that sets no problem to
-% consume the values; normally the environment below has already cleared them.
-% \@ifstar dispatches to the two forms, which differ only in the count flag.
-\newcommand{\importproblem}{\@ifstar\importproblem@off\importproblem@on}
-\newcommand{\importproblem@on}[3][]{\importproblem@do{1}{#1}{#2}{#3}}
-\newcommand{\importproblem@off}[3][]{\importproblem@do{0}{#1}{#2}{#3}}
-% #1 = count flag, #2 = points, #3 = dir, #4 = file.
-\newcommand{\importproblem@do}[4]{%
-  \gdef\CurrentProblemCounts{#1}%
-  \gdef\CurrentProblemPoints{#2}%
-  \import{#3}{#4}%
-  \gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}%
+% \importproblem[OPTIONS]{DIR}{FILE} -- \import a problem with per-import settings.
+% OPTIONS is a comma-separated key=value list (keyval family `eximport'):
+%
+%   points=5    the point value (integer; summed and pluralised)
+%   nocount     show the points but keep them OUT of the total (bonus / choose-1-of-N)
+%   hint        force this problem's hint to show, regardless of the global toggle
+%   nohint      suppress this problem's hint, regardless of the global toggle
+%
+% As a shorthand, a LONE integer means points: \importproblem[5]{...}{...} is
+% exactly \importproblem[points=5]{...}{...} (this is the back-compat form and the
+% common case). To combine points with a flag, write it out: [points=5, hint].
+% (A bare number mixed with flags -- [5, hint] -- is NOT valid; keyval would read
+% "5" as an unknown key. Use points=5.) Bare \import still works and yields no
+% marker (e.g. a lecture, ungraded). The trailing reset restores every default for
+% whatever follows -- a safety net for a file that sets no problem to consume them.
+%
+% New per-import axes slot in here as one more key (a future notes-to-marker note,
+% per-part points, ...), which is why the interface moved to keyval.
+\define@key{eximport}{points}{\gdef\CurrentProblemPoints{#1}}
+\define@key{eximport}{nocount}[true]{\gdef\CurrentProblemCounts{0}}
+\define@key{eximport}{hint}[true]{\gdef\CurrentProblemHint{on}}
+\define@key{eximport}{nohint}[true]{\gdef\CurrentProblemHint{off}}
+
+\newcommand{\importproblem@reset}{%
+  \gdef\CurrentProblemPoints{}%
+  \gdef\CurrentProblemCounts{1}%
+  \gdef\CurrentProblemHint{inherit}%
+}
+\NewDocumentCommand{\importproblem}{O{} m m}{%
+  \importproblem@reset
+  \IfInteger{#1}{\gdef\CurrentProblemPoints{#1}}{\setkeys{eximport}{#1}}%
+  \import{#2}{#3}%
+  \importproblem@reset
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -254,8 +282,17 @@
 % as a hyperlink in a Hyperlinks-loading lecture). Retune in one place.
 \colorlet{HintColor}{BurntOrange}
 
+% Three-state visibility (see \CurrentProblemHint): the per-import hint/nohint keys
+% force this hint on/off; "inherit" (the default, and every non-\importproblem
+% context) follows the document \ifhints toggle. \showhint collapses the three
+% states to one boolean the emit-or-drop below reads.
+\newif\ifshowhint
 \NewEnviron{hint}{%
-  \ifhints
+  \showhintfalse
+  \ifdefstring{\CurrentProblemHint}{on}{\showhinttrue}{%
+    \ifdefstring{\CurrentProblemHint}{off}{}{\ifhints\showhinttrue\fi}%
+  }%
+  \ifshowhint
     \par\smallskip
     \noindent{\bfseries\color{HintColor}Hint.}\quad\ignorespaces
     \BODY
