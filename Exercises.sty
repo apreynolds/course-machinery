@@ -10,6 +10,8 @@
 %   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
 %   \begin{solution} ... \end{solution}   printed only in the solutions build
 %   \begin{hint} ... \end{hint}           printed only in the hints build
+%   \begin{choices} / \begin{oneparchoices}   lettered MC options (stacked/inline);
+%     \choice{}  \choice[correct]{}           key boxed only in the solutions build
 %   \importproblem[points=5, ...]{DIR}{FILE}  \import a problem; keyval options:
 %                                             points= / nocount / hint / nohint
 %                                             ([5] alone is shorthand for points=5)
@@ -298,4 +300,79 @@
     \BODY
     \par
   \fi
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MULTIPLE CHOICE (choices list)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% An MC question is NOT a separate problem type -- it is a normal \begin{problem}
+% (numbered, points via \importproblem, filterable via \ProblemMeta tags) whose
+% body carries a choices list. Two layouts:
+%
+%   \begin{choices} ... \end{choices}          one option per line (long options)
+%   \begin{oneparchoices} ... \end{oneparchoices}   options inline (short: Even/Odd)
+%
+%   \begin{problem}
+%     What is the domain of ...?
+%     \begin{choices}
+%       \choice{$\{x : x\ge -1\}$}
+%       \choice[correct]{$\{x : x\ge -1,\ x\ne 7\}$}
+%       ...
+%     \end{choices}
+%   \end{problem}
+%
+% Options are lettered (A), (B), .... A \choice is marked the key by the optional
+% argument -- \choice[correct]{...} -- so swapping which option is correct is an
+% in-place edit, no command rename. (Any value in the bracket means "key"; the
+% word `correct' is just the readable spelling.) The key is highlighted ONLY in a
+% solutions build (gated by \ifsolutions, the same toggle as \begin{solution}), so
+% the answer never leaks; several may be marked (select-all-that-apply). Braced
+% option (matching the quarry's \Answer{}) lets the box wrap the option cleanly.
+\newcounter{choice}
+
+% How the key is boxed in a solutions build: a tight green frame + light fill
+% (matching the quarry's \Answer{} box), via \fcolorbox so no tcolorbox is needed.
+% SolutionColor is defined in the SOLUTION section above. NB \fcolorbox is an
+% \mbox, so a *very* long correct option will not line-break inside the box --
+% fine for typical MC options, which are short; restyle here if that ever bites.
+\newcommand{\CorrectChoiceFormat}[1]{%
+  {\setlength{\fboxrule}{0.2mm}\fcolorbox{SolutionColor}{SolutionColor!8}{#1}}%
+}
+
+% One \choice, two layouts. \ifchoice@inline (set by each environment) picks the
+% label emission: a list \item for the vertical `choices', or an inline "(A)~"
+% with a \qquad separator before every option after the first for `oneparchoices'.
+% The optional [correct] routes the option through \CorrectChoiceFormat in a
+% solutions build; otherwise it prints plain.
+\newif\ifchoice@inline
+\NewDocumentCommand{\choice}{o m}{%
+  \stepcounter{choice}%
+  \ifchoice@inline
+    \choice@sep(\Alph{choice})~%
+    \let\choice@sep\qquad
+  \else
+    \item[(\Alph{choice})]%
+  \fi
+  \IfNoValueTF{#1}{#2}{\ifsolutions\CorrectChoiceFormat{#2}\else#2\fi}%
+}
+
+\newenvironment{choices}{%
+  \par\choice@inlinefalse\setcounter{choice}{0}%
+  \list{}{%
+    \setlength{\leftmargin}{2.5em}%
+    \setlength{\labelwidth}{2em}%
+    \setlength{\labelsep}{0.5em}%
+    \setlength{\itemsep}{0.2ex}%
+    \setlength{\topsep}{0.4\baselineskip}%
+  }%
+}{%
+  \endlist
+}
+
+\newenvironment{oneparchoices}{%
+  \par\choice@inlinetrue\setcounter{choice}{0}%
+  \let\choice@sep\empty
+  \noindent\ignorespaces
+}{%
+  \par
 }
