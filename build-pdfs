@@ -28,10 +28,13 @@
 # directory: OUTDIR/.OUTDIR, else .CLOUDDIR, else local.
 #
 # Views via a magic comment: a `%! views: ...' line in the leading comment block
-# of a source (before \documentclass) requests extra PDFs. Two views are wired up:
+# of a source (before \documentclass) requests extra PDFs. Three views are wired:
 #   solutions -> also build FILE-SOLUTIONS.pdf, with \def\ShowSolutions{}
-#                injected so the `Test' class shows \solution{...} content that
-#                the student build omits.
+#                injected so \begin{solution} content the student build omits
+#                is shown.
+#   hints     -> also build FILE-HINTS.pdf, with \def\ShowHints{} injected so
+#                \begin{hint} content is shown. Independent of solutions -- a hint
+#                is student-facing help, so list both views for both PDFs.
 #   projector -> also build FILE-PROJECTOR.pdf, with \def\ProjectorView{}
 #                injected so the `LectureNotes' class switches to the room copy
 #                (17pt, wider text, tighter top margin) instead of the handout.
@@ -242,6 +245,13 @@ build_file() {
           compile_view "$jobname" "$base" "$varaux" "-SOLUTIONS" "\\def\\ShowSolutions{}" "$movedir" || exit
           echo "    + $jobname-SOLUTIONS.pdf (solutions)"
           if [[ $mode == BOTH ]]; then cp -- "$jobname-SOLUTIONS.pdf" "$outdir/" || exit; fi
+          ;;
+        hints)
+          varaux="$HOME/.cache/latexmk/${PWD##*/}-$jobname-HINTS"
+          mkdir -p "$varaux" || exit
+          compile_view "$jobname" "$base" "$varaux" "-HINTS" "\\def\\ShowHints{}" "$movedir" || exit
+          echo "    + $jobname-HINTS.pdf (hints)"
+          if [[ $mode == BOTH ]]; then cp -- "$jobname-HINTS.pdf" "$outdir/" || exit; fi
           ;;
         projector)
           varaux="$HOME/.cache/latexmk/${PWD##*/}-$jobname-PROJECTOR"
