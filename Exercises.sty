@@ -7,6 +7,7 @@
 % built instead of resurrecting xsim. It provides:
 %
 %   \begin{problem} ... \end{problem}     numbered, cross-referenceable
+%   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
 %   \begin{solution} ... \end{solution}   printed only in the solutions build
 %   \importproblem[POINTS]{DIR}{FILE}      \import a problem, points set HERE
 %   \importproblem*[POINTS]{DIR}{FILE}     ... shown but NOT added to the total
@@ -134,20 +135,82 @@
 % contents, but clearing globally is robust regardless and enforces consume-once.
 \newcounter{problem}
 
-% The points guard prints the marker whenever a value is present, but only adds
-% to the running total when \CurrentProblemCounts is "1" (\addtocounter is global,
-% so it survives \import's grouping and each problem contributes once). A starred
-% \importproblem sets the flag to "0": the marker still shows, the total does not
-% move. A file that declares no points contributes 0 and shows nothing.
+% Grouped subquestions (see the PROBLEM GROUPS section). Inside a \problemgroup
+% each imported problem renders as a lettered PART -- "(a)", "(b)" -- instead of
+% "Problem N.". The flag below, set locally true by the group, is what the problem
+% environment branches on; the same atomic file renders either way, so nothing in
+% the library changes. The counter resets whenever `problem' steps (so each group,
+% and each top-level problem, starts its letters at (a)); \p@subproblem makes a
+% \ref to a part read "N(a)".
+\newif\ifinproblemgroup
+\newcounter{subproblem}[problem]
+% \thesubproblem carries the parent number ("4(a)") so a \ref to a part reads
+% "4(a)" -- the same nesting trick as \theequation under a section. The prefix
+% must live INSIDE \thesubproblem, not in \p@subproblem: routed through \p@ the
+% \number scan inside \arabic{problem} swallows the following token and the
+% letter is lost. The heading prints just "(a)" via \alph directly (below), so the
+% two representations differ on purpose -- short label on the page, full ref.
+\renewcommand{\thesubproblem}{\theproblem(\alph{subproblem})}
+
+% The heading branches on \ifinproblemgroup: a top-level problem is "Problem N.",
+% a part is "(a)". The POINTS block is shared by both -- per-part points and the
+% starred off-the-books form work identically inside a group. The points guard
+% prints the marker whenever a value is present, but only adds to the running
+% total when \CurrentProblemCounts is "1" (\addtocounter is global, so it survives
+% \import's grouping and each problem contributes once). A file that declares no
+% points contributes 0 and shows nothing.
 \newenvironment{problem}{%
-  \par\refstepcounter{problem}%
-  \noindent\textbf{Problem \theproblem.}%
+  \par
+  \ifinproblemgroup
+    \refstepcounter{subproblem}%
+    \noindent\textbf{(\alph{subproblem})}%
+  \else
+    \refstepcounter{problem}%
+    \noindent\textbf{Problem \theproblem.}%
+  \fi
+  % \refstepcounter sets \@currentlabel LOCALLY, but this environment is a group
+  % and the problem body arrives via \import -- so a \label written next to the
+  % \importproblem (outside the group) would otherwise capture the *enclosing*
+  % label, not this problem's. Globalise it so \label works from the assembly
+  % file. hyperref already makes its anchor (\@currentHref) global, so this keeps
+  % the ref text and the hyperlink target in sync.
+  \global\let\@currentlabel\@currentlabel
   \ifdefempty{\CurrentProblemPoints}{}{%
     \ifdefstring{\CurrentProblemCounts}{1}{\addtocounter{totalpoints}{\CurrentProblemPoints}}{}%
     \ProblemPointsFormat{\CurrentProblemPoints}%
   }%
   \quad\ignorespaces
 }{\par\gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PROBLEM GROUPS (subquestions)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \begin{problemgroup}{STEM} ... \end{problemgroup} -- a numbered "Problem N."
+% carrying a shared instruction (STEM), under which each imported problem prints
+% as a lettered part (a), (b), .... This is the ASSEMBLY-TIME wrapper: the parts
+% stay atomic one-problem files in the bank and are pulled in with \importproblem
+% exactly as anywhere else; the group only changes how they render. Use it for
+% independent items sharing an instruction ("Evaluate the following integrals:").
+% Genuinely dependent parts ("Let f(x)=...; (a)... (b)...") are ONE problem and
+% belong in one file -- not this.
+%
+% Points are per-part (each \importproblem[..] inside carries its own), so the
+% group takes no point value; the grand total sums the parts as usual, and a part
+% may be starred (\importproblem*) to sit off the books.
+%
+% Mechanism: the environment is a TeX group, so \inproblemgrouptrue and the
+% \leftskip indent below are both undone automatically at \end -- the flag falls
+% back to false for whatever follows, and the margin is restored. The stem prints
+% BEFORE the indent is set, so only the parts indent under it. The trailing \par
+% flushes the last part while the indent is still in force.
+\newenvironment{problemgroup}[1]{%
+  \par\refstepcounter{problem}%
+  \noindent\textbf{Problem \theproblem.}\quad\ignorespaces#1\par
+  \addtolength{\leftskip}{2em}% indent the parts under the stem (tunable)
+  \inproblemgrouptrue
+}{%
+  \par
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SOLUTION
