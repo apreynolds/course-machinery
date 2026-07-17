@@ -9,13 +9,15 @@
 %   \begin{problem} ... \end{problem}     numbered, cross-referenceable
 %   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
 %   \begin{solution} ... \end{solution}   printed only in the solutions build
+%   \begin{hint} ... \end{hint}           printed only in the hints build
 %   \importproblem[POINTS]{DIR}{FILE}      \import a problem, points set HERE
 %   \importproblem*[POINTS]{DIR}{FILE}     ... shown but NOT added to the total
 %   \printtotalpoints                      the summed points of the assessment
 %
-% plus the \ifsolutions toggle that drives the solution environment. Deliberately
-% small: a counter, two environments, one conditional, one import wrapper -- all
-% LaTeX primitives, none of xsim's expensive machinery. See NOTE.md item 4 for
+% plus the independent \ifsolutions / \ifhints toggles that drive those two
+% environments. Deliberately small: counters, a few environments, conditionals,
+% one import wrapper -- all LaTeX primitives, none of xsim's expensive machinery.
+% See NOTE.md item 4 for
 % why that boundary is safe.
 %
 % SELF-CONTAINED ON PURPOSE. This is the ESSENTIAL package -- problem sets with
@@ -50,17 +52,24 @@
 \AtBeginDocument{\providecommand{\ProblemMeta}[1]{}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% SOLUTIONS TOGGLE
+% SOLUTIONS / HINTS TOGGLES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Off by default (the student build). build-pdfs injects \def\ShowSolutions{} on
-% the command line for the -SOLUTIONS twin (see its `%! views: solutions').
+% Both off by default (the plain student build). build-pdfs injects
+% \def\ShowSolutions{} / \def\ShowHints{} on the command line for the -SOLUTIONS
+% and -HINTS twins (see its `%! views: solutions, hints').
+%
+% The two are INDEPENDENT: a hint is student-facing help, a solution is the
+% answer key -- different audiences, so a hints build is not a solutions build.
+% List both views to get both (separate) PDFs; nothing here couples them.
 %
 % This lived in Test.cls as scaffolding. Moved here so it is SHARED: a problem
-% file that carries its own \begin{solution} can now be \import-ed into a LECTURE
-% (LectureNotes) as well as a test, which it could not when only Test.cls knew
-% the machinery. That was NOTE.md item 4's open gap; this closes it.
+% file that carries its own \begin{solution} (or \begin{hint}) can now be
+% \import-ed into a LECTURE (LectureNotes) as well as a test, which it could not
+% when only Test.cls knew the machinery. That was NOTE.md item 4's open gap.
 \newif\ifsolutions
 \ifdefined\ShowSolutions \solutionstrue \fi
+\newif\ifhints
+\ifdefined\ShowHints \hintstrue \fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % POINTS (set at import time, NOT in the problem file)
@@ -230,6 +239,25 @@
   \ifsolutions
     \par\smallskip
     \noindent{\bfseries\color{SolutionColor}Solution.}\quad\ignorespaces
+    \BODY
+    \par
+  \fi
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HINT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Same shape as SOLUTION, gated by the independent \ifhints toggle. Inline where
+% written (NOT collected at the end, as xsim's hint model does) -- which is the
+% whole reason we wanted our own. BurntOrange reads as a warm "tip" aside, clearly
+% apart from the green of solutions, and is not a link colour (so it never reads
+% as a hyperlink in a Hyperlinks-loading lecture). Retune in one place.
+\colorlet{HintColor}{BurntOrange}
+
+\NewEnviron{hint}{%
+  \ifhints
+    \par\smallskip
+    \noindent{\bfseries\color{HintColor}Hint.}\quad\ignorespaces
     \BODY
     \par
   \fi
