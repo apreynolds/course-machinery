@@ -9,6 +9,7 @@
 %   \begin{problem} ... \end{problem}     numbered, cross-referenceable
 %   \begin{solution} ... \end{solution}   printed only in the solutions build
 %   \importproblem[POINTS]{DIR}{FILE}      \import a problem, points set HERE
+%   \importproblem*[POINTS]{DIR}{FILE}     ... shown but NOT added to the total
 %   \printtotalpoints                      the summed points of the assessment
 %
 % plus the \ifsolutions toggle that drives the solution environment. Deliberately
@@ -71,6 +72,16 @@
 % never leaks to the next.
 \newcommand{\CurrentProblemPoints}{}
 
+% Whether the current problem's points count toward the total. "1" = counted
+% (the default); "0" = shown but off the books. Set by the star form of
+% \importproblem, read (and reset) in the problem environment alongside points.
+% Serves two cases with one mechanism: BONUS questions (extra, so out of the
+% denominator) and CHOOSE-1-OF-N pairs (mark all but one of the alternatives
+% off-the-books, so a 10-or-10 pair contributes 10, not 20). It deliberately does
+% NOT alter the printed marker -- "choose one" pairs must still read "(10 points)"
+% on both, and which case it is (bonus vs. choose) is carried by exam prose.
+\newcommand{\CurrentProblemCounts}{1}
+
 % How the points render next to the heading. Stylable in one place; the eventual
 % target is the quarry's margin \fbox, but an inline marker is enough for now.
 % \ifnum picks "point" vs "points" -- which is also why points must be an INTEGER
@@ -88,13 +99,21 @@
 \newcommand{\printtotalpoints}{\total{totalpoints}}
 
 % \importproblem[POINTS]{DIR}{FILE} -- \import with a point value attached here.
+% The STARRED form \importproblem*[POINTS]{DIR}{FILE} shows the points but keeps
+% them out of the total (bonus / choose-1-of-N; see \CurrentProblemCounts above).
 % Bare \import still works and yields no marker (e.g. a lecture, ungraded). The
-% trailing reset is a safety net for the odd file that sets no problem to consume
-% the value; normally the environment below has already cleared it.
-\newcommand{\importproblem}[3][]{%
-  \gdef\CurrentProblemPoints{#1}%
-  \import{#2}{#3}%
-  \gdef\CurrentProblemPoints{}%
+% trailing resets are a safety net for the odd file that sets no problem to
+% consume the values; normally the environment below has already cleared them.
+% \@ifstar dispatches to the two forms, which differ only in the count flag.
+\newcommand{\importproblem}{\@ifstar\importproblem@off\importproblem@on}
+\newcommand{\importproblem@on}[3][]{\importproblem@do{1}{#1}{#2}{#3}}
+\newcommand{\importproblem@off}[3][]{\importproblem@do{0}{#1}{#2}{#3}}
+% #1 = count flag, #2 = points, #3 = dir, #4 = file.
+\newcommand{\importproblem@do}[4]{%
+  \gdef\CurrentProblemCounts{#1}%
+  \gdef\CurrentProblemPoints{#2}%
+  \import{#3}{#4}%
+  \gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -115,19 +134,20 @@
 % contents, but clearing globally is robust regardless and enforces consume-once.
 \newcounter{problem}
 
-% The points guard does double duty: when a value is present it both adds it to
-% the running total (\addtocounter is global, so it survives \import's grouping
-% and each problem contributes once) and prints the marker. A file that declares
-% no points contributes 0 and shows nothing.
+% The points guard prints the marker whenever a value is present, but only adds
+% to the running total when \CurrentProblemCounts is "1" (\addtocounter is global,
+% so it survives \import's grouping and each problem contributes once). A starred
+% \importproblem sets the flag to "0": the marker still shows, the total does not
+% move. A file that declares no points contributes 0 and shows nothing.
 \newenvironment{problem}{%
   \par\refstepcounter{problem}%
   \noindent\textbf{Problem \theproblem.}%
   \ifdefempty{\CurrentProblemPoints}{}{%
-    \addtocounter{totalpoints}{\CurrentProblemPoints}%
+    \ifdefstring{\CurrentProblemCounts}{1}{\addtocounter{totalpoints}{\CurrentProblemPoints}}{}%
     \ProblemPointsFormat{\CurrentProblemPoints}%
   }%
   \quad\ignorespaces
-}{\par\gdef\CurrentProblemPoints{}}
+}{\par\gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SOLUTION
