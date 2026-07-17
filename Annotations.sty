@@ -1,0 +1,77 @@
+\ProvidesPackage{Annotations}[2026/07/17 instructor-only annotation layer]
+
+%%% ===========================================================================
+%%% Annotations -- the INSTRUCTOR-NOTES content layer: \InstructorNote (inline),
+%%% InstructorComment (block), \MarginComment (margin). All gated on
+%%% \ifinstructornotes and FULLY GOBBLED when off, so a student build never
+%%% carries a byte of them.
+%%%
+%%% Why a shared .sty and not a class macro: \maketitle (Titling.sty) is a caller
+%%% -- it hangs an "Instructor Copy" marker off \InstructorNote -- and Titling is
+%%% shared by LectureNotes + CourseDocument, so these macros cannot live inside a
+%%% single class.
+%%%
+%%% VIEW MODEL: a "view" is a bundle of content layers. This package owns ONE
+%%% layer, flag \ShowInstructorNotes. The build's `instructor' view injects the
+%%% maximal bundle (\ShowSolutions + \ShowHints + \ShowProblemMeta +
+%%% \ShowInstructorNotes); this file only implements the last of those.
+%%%
+%%% CONTRACT (load order): amsthm/amsmath must already be loaded (newtxmath via
+%%% Typefaces owns that ordering), so REQUIRE Annotations AFTER Typefaces. It pulls
+%%% in tcolorbox itself (CourseDocument loads neither CourseBoxes nor tcolorbox);
+%%% loading tcolorbox[most] a second time is a safe no-op.
+%%% ===========================================================================
+
+\RequirePackage[most]{tcolorbox}   % the annotation boxes
+\RequirePackage{environ}           % \NewEnviron: drop a block's body when off
+\RequirePackage{marginnote}        % \marginnote: margin placement without floating
+
+%%% --- The layer flag (same idiom as Exercises.sty / ProblemMeta.sty) ---------
+\newif\ifinstructornotes
+\ifdefined\ShowInstructorNotes \instructornotestrue \fi
+
+%%% --- Colour (named once; house rule). WCAG-fixed: dvipsnames Lavender is
+%%% 2.09:1 on white (fails even large-bold), and white-on-Lavender is also 2.09:1.
+%%% InstructorInk #4B2E83 is a deep violet -- still unmistakably "lavender family",
+%%% but 10.4:1 on white AND carries white text at 10.4:1; !8 is the pale fill.
+\definecolor{InstructorInk}{HTML}{4B2E83}
+
+%%% --- inline note: on-line violet chip, dark-violet text on a pale wash -------
+\newcommand\InstructorNote[1]{%
+  \ifinstructornotes
+    \tcbox[on line, left=1pt, right=1pt, top=1pt, bottom=1pt,
+      boxrule=0.3mm, arc=0mm, outer arc=0mm,
+      colframe=InstructorInk, colback=InstructorInk!8, coltext=InstructorInk]%
+      {\sffamily #1}%
+  \fi
+  \ignorespaces
+}
+
+%%% --- block comment: titled breakable box; white "instructor" on a violet bar,
+%%% black body (a long note wants maximum legibility; the frame + bar carry the
+%%% signal). \NewEnviron so the body is genuinely DROPPED when the layer is off.
+\NewEnviron{InstructorComment}{%
+  \ifinstructornotes
+    \begin{tcolorbox}[enhanced, breakable, parbox=false,
+      left=15pt, right=15pt, top=9pt,
+      boxrule=0.3mm, arc=0mm, outer arc=0mm,
+      colframe=InstructorInk, colback=InstructorInk!8,
+      colbacktitle=InstructorInk, coltitle=white,
+      title={\ttfamily\bfseries\small instructor},
+      attach boxed title to top left={xshift=5pt, yshift=-\tcboxedtitleheight/2},
+      boxed title style={size=small, boxrule=0pt, arc=0pt, colback=InstructorInk,
+        outer arc=0mm, top=0pt, left=0pt, right=0pt, bottom=0pt}]
+      \sffamily\BODY
+    \end{tcolorbox}%
+  \fi
+}
+
+%%% --- margin note: dark-violet bold sans in the margin (unified with the layer)
+\newcommand\MarginComment[1]{%
+  \ifinstructornotes
+    \marginnote{\color{InstructorInk}\sffamily\bfseries\raggedright #1}%
+  \fi
+  \ignorespaces
+}
+
+\endinput
