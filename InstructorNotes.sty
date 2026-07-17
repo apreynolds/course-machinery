@@ -51,20 +51,24 @@
   \ifinstructornotes{\sffamily\color{InstructorInk}#1}\fi
 }
 
-%%% --- block note: titled breakable box; white "instructor" on a slate bar,
-%%% black body (a long note wants maximum legibility; the frame + bar carry the
-%%% signal). \NewEnviron so the body is genuinely DROPPED when the layer is off.
+%%% --- block note: a slate SIDE-BAR note. No title box, no tt (reserved for
+%%% problem metadata). A wide slate bar sits in the LEFT MARGIN -- drawn by the
+%%% overlay, so the box body keeps text width and aligns with the prose -- with
+%%% "note" rotated 90 inside it. \NewEnviron so the body is DROPPED when off.
+%%% NB the rotated word needs box HEIGHT to sit against: a very short note leaves
+%%% it cramped. Bar width is 6mm (the node xshift is half that); tune to taste.
 \NewEnviron{InstructorBox}{%
   \ifinstructornotes
     \begin{tcolorbox}[enhanced, breakable, parbox=false,
-      left=15pt, right=15pt, top=9pt,
-      boxrule=0.3mm, arc=0mm, outer arc=0mm,
-      colframe=InstructorInk, colback=InstructorInk!8,
-      colbacktitle=InstructorInk, coltitle=white,
-      title={\ttfamily\bfseries\small instructor},
-      attach boxed title to top left={xshift=5pt, yshift=-\tcboxedtitleheight/2},
-      boxed title style={size=small, boxrule=0pt, arc=0pt, colback=InstructorInk,
-        outer arc=0mm, top=0pt, left=0pt, right=0pt, bottom=0pt}]
+      frame hidden, boxrule=0pt, sharp corners,
+      colback=InstructorInk!8,
+      left=8pt, right=8pt, top=8pt, bottom=8pt,
+      overlay={%
+        \fill[InstructorInk]
+          ([xshift=-6mm]frame.south west) rectangle (frame.north west);
+        \node[white, rotate=90, font=\sffamily\bfseries\scriptsize]
+          at ([xshift=-3mm]frame.west) {note};
+      }]
       \sffamily\BODY
     \end{tcolorbox}%
   \fi
