@@ -104,7 +104,7 @@
 \newcommand\ExamTopMargin{3.7cm}
 \RequirePackage{geometry}
 \ifLegalPaper\geometry{legalpaper}\else\geometry{letterpaper}\fi
-\geometry{bottom=1.5cm, left=2.0cm, right=2.0cm, head=15pt}
+\geometry{bottom=2.0cm, left=2.0cm, right=2.0cm, head=15pt}
 \ifNoID\geometry{top=2.0cm}\else\geometry{top=\ExamTopMargin}\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
