@@ -22,6 +22,12 @@
 % blank band down the MIDDLE of the cover -- 9cm to 18cm down the page, per
 % Crowdmark's spec -- where students write their name/ID for the scanner to read.
 %
+% [tuesday]/[thursday] mark which of a two-section pair a copy is: a framed day box
+% (the day over the date) sits beside the title -- TUE on the LEFT, THU on the RIGHT.
+% The SIDE is the whole point: you can sort the two piles at a glance without reading
+% the word. The default (neither) prints no day box. Orthogonal to the identity
+% furniture -- a Tue/Thu paper still gets its NAME/ID box.
+%
 % xcolor's dvipsnames names are already secured by Exercises.sty below.
 \newif\ifLegalPaper
 \DeclareOption{legalpaper}{\LegalPapertrue}
@@ -29,6 +35,11 @@
 \DeclareOption{noid}{\NoIDtrue}
 \newif\ifAutoMatch
 \DeclareOption{automatch}{\AutoMatchtrue}
+\newif\ifTueThu
+\newif\ifThursday% thursday's box sits on the RIGHT; tuesday's on the LEFT
+\def\ExamDay{}
+\DeclareOption{tuesday}{\TueThutrue\def\ExamDay{TUE}}
+\DeclareOption{thursday}{\TueThutrue\Thursdaytrue\def\ExamDay{THU}}
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
 \ProcessOptions\relax
 
@@ -149,8 +160,9 @@
 %   1. an empty NAME / ID box in the upper LEFT (labels only) -- SUPPRESSED under
 %      [noid] (no identity to collect) and [automatch] (identity goes in the middle
 %      matching band instead);
-%   2. a CENTRED, sans-serif title: course (term) over name (date). Under [automatch]
-%      it is boxed to a fixed height so the Crowdmark matching band below stays blank;
+%   2. a CENTRED, sans-serif title: course (term) over name (date). [tuesday]/
+%      [thursday] add a framed day box to its left; under [automatch] it is boxed to
+%      a fixed height so the Crowdmark matching band below stays blank;
 %   3. the instructions verbatim, no heading (whole block omitted if unset).
 % The point total is NOT printed here -- drop \printtotalpoints into `instructions'
 % (or anywhere) if you want it on a given paper.
@@ -165,7 +177,9 @@
        \assess@course\ifdefempty{\assess@term}{}{ (\assess@term)}}\par
     \smallskip
     {\sffamily\bfseries\Large
-       \assess@name\ifdefempty{\assess@date}{}{ (\assess@date)}}\par
+       \assess@name
+       % date lives in the day box under [tuesday]/[thursday], so drop it here then
+       \ifTueThu\else\ifdefempty{\assess@date}{}{ (\assess@date)}\fi}\par
     \ifsolutions
       \smallskip{\sffamily\bfseries\color{SolutionColor}SOLUTIONS}\par
     \fi
@@ -177,6 +191,20 @@
 % read region starts (the short title ends above it, so it stays blank).
 \newcommand\AutoMatchTop{9cm}
 \newcommand\AutoMatchBottom{18cm}
+
+% [tuesday]/[thursday] day marker: a framed box, the day (\ExamDay) over the date,
+% set beside the title -- TUE left, THU right (see \AssessmentTitle). The 1.8cm
+% inner width is fixed so a same-width phantom balances the OTHER side and keeps the
+% title page-centred. Drawn only in the \ifTueThu branch below; \assess@date's line
+% is dropped if no date was set.
+\newsavebox\TueThu@box
+\newcommand\TueThu@daybox{%
+  {\setlength{\fboxrule}{1pt}\setlength{\fboxsep}{6pt}%
+   \fbox{\parbox[c]{1.8cm}{\centering\sffamily\bfseries
+     {\Large\ExamDay}%
+     \ifdefempty{\assess@date}{}{\\[0.6ex]{\normalsize\assess@date}}%
+   }}}%
+}
 
 \newcommand{\AssessmentTitle}{%
   % 1. NAME / ID box, lifted into the top margin band (kept clear for Crowdmark's
@@ -196,18 +224,33 @@
     }%
     \par\bigskip
   \fi\fi
-  % 2. Centred title. Under [automatch] it sits at the top of a fixed-height zone
-  % whose bottom is \AutoMatchBottom down the page (measuring from the text top,
-  % which geometry puts at \ExamTopMargin), leaving the matching band below it blank
-  % and resuming content just past it; otherwise it is set normally.
-  \ifAutoMatch
+  % 2. Centred title. [tuesday]/[thursday] set a framed day box beside it -- TUE
+  % left, THU right, the side being the at-a-glance version signal; [automatch]
+  % boxes it to a fixed height so the matching band below stays blank; otherwise it
+  % is set normally. (Tue/Thu and automatch are not meant to combine; Tue/Thu wins
+  % the title layout if both are somehow set.) The empty side carries a phantom of
+  % the box's width so the title stays centred on the page either way.
+  \ifTueThu
+    \sbox\TueThu@box{\TueThu@daybox}%
+    \noindent\makebox[\linewidth]{%
+      \ifThursday
+        \hspace{\wd\TueThu@box}\hfill
+        \begin{minipage}[c]{10cm}\AssessmentTitle@titlebody\end{minipage}%
+        \hfill\usebox\TueThu@box
+      \else
+        \usebox\TueThu@box\hfill
+        \begin{minipage}[c]{10cm}\AssessmentTitle@titlebody\end{minipage}%
+        \hfill\hspace{\wd\TueThu@box}%
+      \fi
+    }\par
+  \else\ifAutoMatch
     \noindent
     \begin{minipage}[t][\dimexpr\AutoMatchBottom-\ExamTopMargin\relax][t]{\linewidth}%
       \AssessmentTitle@titlebody
     \end{minipage}\par
   \else
     \AssessmentTitle@titlebody
-  \fi
+  \fi\fi
   % 3. Instructions (optional) -- no heading; the content stands on its own. Under
   % [automatch] they fall below the matching band, just above the questions.
   \ifdefempty{\assess@instructions}{}{%
