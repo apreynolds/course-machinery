@@ -12,7 +12,9 @@
 %
 %   \workspace            8 lines (the default)
 %   \workspace[12]        12 lines
-%   \workspace[halfpage]  half the text block   (0.5\textheight)
+%   \workspace[halfpage]  ~half the text block  (0.5\textheight - 1 line, so a
+%                         line at the page TOP ends up vertically centred: equal
+%                         space above and below it)
 %   \workspace[fullpage]  the whole text block  (\textheight; TEXT height, not paper)
 %   \workspace*           fill to the bottom of the page (\vfill)
 %
@@ -46,7 +48,7 @@
 
 % \workspace[amount] / \workspace* -- reserve blank writing space.
 %   *         -> \vfill (fill to the page bottom); elastic, so nothing to guarantee.
-%   halfpage  -> 0.5\textheight
+%   halfpage  -> 0.5\textheight - \baselineskip (see below)
 %   fullpage  -> \textheight
 %   <number>  -> that many \HandwritingLine's (default 8)
 % \textheight is read at USE time (in the body), so geometry has long since set it;
@@ -56,7 +58,11 @@
   \IfBooleanTF{#1}
     {\vfill}%
     {\ifstrequal{#2}{halfpage}
-       {\workspace@fixed{0.5\textheight}}%
+       % 0.5\textheight would put half a page BETWEEN the flanking lines, but the
+       % lines themselves eat into the room BELOW -- so the bottom gap comes up
+       % short by ~their combined height. Subtracting one \baselineskip (the mean
+       % of two single lines) equalises the gaps for a line sitting at the page top.
+       {\workspace@fixed{\dimexpr0.5\textheight-\baselineskip\relax}}%
        {\ifstrequal{#2}{fullpage}
           {\workspace@fixed{\textheight}}%
           {\workspace@fixed{#2\HandwritingLine}}%
