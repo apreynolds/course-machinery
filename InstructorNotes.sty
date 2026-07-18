@@ -16,8 +16,8 @@
 %%%
 %%% VIEW MODEL: a "view" is a bundle of content layers. This package owns ONE
 %%% layer, flag \ShowInstructorNotes. The build's `instructor' view injects the
-%%% maximal bundle (\ShowSolutions + \ShowHints + \ShowProblemMeta +
-%%% \ShowInstructorNotes); this file only implements the last of those.
+%%% bundle (\ShowSolutions + \ShowHints + \ShowInstructorNotes + \ShowPrivateNotes);
+%%% this file only implements the last two of those.
 %%%
 %%% CONTRACT (load order): amsthm/amsmath must already be loaded (newtxmath via
 %%% Typefaces owns that ordering), so REQUIRE InstructorNotes AFTER Typefaces. It
