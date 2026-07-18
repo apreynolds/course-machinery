@@ -61,6 +61,10 @@
 \RequirePackage{Exercises}
 \RequirePackage{ProblemMeta}
 
+% Explicit handwriting whitespace: \workspace[lines|halfpage|fullpage] / \workspace*.
+% Shared with LectureNotes -- both need copious writing room, unlike CourseDocument.
+\RequirePackage{Workspace}
+
 % No [osf] -- assessments must read clearly and standardly; figures stay lining.
 % Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
 \RequirePackage{Typefaces}
