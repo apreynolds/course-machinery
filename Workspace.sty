@@ -27,15 +27,16 @@
 % solutions key shows the blank space AND the printed solution below it; expected,
 % not a bug -- do NOT make \workspace collapse in the solutions build.
 %
-% GUARANTEED, NOT TRUNCATED: a bare \vspace that lands at (or crosses) a page break
-% is DISCARDED (and \vspace* around breaks is fragile), so a \workspace near a page
-% bottom would silently shrink -- the exact failure this is meant to prevent. So a
-% fixed amount is reserved as an invisible STRUT -- a zero-width box of that height.
-% A box is never discarded and never split, so if it will not fit it moves WHOLE to
-% the next page and the full room always survives. Side effect: a big \workspace near
-% a page bottom pushes to the next page, leaving a gap -- for writing space,
-% contiguous room beats a filled page. (For a guaranteed-clean blank page, place
-% \workspace[fullpage] right after a \newpage, i.e. at a true page top.)
+% NO CARRY-OVER (by choice): a \workspace is plain vertical space. If it is larger
+% than the room left on the page, the overflow is simply dropped and the following
+% content starts the next page -- the space does NOT reappear on the next page. This
+% matches the way these documents are actually laid out: content at the top of each
+% page, whitespace beneath, and the rare page where a workspace would not fit is
+% re-spaced BY HAND (move the offending content to the next page) rather than having a
+% workspace silently push a half-page gap onto the next page. Simple on purpose, not
+% precious about page boundaries. (One consequence of plain \vspace: an amount placed
+% at the very TOP of a page is discarded like any top-of-page glue -- put content
+% above it, or use \workspace* to fill a page from the top.)
 
 \RequirePackage{etoolbox}   % \ifstrequal: the halfpage/fullpage keywords
 
@@ -63,11 +64,8 @@
     }%
 }
 
-% Reserve a FIXED amount as an invisible strut: a zero-width \rule of that height, on
-% its own line. A box is never discarded at a page break and never split, so it moves
-% whole to the next page if it will not fit -- the room is always the full amount.
-\newcommand{\workspace@fixed}[1]{%
-  \par\noindent\rule{0pt}{#1}\par
-}
+% Reserve a FIXED amount as ordinary vertical space -- deliberately NOT an unbreakable
+% block, so it never carries a big gap onto the next page (see NO CARRY-OVER above).
+\newcommand{\workspace@fixed}[1]{\vspace{#1}}
 
 \endinput
