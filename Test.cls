@@ -7,9 +7,19 @@
 % [legalpaper] is our own (same name CourseDocument uses): tests and finals
 % sometimes run on legal stock for the extra vertical room. It only sets a flag,
 % read by the GEOMETRY block below where the paper size is chosen before the
-% margins. xcolor's dvipsnames names are already secured by Exercises.sty below.
+% margins.
+%
+% [noid] is for documents that collect no student identity -- homework, in-class
+% worksheets, MC practice: it drops the NAME/ID box (in \AssessmentTitle) and the
+% deep Crowdmark top margin (in GEOMETRY). The default keeps the full identified-
+% exam furniture on purpose: forgetting [noid] only over-furnishes homework with an
+% unused ID box (harmless), whereas a plain default could ship a real exam with no
+% ID box at all (a silent, high-stakes failure) -- so the safe mistake is the easy
+% one to make. xcolor's dvipsnames names are already secured by Exercises.sty below.
 \newif\ifLegalPaper
 \DeclareOption{legalpaper}{\LegalPapertrue}
+\newif\ifNoID
+\DeclareOption{noid}{\NoIDtrue}
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
 \ProcessOptions\relax
 
@@ -60,17 +70,19 @@
 % students write in. So the text block stays wide (near article's stock ~1in
 % margins) and the reclaimed room goes to the student, not the typographer.
 %
-% `top' is a deliberately deep 3.7cm. Crowdmark stamps a QR code and matching
-% information into the top band of EVERY page when the paper is uploaded, so that
-% band must stay clear of content on the interior pages. On the cover,
+% `top' is a deliberately deep 3.7cm (the default). Crowdmark stamps a QR code and
+% matching information into the top band of EVERY page when the paper is uploaded,
+% so that band must stay clear of content on the interior pages. On the cover,
 % \AssessmentTitle lifts its NAME/ID box up into this same band (a negative
 % \vspace, as the reference class did) so the box sits beside the QR near the top
-% edge rather than below it.
+% edge rather than below it. [noid] drops this band -- no QR to clear, no box to
+% lift -- for a normal 2cm top.
 % [legalpaper] swaps only the sheet; the cm margins are absolute, so legal's extra
 % 3in of height simply becomes more writing room (same 8.5in width, same margins).
 \RequirePackage{geometry}
 \ifLegalPaper\geometry{legalpaper}\else\geometry{letterpaper}\fi
-\geometry{top=3.7cm, bottom=1.5cm, left=2.0cm, right=2.0cm, head=15pt}
+\geometry{bottom=1.5cm, left=2.0cm, right=2.0cm, head=15pt}
+\ifNoID\geometry{top=2.0cm}\else\geometry{top=3.7cm}\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HEADERS / FOOTERS
@@ -122,7 +134,9 @@
 \newcommand{\assessmentsetup}[1]{\setkeys{assessment}{#1}}
 
 % \AssessmentTitle -- the cover, in three stacked pieces:
-%   1. an empty NAME / ID box in the upper LEFT (labels only, as the reference had);
+%   1. an empty NAME / ID box in the upper LEFT (labels only, as the reference had)
+%      -- SUPPRESSED under [noid], where there is no identity to collect and no deep
+%      top band to lift it into; the title then simply starts at the normal top;
 %   2. a CENTRED, sans-serif title: course (term) over name (date);
 %   3. the instructions verbatim, no heading (whole block omitted if unset).
 % The point total is NOT printed here -- drop \printtotalpoints into `instructions'
@@ -134,17 +148,20 @@
   % 1. NAME / ID box, lifted into the top margin band (kept clear for Crowdmark's
   % QR on interior pages) so it sits near the top edge, beside where the QR lands.
   % Empty box, labels only -- the student writes to the right of each; the parbox
-  % fixes the height so the two labels sit centred with room between them.
-  \vspace*{-3.3cm}%
-  \noindent
-  \framebox[8.5cm][c]{%
-    \parbox[c][2.5cm][c]{8cm}{%
-      \sffamily\bfseries
-      NAME: \\[4ex]
-      ID:
+  % fixes the height so the two labels sit centred with room between them. Under
+  % [noid] the whole box (and its lift) is dropped.
+  \ifNoID\else
+    \vspace*{-3.3cm}%
+    \noindent
+    \framebox[8.5cm][c]{%
+      \parbox[c][2.5cm][c]{8cm}{%
+        \sffamily\bfseries
+        NAME: \\[4ex]
+        ID:
+      }%
     }%
-  }%
-  \par\bigskip
+    \par\bigskip
+  \fi
   % 2. Centred title.
   \begin{center}
     {\sffamily\bfseries\LARGE
