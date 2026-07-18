@@ -52,6 +52,11 @@
 \PassOptionsToPackage{dvipsnames}{xcolor}
 \RequirePackage{xcolor}
 
+% The solution/hint bodies are set in tcolorboxes (see the SOLUTION section).
+% Loaded here so this package still compiles standalone; [most] matches the
+% option CourseBoxes passes, so loading both in one document does not clash.
+\RequirePackage[most]{tcolorbox}
+
 % If ProblemMeta is not loaded, make \ProblemMeta a no-op that swallows its
 % argument, so problem files carrying a metadata block still compile. Deferred to
 % \AtBeginDocument so it is order-independent: if ProblemMeta IS loaded (before or
@@ -295,18 +300,42 @@
 % retuned in one place.
 \colorlet{SolutionColor}{ForestGreen}
 
+% The look of the solution box, named once so it retunes in one place (the same
+% one-place-to-restyle idiom as CourseBoxes' cb/... styles). A light-green fill
+% under a thin green frame, sharp corners, with a small white-on-green "solution"
+% tab hung over the top-left border -- the SolutionBox look from the old
+% custom-cls-sty. parbox=false so display math and multiple paragraphs in the body
+% set normally; breakable so a long solution can cross a page. The tab fill is the
+% SOLID SolutionColor (not a tint) so the white tab text keeps its contrast.
+\tcbset{
+  ex/solution/.style={
+    enhanced, breakable, parbox=false,
+    colback=SolutionColor!5, colframe=SolutionColor!60,
+    sharp corners, boxrule=0.2mm,
+    left=10pt, right=10pt, top=8pt, bottom=8pt,
+    coltitle=white, colbacktitle=SolutionColor,
+    title={\ttfamily\bfseries\small solution},
+    attach boxed title to top left={xshift=6pt, yshift=-\tcboxedtitleheight/2},
+    boxed title style={
+      size=small, boxrule=0pt, sharp corners,
+      colback=SolutionColor,
+      top=1pt, bottom=1pt, left=3pt, right=3pt,
+    },
+  },
+}
+
 % \NewEnviron captures the whole body as \BODY. When solutions are OFF we simply
 % never emit \BODY -- the clean way to drop an environment's contents, and the
 % same pattern IfThenBoxes.sty already uses for its solution-only boxes. A plain
 % \newenvironment with \ifsolutions...\fi wrapped around the delimiters is
 % fragile (the body is still scanned, and the \fi lands in the wrong group); this
-% is not.
+% is not. When solutions are ON, the body is set inside the ex/solution box.
 \NewEnviron{solution}{%
   \ifsolutions
-    \par\smallskip
-    \noindent{\bfseries\color{SolutionColor}Solution.}\quad\ignorespaces
-    \BODY
     \par
+    \begin{tcolorbox}[ex/solution]%
+      \BODY
+    \end{tcolorbox}%
   \fi
 }
 
