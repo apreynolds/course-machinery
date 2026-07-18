@@ -15,11 +15,20 @@
 % exam furniture on purpose: forgetting [noid] only over-furnishes homework with an
 % unused ID box (harmless), whereas a plain default could ship a real exam with no
 % ID box at all (a silent, high-stakes failure) -- so the safe mistake is the easy
-% one to make. xcolor's dvipsnames names are already secured by Exercises.sty below.
+% one to make.
+%
+% [automatch] is for Crowdmark's automatic name matching: it KEEPS the deep top
+% margin (the QR still lands there) but replaces the top NAME/ID box with a large
+% blank band down the MIDDLE of the cover -- 9cm to 18cm down the page, per
+% Crowdmark's spec -- where students write their name/ID for the scanner to read.
+%
+% xcolor's dvipsnames names are already secured by Exercises.sty below.
 \newif\ifLegalPaper
 \DeclareOption{legalpaper}{\LegalPapertrue}
 \newif\ifNoID
 \DeclareOption{noid}{\NoIDtrue}
+\newif\ifAutoMatch
+\DeclareOption{automatch}{\AutoMatchtrue}
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
 \ProcessOptions\relax
 
@@ -79,10 +88,13 @@
 % lift -- for a normal 2cm top.
 % [legalpaper] swaps only the sheet; the cm margins are absolute, so legal's extra
 % 3in of height simply becomes more writing room (same 8.5in width, same margins).
+% \ExamTopMargin is the deep-top value, single-sourced here because \AssessmentTitle
+% also needs it to size the [automatch] band from the page top.
+\newcommand\ExamTopMargin{3.7cm}
 \RequirePackage{geometry}
 \ifLegalPaper\geometry{legalpaper}\else\geometry{letterpaper}\fi
 \geometry{bottom=1.5cm, left=2.0cm, right=2.0cm, head=15pt}
-\ifNoID\geometry{top=2.0cm}\else\geometry{top=3.7cm}\fi
+\ifNoID\geometry{top=2.0cm}\else\geometry{top=\ExamTopMargin}\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HEADERS / FOOTERS
@@ -134,23 +146,45 @@
 \newcommand{\assessmentsetup}[1]{\setkeys{assessment}{#1}}
 
 % \AssessmentTitle -- the cover, in three stacked pieces:
-%   1. an empty NAME / ID box in the upper LEFT (labels only, as the reference had)
-%      -- SUPPRESSED under [noid], where there is no identity to collect and no deep
-%      top band to lift it into; the title then simply starts at the normal top;
-%   2. a CENTRED, sans-serif title: course (term) over name (date);
+%   1. an empty NAME / ID box in the upper LEFT (labels only) -- SUPPRESSED under
+%      [noid] (no identity to collect) and [automatch] (identity goes in the middle
+%      matching band instead);
+%   2. a CENTRED, sans-serif title: course (term) over name (date). Under [automatch]
+%      it is boxed to a fixed height so the Crowdmark matching band below stays blank;
 %   3. the instructions verbatim, no heading (whole block omitted if unset).
 % The point total is NOT printed here -- drop \printtotalpoints into `instructions'
 % (or anywhere) if you want it on a given paper.
 % SolutionColor comes from Exercises; the SOLUTIONS flag rides the same \ifsolutions
 % toggle as \begin{solution}. The instructor copy is already marked by the page-edge
 % frame, so no separate instructor flag is needed here.
+% The centred title block, factored so the [automatch] path can wrap it in a
+% fixed-height zone without duplicating it.
+\newcommand{\AssessmentTitle@titlebody}{%
+  \begin{center}
+    {\sffamily\bfseries\LARGE
+       \assess@course\ifdefempty{\assess@term}{}{ (\assess@term)}}\par
+    \smallskip
+    {\sffamily\bfseries\Large
+       \assess@name\ifdefempty{\assess@date}{}{ (\assess@date)}}\par
+    \ifsolutions
+      \smallskip{\sffamily\bfseries\color{SolutionColor}SOLUTIONS}\par
+    \fi
+  \end{center}%
+}
+
+% [automatch] band bounds, measured DOWN THE PAGE (Crowdmark spec: blank from 9cm
+% to 18cm). Only \AutoMatchBottom drives layout; \AutoMatchTop documents where the
+% read region starts (the short title ends above it, so it stays blank).
+\newcommand\AutoMatchTop{9cm}
+\newcommand\AutoMatchBottom{18cm}
+
 \newcommand{\AssessmentTitle}{%
   % 1. NAME / ID box, lifted into the top margin band (kept clear for Crowdmark's
   % QR on interior pages) so it sits near the top edge, beside where the QR lands.
   % Empty box, labels only -- the student writes to the right of each; the parbox
-  % fixes the height so the two labels sit centred with room between them. Under
-  % [noid] the whole box (and its lift) is dropped.
-  \ifNoID\else
+  % fixes the height so the two labels sit centred with room between them. Dropped
+  % under [noid] (no identity) and [automatch] (identity goes in the middle band).
+  \ifNoID\else\ifAutoMatch\else
     \vspace*{-3.3cm}%
     \noindent
     \framebox[8.5cm][c]{%
@@ -161,19 +195,21 @@
       }%
     }%
     \par\bigskip
+  \fi\fi
+  % 2. Centred title. Under [automatch] it sits at the top of a fixed-height zone
+  % whose bottom is \AutoMatchBottom down the page (measuring from the text top,
+  % which geometry puts at \ExamTopMargin), leaving the matching band below it blank
+  % and resuming content just past it; otherwise it is set normally.
+  \ifAutoMatch
+    \noindent
+    \begin{minipage}[t][\dimexpr\AutoMatchBottom-\ExamTopMargin\relax][t]{\linewidth}%
+      \AssessmentTitle@titlebody
+    \end{minipage}\par
+  \else
+    \AssessmentTitle@titlebody
   \fi
-  % 2. Centred title.
-  \begin{center}
-    {\sffamily\bfseries\LARGE
-       \assess@course\ifdefempty{\assess@term}{}{ (\assess@term)}}\par
-    \smallskip
-    {\sffamily\bfseries\Large
-       \assess@name\ifdefempty{\assess@date}{}{ (\assess@date)}}\par
-    \ifsolutions
-      \smallskip{\sffamily\bfseries\color{SolutionColor}SOLUTIONS}\par
-    \fi
-  \end{center}
-  % 3. Instructions (optional) -- no heading; the content stands on its own.
+  % 3. Instructions (optional) -- no heading; the content stands on its own. Under
+  % [automatch] they fall below the matching band, just above the questions.
   \ifdefempty{\assess@instructions}{}{%
     \bigskip
     \assess@instructions\par
