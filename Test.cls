@@ -185,7 +185,7 @@
 % a grouped part render identically. \ifnum needs the integer (guaranteed by
 % \importproblem).
 \renewcommand{\ProblemPointsFormat}[1]{%
-  \marginnote{\small\bfseries #1\ \ifnum#1=1 pt\else pts\fi}%
+  \marginnote{\small\bfseries (#1\ \ifnum#1=1 pt\else pts\fi)}%
 }
 \renewcommand{\ProblemHeadingFormat}{%
   \par\addvspace{2\baselineskip}%
