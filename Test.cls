@@ -1,10 +1,15 @@
 \ProvidesClass{Test}[2026/07/17]
 
-% Forward \documentclass[...] options to article, as the sibling classes do.
-% Without this, a stray option (12pt, twoside, ...) is collected and then SILENTLY
+% Forward \documentclass[...] options to article, as the sibling classes do; a
+% stray option (12pt, twoside, ...) would otherwise be collected and then SILENTLY
 % dropped -- \LoadClass{article} does not forward what the class never processed.
-% No named options of our own yet; xcolor's dvipsnames names are already secured by
-% Exercises.sty, which loads xcolor before anything else here touches it.
+%
+% [legalpaper] is our own (same name CourseDocument uses): tests and finals
+% sometimes run on legal stock for the extra vertical room. It only sets a flag,
+% read by the GEOMETRY block below where the paper size is chosen before the
+% margins. xcolor's dvipsnames names are already secured by Exercises.sty below.
+\newif\ifLegalPaper
+\DeclareOption{legalpaper}{\LegalPapertrue}
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
 \ProcessOptions\relax
 
@@ -61,8 +66,10 @@
 % \AssessmentTitle lifts its NAME/ID box up into this same band (a negative
 % \vspace, as the reference class did) so the box sits beside the QR near the top
 % edge rather than below it.
+% [legalpaper] swaps only the sheet; the cm margins are absolute, so legal's extra
+% 3in of height simply becomes more writing room (same 8.5in width, same margins).
 \RequirePackage{geometry}
-\geometry{letterpaper}
+\ifLegalPaper\geometry{legalpaper}\else\geometry{letterpaper}\fi
 \geometry{top=3.7cm, bottom=1.5cm, left=2.0cm, right=2.0cm, head=15pt}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
