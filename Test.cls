@@ -33,12 +33,12 @@
 % Instructor-only notes layer, shared with LectureNotes and CourseDocument. Loaded
 % AFTER Typefaces per its contract (amsthm/amsmath must already be in place; it
 % pulls in tcolorbox itself). This completes the `instructor' view bundle for
-% assessments: Exercises already supplies \ShowSolutions/\ShowHints and ProblemMeta
-% supplies \ShowProblemMeta, so adding InstructorNotes (\ShowInstructorNotes /
-% \ShowPrivateNotes) means build-pdfs' `instructor' view yields a full -INSTRUCTOR
-% exam copy -- answer key + hints + metadata + staff notes, inside the slate
-% "Instructor copy" page frame. The plain -SOLUTIONS answer-key twin already worked
-% without it (Exercises owns \ifsolutions); this adds the notes layer on top.
+% assessments: Exercises already supplies \ShowSolutions/\ShowHints, so adding
+% InstructorNotes (\ShowInstructorNotes / \ShowPrivateNotes) means build-pdfs'
+% `instructor' view yields a full -INSTRUCTOR exam copy -- answer key + hints +
+% staff notes, inside the slate "Instructor copy" page frame. The plain -SOLUTIONS
+% answer-key twin already worked without it (Exercises owns \ifsolutions); this
+% adds the notes layer on top.
 \RequirePackage{InstructorNotes}
 
 % Blank line between paragraphs instead of an indent. Default skip; assessments
@@ -63,18 +63,7 @@
 % edge rather than below it.
 \RequirePackage{geometry}
 \geometry{letterpaper}
-\geometry{top=3.7cm, bottom=1.5cm, left=2.0cm, right=1.5cm, head=15pt}
-
-% The instructor/metadata view (build-pdfs injects \ShowProblemMeta as part of the
-% `instructor' bundle) hangs ProblemMeta's topics/tags/difficulty/source blocks in
-% the RIGHT margin via \marginpar. The exam default reserves no margin column -- a
-% student copy wants the full width to write in -- so those blocks would run off
-% the paper edge. Widen the right margin and reserve a marginpar column ONLY in
-% that view, leaving the student copy's writing width untouched. (A pre-echo of the
-% per-page-type \newgeometry furniture NOTE.md defers; kept to this one need.)
-\ifdefined\ShowProblemMeta
-  \geometry{right=5cm, marginparwidth=3cm, marginparsep=4mm}
-\fi
+\geometry{top=3.7cm, bottom=1.5cm, left=2.0cm, right=2.0cm, head=15pt}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HEADERS / FOOTERS
@@ -165,4 +154,51 @@
     \bigskip
     \assess@instructions\par
   }%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PROBLEM LABELS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% On a test a problem is a numbered QUESTION. The LEFT margin is a pure NUMBER rail
+% -- "Q N" hung there for a standalone question, "Q N." for a group stem -- and the
+% RIGHT margin is the MARKS rail: every scored item drops its point value there via
+% \ProblemPointsFormat. Splitting numbers (left) from marks (right) is what keeps a
+% standalone question and a grouped question's PARTS consistent: a part is lettered
+% "(a)" inline, not numbered in the margin, yet its marks still land in the same
+% right rail as every other item's. (The reference class stacked marks under the
+% number on the LEFT -- which read well for a lone question but had no answer for
+% the grouped parts; this is the fix.)
+%
+% \llap hangs the number block in the left margin; \smash keeps it off the line's
+% height so the body's first line is not pushed down; the \hspace opens a gap to
+% the text. \marginnote (from InstructorNotes' marginnote) drops the marks in the
+% outer = right margin, aligned with the heading line and without floating. Point
+% BOOKKEEPING is already done by the problem environment, so these hooks DISPLAY only.
+%
+% The \smash means the number block reserves NO vertical room, so two short
+% back-to-back questions would let one hang onto the next. The leading \addvspace
+% restores the inter-question gap (and reads as deliberate breathing room). It is
+% \addvspace, not \vspace, so it merges with any skip a question already left.
+\renewcommand{\ProblemLabelWord}{Q}
+\renewcommand{\ProblemNumberText}{\ProblemLabelWord\theproblem}% tight: "Q3", no space
+% Marks in the right margin -- the SHARED points hook, so a standalone question and
+% a grouped part render identically. \ifnum needs the integer (guaranteed by
+% \importproblem).
+\renewcommand{\ProblemPointsFormat}[1]{%
+  \marginnote{\small\bfseries #1\ \ifnum#1=1 pt\else pts\fi}%
+}
+\renewcommand{\ProblemHeadingFormat}{%
+  \par\addvspace{2\baselineskip}%
+  \noindent
+  \llap{\smash{\textbf{\ProblemNumberText.}}\hspace{1em}}%
+  \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
+}
+% The group's numbered stem gets the SAME margin placement (number hung left, no
+% points box -- the parts carry the points), so a grouped question lines up with
+% the standalone ones. The stem then sets flush against the text edge.
+\renewcommand{\ProblemGroupHeadingFormat}[1]{%
+  \par\addvspace{2\baselineskip}%
+  \noindent
+  \llap{\smash{\textbf{\ProblemNumberText.}}\hspace{1em}}%
+  \ignorespaces#1\par
 }
