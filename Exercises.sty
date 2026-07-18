@@ -300,28 +300,35 @@
 % retuned in one place.
 \colorlet{SolutionColor}{ForestGreen}
 
-% The look of the solution box, named once so it retunes in one place (the same
-% one-place-to-restyle idiom as CourseBoxes' cb/... styles). A light-green fill
-% under a thin green frame, sharp corners, with a small white-on-green "solution"
-% tab hung over the top-left border -- the SolutionBox look from the old
-% custom-cls-sty. parbox=false so display math and multiple paragraphs in the body
-% set normally; breakable so a long solution can cross a page. The tab fill is the
-% SOLID SolutionColor (not a tint) so the white tab text keeps its contrast.
+% The look of the solution/hint boxes, factored into ONE shared base so both
+% retune in a single place (the same one-place-to-restyle idiom as CourseBoxes'
+% cb/... styles). ex/answerbox takes a colour and a label word; ex/solution below
+% and ex/hint (in the HINT section, once HintColor exists) each just pick the
+% colour + word. A light fill under a thin frame, sharp corners, with a small
+% white-on-colour tab hung over the top-left border -- the SolutionBox look from
+% the old custom-cls-sty. parbox=false so display math and multiple paragraphs in
+% the body set normally; breakable so a long body can cross a page. The tab fill
+% is a strong tint (!80) so the white tab text keeps its contrast.
 \tcbset{
-  ex/solution/.style={
+  ex/answerbox/.style 2 args={
     enhanced, breakable, parbox=false,
-    colback=SolutionColor!5, colframe=SolutionColor!60,
+    colback=#1!5, colframe=#1!60,
     sharp corners, boxrule=0.2mm,
-    left=10pt, right=10pt, top=8pt, bottom=8pt,
-    coltitle=white, colbacktitle=SolutionColor,
-    title={\ttfamily\bfseries\small solution},
-    attach boxed title to top left={xshift=6pt, yshift=-\tcboxedtitleheight/2},
+    left=6pt, right=6pt, top=10pt, bottom=6pt,
+    coltitle=white, colbacktitle=#1!80,
+    title={\sffamily\footnotesize #2},
+    % xshift aligns the tab's LABEL TEXT with the body text's left margin (the
+    % tab's left edge overhangs a touch into the border), so the label reads as a
+    % heading over its paragraph. Tuned to the left= paddings here; retune if those
+    % change. (Use ~16pt instead to make the tab's left EDGE flush with the body.)
+    attach boxed title to top left={xshift=8.5pt, yshift=-\tcboxedtitleheight/2},
     boxed title style={
       size=small, boxrule=0pt, sharp corners,
-      colback=SolutionColor,
-      top=1pt, bottom=1pt, left=3pt, right=3pt,
+      colback=#1!70,
+      top=0.5pt, bottom=0.5pt, left=1.5pt, right=1.5pt,
     },
   },
+  ex/solution/.style={ex/answerbox={SolutionColor}{solution}},
 }
 
 % \NewEnviron captures the whole body as \BODY. When solutions are OFF we simply
@@ -349,6 +356,10 @@
 % as a hyperlink in a Hyperlinks-loading lecture). Retune in one place.
 \colorlet{HintColor}{BurntOrange}
 
+% Same box as the solution, in the hint colour + word -- derived from the shared
+% ex/answerbox base in the SOLUTION section, so the two never drift apart.
+\tcbset{ex/hint/.style={ex/answerbox={HintColor}{hint}}}
+
 % Three-state visibility (see \CurrentProblemHint): the per-import hint/nohint keys
 % force this hint on/off; "inherit" (the default, and every non-\importproblem
 % context) follows the document \ifhints toggle. \showhint collapses the three
@@ -360,10 +371,10 @@
     \ifdefstring{\CurrentProblemHint}{off}{}{\ifhints\showhinttrue\fi}%
   }%
   \ifshowhint
-    \par\smallskip
-    \noindent{\bfseries\color{HintColor}Hint.}\quad\ignorespaces
-    \BODY
     \par
+    \begin{tcolorbox}[ex/hint]%
+      \BODY
+    \end{tcolorbox}%
   \fi
 }
 
