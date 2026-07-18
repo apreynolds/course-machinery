@@ -74,4 +74,53 @@
 % block, so it never carries a big gap onto the next page (see NO CARRY-OVER above).
 \newcommand{\workspace@fixed}[1]{\vspace{#1}}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BLANK / EXTRA-WORK PAGES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   \blankpage             one blank page (no body content)
+%   \blankpage[watermark]  one blank page carrying a faint centred watermark
+%                          ("Blank page for extra work") -- the back-of-the-test
+%                          "use this space if you need it" page.
+% Any other keyword (e.g. \blankpage[blank]) is treated as a plain blank page.
+%
+% WHY A DEDICATED COMMAND, NOT \newpage[...]: \newpage is a LaTeX kernel command
+% (\clearpage and the float mechanism call it internally). Giving it an optional
+% argument would make it scan for a following "[", which could silently swallow a
+% bracket that legitimately opens the next line -- a paragraph starting "[0,1] is
+% ...". So \newpage is left untouched and blank pages get their own verb. A blank
+% page must carry ONE box to ship at all; the \null that does that lives INSIDE the
+% command, so the document source needs no \null / \mbox hack of its own.
+%   (\blankpage has its own, far smaller "[" caveat: put a blank line or a
+%    structural command after it -- as you always would -- and its optional-arg
+%    scan stops at the paragraph break, never reaching following bracketed text.)
+%
+% The watermark uses eso-pic's PER-PAGE background hook -- \AddToShipoutPictureBG*
+% clears itself after that one shipout -- the same shipout-background route the
+% instructor frame takes, and deliberately NOT the "background" package (which warns
+% about everypage / the LaTeX version and needs a \WarningFilter to hush; eso-pic
+% does neither).
+\RequirePackage{eso-pic}    % per-page shipout background -> the watermark
+\RequirePackage{graphicx}   % \rotatebox -> the diagonal watermark
+\RequirePackage{color}      % \color[gray]{..}; lighter than xcolor, no option clash
+
+% --- TWEAK HERE: the watermark's wording and look ---------------------------
+\newcommand{\BlankPageText}{Blank page for extra work}
+\newcommand{\blankpage@mark}{%
+  \AtPageCenter{\makebox(0,0){%
+    \rotatebox{45}{%
+      \color[gray]{0.85}\sffamily\bfseries\fontsize{1.4cm}{1.4cm}\selectfont
+      \BlankPageText}}}%
+}
+
+\NewDocumentCommand{\blankpage}{O{}}{%
+  \par
+  \newpage                   % ship whatever preceded (real content stays put)
+                             % TWEAK: the blank page keeps the running page
+                             % number/footer. Add \thispagestyle{empty} here for a
+                             % fully bare page instead.
+  \ifstrequal{#1}{watermark}{\AddToShipoutPictureBG*{\blankpage@mark}}{}%
+  \null                      % the one box that makes the empty page actually ship
+  \newpage                   % ship the blank page; following content starts fresh
+}
+
 \endinput
