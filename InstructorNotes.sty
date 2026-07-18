@@ -98,12 +98,14 @@
 }
 
 %%% --- "Instructor copy" page frame -------------------------------------------
-%%% A slate frame just inside every page edge, with a small bottom-centre
-%%% "Instructor copy" tab sitting on the frame line. This REPLACES a title stamp
-%%% (seen only on page 1) and a diagonal watermark (which fights the content): an
-%%% ever-present, low-distraction marker. Drawn via eso-pic's shipout background
-%%% -- NO tikz, so no remember-picture two-pass -- and loaded ONLY for the
-%%% instructor view, so student builds never pull eso-pic in.
+%%% A slate frame just inside every page edge, with a small "Instructor copy" tab
+%%% tucked into the BOTTOM-RIGHT corner, sitting on the frame line. Bottom-right,
+%%% not bottom-centre, so it clears the centred page-number footer both the lecture
+%%% and assessment classes carry (centred tab + centred footer collided). This
+%%% REPLACES a title stamp (seen only on page 1) and a diagonal watermark (which
+%%% fights the content): an ever-present, low-distraction marker. Drawn via eso-pic's
+%%% shipout background -- NO tikz, so no remember-picture two-pass -- and loaded ONLY
+%%% for the instructor view, so student builds never pull eso-pic in.
 \ifinstructornotes
   \RequirePackage{eso-pic}
   % --- TWEAK HERE: the two knobs for the instructor-copy frame ----------------
@@ -115,8 +117,8 @@
       \framebox(\LenToUnit{\dimexpr\paperwidth-\InstructorFrameInset-\InstructorFrameInset\relax},%
                 \LenToUnit{\dimexpr\paperheight-\InstructorFrameInset-\InstructorFrameInset\relax}){}%
     }%
-    \put(\LenToUnit{.5\paperwidth},\LenToUnit{\InstructorFrameInset}){%
-      \makebox(0,0){\colorbox{white}{%
+    \put(\LenToUnit{\dimexpr\paperwidth-\InstructorFrameInset-5mm\relax},\LenToUnit{\InstructorFrameInset}){%
+      \makebox(0,0)[r]{\colorbox{white}{%
         \color{InstructorInk}\sffamily\bfseries\footnotesize\,Instructor copy\,}}%
     }%
   }%
