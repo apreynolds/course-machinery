@@ -195,22 +195,47 @@
 % two representations differ on purpose -- short label on the page, full ref.
 \renewcommand{\thesubproblem}{\theproblem(\alph{subproblem})}
 
-% The heading branches on \ifinproblemgroup: a top-level problem is "Problem N.",
-% a part is "(a)". The POINTS block is shared by both -- per-part points and the
-% starred off-the-books form work identically inside a group. The points guard
-% prints the marker whenever a value is present, but only adds to the running
-% total when \CurrentProblemCounts is "1" (\addtocounter is global, so it survives
-% \import's grouping and each problem contributes once). A file that declares no
-% points contributes 0 and shows nothing.
+% ---- Heading: class-overridable PRESENTATION -------------------------------
+% A problem file is context-neutral -- \begin{problem} names no label of its own,
+% because the SAME file is a numbered "Q" on a test and an "Example" in a lecture.
+% The consuming class decides the look through two hooks, the same idiom as
+% Titling's \TitleColor and Hyperlinks' \LinkColor:
+%
+%   \ProblemLabelWord     the noun -- "Problem" (default), "Q", "Example".
+%   \ProblemNumberText    the FORMATTED number, "Problem N" / "Q N" / "Q N" (tight).
+%                         One macro so the standalone heading and the group stem
+%                         can never disagree; a class overrides it if the separator
+%                         differs (Test wants "QN", no space).
+%   \ProblemHeadingFormat typesets a TOP-LEVEL problem's whole heading. It runs
+%                         AFTER the counter is stepped and (for a counted problem)
+%                         the points are already in the total, so it is pure
+%                         presentation -- read \ProblemNumberText / \CurrentProblemPoints
+%                         and place them inline or in the margin, with no risk to
+%                         the count. Default: run-in "Problem N." + inline points.
+%   \ProblemGroupHeadingFormat{STEM}  the same, for a \problemgroup's numbered stem.
+%
+%   Test.cls overrides these to "Q N" over a points \fbox hung in the left margin;
+%   LectureNotes.cls (later) to a run-in "Example.".
+\newcommand{\ProblemLabelWord}{Problem}
+\newcommand{\ProblemNumberText}{\ProblemLabelWord\ \theproblem}
+\newcommand{\ProblemHeadingFormat}{%
+  \noindent\textbf{\ProblemNumberText.}%
+  \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
+  \quad
+}
+\newcommand{\ProblemGroupHeadingFormat}[1]{%
+  \noindent\textbf{\ProblemNumberText.}\quad\ignorespaces#1\par
+}
+
+% The environment separates BOOKKEEPING (counter + running total -- never
+% overridable, so a restyled heading can never disturb the point count) from
+% PRESENTATION (the heading). A part inside a \problemgroup always renders as a
+% lettered "(a)" run-in -- the group, not the class, owns that layout -- while a
+% top-level problem goes through \ProblemHeadingFormat.
 \newenvironment{problem}{%
   \par
-  \ifinproblemgroup
-    \refstepcounter{subproblem}%
-    \noindent\textbf{(\alph{subproblem})}%
-  \else
-    \refstepcounter{problem}%
-    \noindent\textbf{Problem \theproblem.}%
-  \fi
+  % --- Bookkeeping.
+  \ifinproblemgroup\refstepcounter{subproblem}\else\refstepcounter{problem}\fi
   % \refstepcounter sets \@currentlabel LOCALLY, but this environment is a group
   % and the problem body arrives via \import -- so a \label written next to the
   % \importproblem (outside the group) would otherwise capture the *enclosing*
@@ -220,9 +245,16 @@
   \global\let\@currentlabel\@currentlabel
   \ifdefempty{\CurrentProblemPoints}{}{%
     \ifdefstring{\CurrentProblemCounts}{1}{\addtocounter{totalpoints}{\CurrentProblemPoints}}{}%
-    \ProblemPointsFormat{\CurrentProblemPoints}%
   }%
-  \quad\ignorespaces
+  % --- Presentation.
+  \ifinproblemgroup
+    \noindent\textbf{(\alph{subproblem})}%
+    \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
+    \quad
+  \else
+    \ProblemHeadingFormat
+  \fi
+  \ignorespaces
 }{\par\gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -248,7 +280,7 @@
 % flushes the last part while the indent is still in force.
 \newenvironment{problemgroup}[1]{%
   \par\refstepcounter{problem}%
-  \noindent\textbf{Problem \theproblem.}\quad\ignorespaces#1\par
+  \ProblemGroupHeadingFormat{#1}%
   \addtolength{\leftskip}{2em}% indent the parts under the stem (tunable)
   \inproblemgrouptrue
 }{%
