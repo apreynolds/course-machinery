@@ -350,6 +350,16 @@
   ex/solutionplain/.style={ex/answerbox=SolutionColor, top=6pt},
 }
 
+% Zero-height overlay routing. Workspace.sty (loaded by Test/LectureNotes) defines
+% \WSZeroHeight, which in the default OVERLAY mode emits a box at zero height so it
+% paints down into the reserved \workspace instead of shifting the layout; under
+% \solidboxes it emits normally. Both the solution and hint environments route their
+% box through it. Exercises stays SELF-CONTAINED: if Workspace is absent (e.g. under
+% CourseDocument), this \AtBeginDocument fallback makes \WSZeroHeight a pass-through,
+% so the boxes just render at normal height. \providecommand at begin-document, so
+% the real definition wins whenever Workspace is loaded (before or after us).
+\AtBeginDocument{\providecommand{\WSZeroHeight}[1]{#1}}
+
 % Per-box options, keyval family `exbox' -- the same idiom as \importproblem's
 % `eximport'. Shared by \begin{solution} and \begin{hint} (both take an optional
 % [key,...] argument). One key for now; future per-box axes slot in as one more.
@@ -374,9 +384,9 @@
     \setkeys{exbox}{#1}%
     \par
     \ifex@notitle
-      \begin{tcolorbox}[ex/solutionplain]\BODY\end{tcolorbox}%
+      \WSZeroHeight{\begin{tcolorbox}[ex/solutionplain]\BODY\end{tcolorbox}}%
     \else
-      \begin{tcolorbox}[ex/solution]\BODY\end{tcolorbox}%
+      \WSZeroHeight{\begin{tcolorbox}[ex/solution]\BODY\end{tcolorbox}}%
     \fi
   \fi
 }
@@ -414,9 +424,9 @@
     \setkeys{exbox}{#1}%
     \par
     \ifex@notitle
-      \begin{tcolorbox}[ex/hintplain]\BODY\end{tcolorbox}%
+      \WSZeroHeight{\begin{tcolorbox}[ex/hintplain]\BODY\end{tcolorbox}}%
     \else
-      \begin{tcolorbox}[ex/hint]\BODY\end{tcolorbox}%
+      \WSZeroHeight{\begin{tcolorbox}[ex/hint]\BODY\end{tcolorbox}}%
     \fi
   \fi
 }

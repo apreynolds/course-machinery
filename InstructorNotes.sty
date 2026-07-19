@@ -72,8 +72,17 @@
 %%% centred on the box height via the overlay (which adds no height), so a very
 %%% SHORT box with a LONG word can spill -- moot in practice. Bar 6mm; node xshift
 %%% is half that.
+% Zero-height overlay routing. Workspace.sty (loaded by Test/LectureNotes) defines
+% \WSZeroHeight -- in the default OVERLAY mode it emits the box at zero height so it
+% paints down into the reserved \workspace instead of shifting the layout; under
+% \solidboxes it emits normally. InstructorNotes stays self-contained: this
+% \AtBeginDocument fallback makes \WSZeroHeight a pass-through when Workspace is
+% absent (e.g. under CourseDocument, which loads this package but no \workspace), so
+% the box just renders at normal height there.
+\AtBeginDocument{\providecommand{\WSZeroHeight}[1]{#1}}
+
 \newcommand\instr@sidebar[1]{% #1 = the rotated bar word; body is \BODY
-  \begin{tcolorbox}[enhanced, breakable, parbox=false,
+  \WSZeroHeight{\begin{tcolorbox}[enhanced, breakable, parbox=false,
     frame hidden, boxrule=0pt, sharp corners,
     colback=InstructorInk!8,
     left=8pt, right=8pt, top=8pt, bottom=8pt,
@@ -84,7 +93,7 @@
         at ([xshift=-3mm]frame.west) {#1};
     }]
     \sffamily\BODY
-  \end{tcolorbox}%
+  \end{tcolorbox}}%
 }
 \NewEnviron{InstructorBox}[1][note]{\ifinstructornotes\instr@sidebar{#1}\fi}
 \NewEnviron{InstructorPrivate}[1][private]{\ifprivatenotes\instr@sidebar{#1}\fi}
