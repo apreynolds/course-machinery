@@ -55,8 +55,8 @@
 %             they never shift the layout: the solutions/instructor copy is a
 %             pixel-perfect overlay of the student copy.
 %   \solidboxes   SOLID -- those boxes render at NORMAL height and the reserved
-%             room (\workspace AND \blankpage) collapses to nothing: a compact
-%             answer key. Set once in the preamble.
+%             room (\workspace, and \FreshPage's breaks / blank pages) collapses to
+%             nothing: a compact answer key. Set once in the preamble.
 %   \overlayboxes -- back to the default (for completeness / local re-enable).
 %
 % \ifWorkspaceOverlay is the flag both THIS package (the \workspace collapse below)
@@ -139,24 +139,33 @@
 \newcommand{\workspace@fixed}[1]{\vspace{#1}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% BLANK / EXTRA-WORK PAGES
+% \FreshPage -- COLLAPSIBLE PAGE BREAKS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%   \blankpage             one blank page (no body content)
-%   \blankpage[watermark]  one blank page carrying a faint centred watermark
+% One command, three forms -- ALL of which VANISH under \solidboxes (page breaks and
+% extra-work pages are layout for the spacing copy, not the compact answer key):
+%
+%   \FreshPage             a collapsible \newpage: break to a fresh page your content
+%                          then flows ONTO (flush at the top, exactly as \newpage).
+%   \FreshPage[blank]      a DEDICATED blank page -- nothing on it; following content
+%                          starts the NEXT page. The [blank] keyword is purely a
+%                          visible reminder in the source that the blank is deliberate.
+%   \FreshPage[watermark]  a dedicated blank page carrying a faint diagonal watermark
 %                          ("Blank page for extra work") -- the back-of-the-test
 %                          "use this space if you need it" page.
-% Any other keyword (e.g. \blankpage[blank]) is treated as a plain blank page.
 %
-% WHY A DEDICATED COMMAND, NOT \newpage[...]: \newpage is a LaTeX kernel command
-% (\clearpage and the float mechanism call it internally). Giving it an optional
-% argument would make it scan for a following "[", which could silently swallow a
-% bracket that legitimately opens the next line -- a paragraph starting "[0,1] is
-% ...". So \newpage is left untouched and blank pages get their own verb. A blank
-% page must carry ONE box to ship at all; the \null that does that lives INSIDE the
-% command, so the document source needs no \null / \mbox hack of its own.
-%   (\blankpage has its own, far smaller "[" caveat: put a blank line or a
-%    structural command after it -- as you always would -- and its optional-arg
-%    scan stops at the paragraph break, never reaching following bracketed text.)
+% The difference between the no-argument form and [blank]: no argument is a BARE
+% \newpage, so content SHARES the fresh page; [blank]/[watermark] force an EMPTY page
+% (via \null) and push following content to the page after. Any keyword other than
+% watermark behaves like [blank]. Plain \newpage stays untouched for the rare break
+% that must NEVER collapse.
+%
+% WHY AN ARGUMENT, NOT \newpage[...]: \newpage is a LaTeX kernel command (\clearpage
+% and the float mechanism call it internally). Giving IT an optional argument would
+% make it scan for a following "[", silently swallowing a bracket that legitimately
+% opens the next line -- a paragraph starting "[0,1] is ...". So \newpage is left
+% untouched and the collapsible break gets its own verb. \FreshPage has the same, far
+% smaller "[" caveat: put a blank line or a structural command after it -- as you
+% always would -- and its optional-arg scan stops at the paragraph break.
 %
 % The watermark uses eso-pic's PER-PAGE background hook -- \AddToShipoutPictureBG*
 % clears itself after that one shipout -- the same shipout-background route the
@@ -169,27 +178,38 @@
 
 % --- TWEAK HERE: the watermark's wording and look ---------------------------
 \newcommand{\BlankPageText}{Blank page for extra work}
-\newcommand{\blankpage@mark}{%
+\newcommand{\freshpage@mark}{%
   \AtPageCenter{\makebox(0,0){%
     \rotatebox{45}{%
-      \color[gray]{0.85}\sffamily\bfseries\fontsize{1.4cm}{1.4cm}\selectfont
+      % \color goes AFTER \selectfont, not before: colour-before-font-selection
+      % inside this rotated shipout box can error ("Missing }") if the page ever also
+      % carries body content (a font-selection/colour-group clash). \FreshPage always
+      % watermarks a BLANK page, so it is not strictly needed here -- but this order
+      % is robust either way and costs nothing. Same pixels.
+      \sffamily\bfseries\fontsize{1.4cm}{1.4cm}\selectfont\color[gray]{0.85}%
       \BlankPageText}}}%
 }
 
-% Like \workspace, a blank page is RESERVED room (a whole page of "use this space
-% if you need it"), so it collapses under \solidboxes: the compact answer-key form
-% wants neither the reserved handwriting gaps NOR the extra-work pages. In OVERLAY
-% mode (default) it ships the page as documented; in SOLID mode it emits nothing.
-\NewDocumentCommand{\blankpage}{O{}}{%
+% In OVERLAY mode (default) \FreshPage ships as documented; in SOLID mode it emits
+% nothing (the break, and any blank/extra-work page, collapses). The leading \newpage
+% is shared by all three forms: for the NO-ARGUMENT form it IS the whole break, so
+% content flows onto the fresh page flush at the top (a bare \newpage -- no \null, no
+% shift). For [blank]/[watermark] that \newpage ships the preceding page, then \null
+% + a second \newpage ship a DEDICATED empty (optionally watermarked) page.
+%
+% TWEAK: the blank/fresh page keeps the running page number/footer; add
+% \thispagestyle{empty} in the keyword branch for a fully bare page instead.
+\NewDocumentCommand{\FreshPage}{O{}}{%
   \ifWorkspaceOverlay
     \par
-    \newpage                 % ship whatever preceded (real content stays put)
-                             % TWEAK: the blank page keeps the running page
-                             % number/footer. Add \thispagestyle{empty} here for a
-                             % fully bare page instead.
-    \ifstrequal{#1}{watermark}{\AddToShipoutPictureBG*{\blankpage@mark}}{}%
-    \null                    % the one box that makes the empty page actually ship
-    \newpage                 % ship the blank page; following content starts fresh
+    \newpage
+    \ifstrequal{#1}{}%
+      {}%                        % no argument: a bare collapsible break; content flows on
+      {% a keyword -> a DEDICATED blank page ([watermark] also stamps the mark)
+        \ifstrequal{#1}{watermark}{\AddToShipoutPictureBG*{\freshpage@mark}}{}%
+        \null                    % the one box that makes the empty page actually ship
+        \newpage                 % ship the blank page; following content starts fresh
+      }%
   \fi
 }
 
