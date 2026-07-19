@@ -10,7 +10,8 @@
 %   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
 %   \begin{solution}[notitle] ...          printed only in the solutions build; a
 %                                          colour box, [notitle] drops its corner tab
-%   \begin{hint}[notitle] ...              printed only in the hints build; likewise
+%   \begin{hint} ... \end{hint}            printed only in the hints build; a plain
+%                                          "HINT:" run-in, italic body (no box)
 %   \begin{choices}[stacked|onepar|grid]   lettered MC options in that layout;
 %     \choice{}  \choice[correct]{}        key boxed only in the solutions build
 %     \graphchoice[correct]{FILE}          a graph option (label beside, centred)
@@ -301,8 +302,9 @@
 % retuned in one place.
 \colorlet{SolutionColor}{ForestGreen}
 
-% The look of the solution/hint boxes, factored so both retune in a single place
-% (the same one-place-to-restyle idiom as CourseBoxes' cb/... styles). Two pieces:
+% The look of the solution box, factored into two pieces so its titled and plain
+% (no-tab) variants share one definition (retune in a single place, the same
+% one-place-to-restyle idiom as CourseBoxes' cb/... styles):
 %
 %   ex/answerbox={COLOUR}       the box itself -- light fill, thin frame, sharp
 %                               corners, leftskip-aware width. NO tab.
@@ -310,11 +312,10 @@
 %                               left border (the SolutionBox look from the old
 %                               custom-cls-sty).
 %
-% Composed into four styles: ex/solution / ex/hint (box + tab) and their
-% ex/...plain twins (box only, for \begin{solution}[notitle]). Splitting the tab
-% out is what makes the tab suppressible per box -- the plain twin simply omits it
-% (and trims the top padding, since there is no tab to clear). ex/hint and its
-% plain twin live in the HINT section, once HintColor exists.
+% Composed into ex/solution (box + tab) and ex/solutionplain (box only, for
+% \begin{solution}[notitle]). Splitting the tab out is what makes it suppressible:
+% the plain twin simply omits it (and trims the top padding, since there is no tab
+% to clear). (The hint used to reuse these pieces too; it is now a plain run-in.)
 %
 % parbox=false so display math and multiple paragraphs in the body set normally;
 % breakable so a long body can cross a page. The tab fill is a strong tint (!80)
@@ -360,9 +361,9 @@
 % the real definition wins whenever Workspace is loaded (before or after us).
 \AtBeginDocument{\providecommand{\WSZeroHeight}[1]{#1}}
 
-% Per-box options, keyval family `exbox' -- the same idiom as \importproblem's
-% `eximport'. Shared by \begin{solution} and \begin{hint} (both take an optional
-% [key,...] argument). One key for now; future per-box axes slot in as one more.
+% Per-box options for \begin{solution}, keyval family `exbox' -- the same idiom as
+% \importproblem's `eximport'. (The hint is a plain run-in now, not a box, so it
+% takes no options.) One key for now; future per-box axes slot in as one more.
 %
 %   notitle   drop the corner tab, leaving just the coloured box
 %
@@ -394,40 +395,34 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HINT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Same shape as SOLUTION, gated by the independent \ifhints toggle. Inline where
-% written (NOT collected at the end, as xsim's hint model does) -- which is the
-% whole reason we wanted our own. BurntOrange reads as a warm "tip" aside, clearly
-% apart from the green of solutions, and is not a link colour (so it never reads
-% as a hyperlink in a Hyperlinks-loading lecture). Retune in one place.
-\colorlet{HintColor}{BurntOrange}
-
-% Same box as the solution, in the hint colour + word -- composed from the shared
-% ex/answerbox + ex/answertab pieces in the SOLUTION section, so the two never
-% drift apart. ex/hintplain is the no-tab twin for \begin{hint}[notitle].
-\tcbset{
-  ex/hint/.style     ={ex/answerbox=HintColor, ex/answertab={HintColor}{hint}},
-  ex/hintplain/.style={ex/answerbox=HintColor, top=6pt},
-}
+% A hint is a LIGHT run-in aside, NOT a box: a new line, a "HINT:" label, then the
+% hint text in italics. Deliberately plainer than the solution (a boxed answer key)
+% -- a hint is a small nudge, not the answer. Inline where written (NOT collected at
+% the end, as xsim's hint model does). Shown in the hints build via the independent
+% \ifhints toggle.
+%
+% NOT zero-height (unlike the solution overlay): a hint is student-facing help shown
+% in the hints build and should push content down NORMALLY, so it does not route
+% through \WSZeroHeight and is unaffected by \solidboxes.
+%
+% \HintLabel is the single styling knob -- the fully-formatted run-in label. The
+% body that follows is italicised by the environment. TWEAK the label look here
+% (e.g. wrap in \textcolor for a warm cue; kept plain bold for a light touch).
+\newcommand{\HintLabel}{\textbf{HINT:}}
 
 % Three-state visibility (see \CurrentProblemHint): the per-import hint/nohint keys
 % force this hint on/off; "inherit" (the default, and every non-\importproblem
 % context) follows the document \ifhints toggle. \showhint collapses the three
 % states to one boolean the emit-or-drop below reads.
 \newif\ifshowhint
-\NewEnviron{hint}[1][]{%
+\NewEnviron{hint}{%
   \showhintfalse
   \ifdefstring{\CurrentProblemHint}{on}{\showhinttrue}{%
     \ifdefstring{\CurrentProblemHint}{off}{}{\ifhints\showhinttrue\fi}%
   }%
   \ifshowhint
-    \ex@notitlefalse
-    \setkeys{exbox}{#1}%
-    \par
-    \ifex@notitle
-      \WSZeroHeight{\begin{tcolorbox}[ex/hintplain]\BODY\end{tcolorbox}}%
-    \else
-      \WSZeroHeight{\begin{tcolorbox}[ex/hint]\BODY\end{tcolorbox}}%
-    \fi
+    \par\smallskip
+    \noindent\HintLabel\ {\itshape\ignorespaces\BODY}\par
   \fi
 }
 
@@ -473,8 +468,35 @@
 % SolutionColor is defined in the SOLUTION section above. NB \fcolorbox is an
 % \mbox, so a *very* long correct option will not line-break inside the box --
 % fine for typical MC options, which are short; restyle here if that ever bites.
+%
+% ZERO-FOOTPRINT (the overlay contract): the box must occupy EXACTLY the same
+% height/depth/width as the bare option text, so a choices list lays out identically
+% whether the key is boxed (solutions build) or not (student build) -- otherwise the
+% ~7pt the \fboxsep+\fboxrule add on each side would make the solutions list taller
+% and shift a downstream page break, breaking the pixel-perfect overlay. So we
+% MEASURE the bare text, then declare the framed box's metrics back down to it and let
+% the frame paint OUTSIDE (over the inter-choice / cell whitespace):
+%   \sbox        capture the bare text's \ht/\dp/\wd;
+%   \raisebox[][] force the (taller) frame to report the bare height/depth (it
+%                overflows top/bottom for free);
+%   \makebox[..][l] reserve only the bare width (frame overflows right);
+%   \kern-(rule+sep) slide the frame left so the TEXT stays x-aligned with the other
+%                choices (frame overflows into the "(A)" gap on the left).
+% Works uniformly for all three layouts and \graphchoice, since the output is simply
+% "a box with the bare content's metrics". \fboxsep is kept modest so the overflow
+% into neighbours stays subtle. Retune \fboxsep / \fboxrule here.
+\newsavebox{\cc@inner}
 \newcommand{\CorrectChoiceFormat}[1]{%
-  {\setlength{\fboxrule}{0.2mm}\fcolorbox{SolutionColor}{SolutionColor!8}{#1}}%
+  \begingroup
+    \setlength{\fboxrule}{0.2mm}\setlength{\fboxsep}{2pt}%
+    \sbox\cc@inner{#1}%
+    \makebox[\wd\cc@inner][l]{%
+      \kern-\dimexpr\fboxrule+\fboxsep\relax
+      \raisebox{\z@}[\ht\cc@inner][\dp\cc@inner]{%
+        \fcolorbox{SolutionColor}{SolutionColor!8}{\usebox\cc@inner}%
+      }%
+    }%
+  \endgroup
 }
 
 % Shared: render option text, boxed iff this \choice is the key AND solutions on.
