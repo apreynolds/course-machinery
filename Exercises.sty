@@ -8,8 +8,9 @@
 %
 %   \begin{problem} ... \end{problem}     numbered, cross-referenceable
 %   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
-%   \begin{solution} ... \end{solution}   printed only in the solutions build
-%   \begin{hint} ... \end{hint}           printed only in the hints build
+%   \begin{solution}[notitle] ...          printed only in the solutions build; a
+%                                          colour box, [notitle] drops its corner tab
+%   \begin{hint}[notitle] ...              printed only in the hints build; likewise
 %   \begin{choices}[stacked|onepar|grid]   lettered MC options in that layout;
 %     \choice{}  \choice[correct]{}        key boxed only in the solutions build
 %     \graphchoice[correct]{FILE}          a graph option (label beside, centred)
@@ -300,17 +301,26 @@
 % retuned in one place.
 \colorlet{SolutionColor}{ForestGreen}
 
-% The look of the solution/hint boxes, factored into ONE shared base so both
-% retune in a single place (the same one-place-to-restyle idiom as CourseBoxes'
-% cb/... styles). ex/answerbox takes a colour and a label word; ex/solution below
-% and ex/hint (in the HINT section, once HintColor exists) each just pick the
-% colour + word. A light fill under a thin frame, sharp corners, with a small
-% white-on-colour tab hung over the top-left border -- the SolutionBox look from
-% the old custom-cls-sty. parbox=false so display math and multiple paragraphs in
-% the body set normally; breakable so a long body can cross a page. The tab fill
-% is a strong tint (!80) so the white tab text keeps its contrast.
+% The look of the solution/hint boxes, factored so both retune in a single place
+% (the same one-place-to-restyle idiom as CourseBoxes' cb/... styles). Two pieces:
+%
+%   ex/answerbox={COLOUR}       the box itself -- light fill, thin frame, sharp
+%                               corners, leftskip-aware width. NO tab.
+%   ex/answertab={COLOUR}{WORD} the small white-on-colour tab hung over the top-
+%                               left border (the SolutionBox look from the old
+%                               custom-cls-sty).
+%
+% Composed into four styles: ex/solution / ex/hint (box + tab) and their
+% ex/...plain twins (box only, for \begin{solution}[notitle]). Splitting the tab
+% out is what makes the tab suppressible per box -- the plain twin simply omits it
+% (and trims the top padding, since there is no tab to clear). ex/hint and its
+% plain twin live in the HINT section, once HintColor exists.
+%
+% parbox=false so display math and multiple paragraphs in the body set normally;
+% breakable so a long body can cross a page. The tab fill is a strong tint (!80)
+% so the white tab text keeps its contrast.
 \tcbset{
-  ex/answerbox/.style 2 args={
+  ex/answerbox/.style={
     enhanced, breakable, parbox=false,
     colback=#1!5, colframe=#1!60,
     sharp corners, boxrule=0.2mm,
@@ -321,6 +331,8 @@
     % \linewidth -- so an unshrunk box runs \leftskip past the margin (the "24pt
     % too wide" overfull). At top level \leftskip is 0pt, so this is just \linewidth.
     width=\dimexpr\linewidth-\leftskip\relax,
+  },
+  ex/answertab/.style 2 args={
     coltitle=white, colbacktitle=#1!80,
     title={\sffamily\footnotesize #2},
     % xshift aligns the tab's LABEL TEXT with the body text's left margin (the
@@ -334,21 +346,38 @@
       top=0.5pt, bottom=0.5pt, left=1.5pt, right=1.5pt,
     },
   },
-  ex/solution/.style={ex/answerbox={SolutionColor}{solution}},
+  ex/solution/.style     ={ex/answerbox=SolutionColor, ex/answertab={SolutionColor}{solution}},
+  ex/solutionplain/.style={ex/answerbox=SolutionColor, top=6pt},
 }
+
+% Per-box options, keyval family `exbox' -- the same idiom as \importproblem's
+% `eximport'. Shared by \begin{solution} and \begin{hint} (both take an optional
+% [key,...] argument). One key for now; future per-box axes slot in as one more.
+%
+%   notitle   drop the corner tab, leaving just the coloured box
+%
+% \ifex@notitle is reset false before each box, so the option never leaks to the
+% next; \setkeys errors loudly on an unknown key (a typo), as eximport does.
+\newif\ifex@notitle
+\define@key{exbox}{notitle}[true]{\ex@notitletrue}
 
 % \NewEnviron captures the whole body as \BODY. When solutions are OFF we simply
 % never emit \BODY -- the clean way to drop an environment's contents, and the
 % same pattern IfThenBoxes.sty already uses for its solution-only boxes. A plain
 % \newenvironment with \ifsolutions...\fi wrapped around the delimiters is
 % fragile (the body is still scanned, and the \fi lands in the wrong group); this
-% is not. When solutions are ON, the body is set inside the ex/solution box.
-\NewEnviron{solution}{%
+% is not. When solutions are ON, the body is set inside the ex/solution box --
+% or ex/solutionplain (no tab) for \begin{solution}[notitle].
+\NewEnviron{solution}[1][]{%
   \ifsolutions
+    \ex@notitlefalse
+    \setkeys{exbox}{#1}%
     \par
-    \begin{tcolorbox}[ex/solution]%
-      \BODY
-    \end{tcolorbox}%
+    \ifex@notitle
+      \begin{tcolorbox}[ex/solutionplain]\BODY\end{tcolorbox}%
+    \else
+      \begin{tcolorbox}[ex/solution]\BODY\end{tcolorbox}%
+    \fi
   \fi
 }
 
@@ -362,25 +391,33 @@
 % as a hyperlink in a Hyperlinks-loading lecture). Retune in one place.
 \colorlet{HintColor}{BurntOrange}
 
-% Same box as the solution, in the hint colour + word -- derived from the shared
-% ex/answerbox base in the SOLUTION section, so the two never drift apart.
-\tcbset{ex/hint/.style={ex/answerbox={HintColor}{hint}}}
+% Same box as the solution, in the hint colour + word -- composed from the shared
+% ex/answerbox + ex/answertab pieces in the SOLUTION section, so the two never
+% drift apart. ex/hintplain is the no-tab twin for \begin{hint}[notitle].
+\tcbset{
+  ex/hint/.style     ={ex/answerbox=HintColor, ex/answertab={HintColor}{hint}},
+  ex/hintplain/.style={ex/answerbox=HintColor, top=6pt},
+}
 
 % Three-state visibility (see \CurrentProblemHint): the per-import hint/nohint keys
 % force this hint on/off; "inherit" (the default, and every non-\importproblem
 % context) follows the document \ifhints toggle. \showhint collapses the three
 % states to one boolean the emit-or-drop below reads.
 \newif\ifshowhint
-\NewEnviron{hint}{%
+\NewEnviron{hint}[1][]{%
   \showhintfalse
   \ifdefstring{\CurrentProblemHint}{on}{\showhinttrue}{%
     \ifdefstring{\CurrentProblemHint}{off}{}{\ifhints\showhinttrue\fi}%
   }%
   \ifshowhint
+    \ex@notitlefalse
+    \setkeys{exbox}{#1}%
     \par
-    \begin{tcolorbox}[ex/hint]%
-      \BODY
-    \end{tcolorbox}%
+    \ifex@notitle
+      \begin{tcolorbox}[ex/hintplain]\BODY\end{tcolorbox}%
+    \else
+      \begin{tcolorbox}[ex/hint]\BODY\end{tcolorbox}%
+    \fi
   \fi
 }
 
