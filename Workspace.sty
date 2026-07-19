@@ -83,9 +83,22 @@
 %      restore \prevdepth afterwards -- so the FOLLOWING content (the \workspace)
 %      is placed EXACTLY as if this box had never been emitted. That equality is
 %      the point: the annotated copy overlays the student copy to the pixel.
+%   4. paint the box \WSOverlayGap LOWER, bracketed by a canceling pair of kerns:
+%      +gap moves it down (a natural gap opens above it, instead of the box top
+%      jamming against the previous line), -gap takes that back out of the layout,
+%      so the NET height added is still zero. The box just paints a little further
+%      into the (blank) workspace below; nothing else moves. Without this the
+%      \nointerlineskip of step 3 leaves the box top flush under the previous line.
 % A box TALLER than the workspace below it simply overprints the following content
 % -- the intended "leave more room" alarm, not a bug. (A breakable tcolorbox in a
 % \vtop renders unbroken, which is right: an overlay is a fixed stamp, not paged.)
+
+% --- TWEAK HERE: the gap painted above an overlay box, matching its solid-mode top
+% skip so the two builds look the same. Rigid (a kern), so its exact value is what
+% shows; retune in one place.
+\newlength{\WSOverlayGap}
+\setlength{\WSOverlayGap}{\medskipamount}
+
 \newsavebox{\WS@ovbox}
 \newdimen\WS@prevdp
 \newcommand{\WSZeroHeight}[1]{%
@@ -94,7 +107,9 @@
     \setbox\WS@ovbox=\vtop{#1}%          % build (its own inner list; outer list untouched)
     \ht\WS@ovbox=\z@ \dp\WS@ovbox=\z@     % report zero height + depth
     \WS@prevdp=\prevdepth                 % remember the exact vertical position
-    \nointerlineskip \box\WS@ovbox        % paint, with no glue before it
+    \kern\WSOverlayGap                    % paint the box this far below the previous line...
+    \nointerlineskip \box\WS@ovbox        % ...with no baseline glue before it
+    \kern-\WSOverlayGap                   % ...and take the gap back out, so net height is 0
     \prevdepth=\WS@prevdp                 % restore: following content is unshifted
   \else
     #1%
