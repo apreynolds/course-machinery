@@ -116,6 +116,31 @@
 % the per-import override layered on top, so both frameworks coexist.
 \newcommand{\CurrentProblemHint}{inherit}
 
+% Literal display number for the current problem, set by \importproblem's
+% `number' key. Empty (the default) means the CONTEXT decides: on a test the
+% `problem' counter numbers it; in lecture notes it prints unnumbered. A
+% non-empty value is a plain STRING -- typically a textbook's own number, e.g.
+% "2.1.8" -- printed verbatim next to the label word and used as the \label
+% target. It steps NO counter, so an imported textbook number never competes
+% with a numbering scheme of your own. Only a class that shows it (LectureNotes)
+% reads this; Test.cls ignores it (an exam owns its own numbering).
+\newcommand{\CurrentProblemNumber}{}
+
+% Free-text parenthetical shown after the heading, set by \importproblem's
+% `desc' key -- e.g. "Example (similar to 2.1.8)". Empty (default) prints
+% nothing. Like `number', pure presentation: the notes heading appends it in
+% parentheses; Test.cls ignores it (an exam question is not annotated).
+\newcommand{\CurrentProblemDesc}{}
+
+% Whether the current import prints at all. \importproblem's `noprint' flag
+% (equivalently print=false) clears this, and \importproblem then SKIPS the
+% \import entirely -- the file is not read, so no counter steps, no points are
+% tallied, and no \label target is made. Default true. Skip-entirely is
+% deliberate (not typeset-then-hide): hiding output while still stepping the
+% counter would leave numbering gaps and silently inflate the points total.
+\newif\ifCurrentProblemPrint
+\CurrentProblemPrinttrue
+
 % How the points render next to the heading. Stylable in one place; the eventual
 % target is the quarry's margin \fbox, but an inline marker is enough for now.
 % \ifnum picks "point" vs "points" -- which is also why points must be an INTEGER
@@ -135,10 +160,15 @@
 % \importproblem[OPTIONS]{DIR}{FILE} -- \import a problem with per-import settings.
 % OPTIONS is a comma-separated key=value list (keyval family `eximport'):
 %
-%   points=5    the point value (integer; summed and pluralised)
-%   nocount     show the points but keep them OUT of the total (bonus / choose-1-of-N)
-%   hint        force this problem's hint to show, regardless of the global toggle
-%   nohint      suppress this problem's hint, regardless of the global toggle
+%   points=5      the point value (integer; summed and pluralised)
+%   nocount       show the points but keep them OUT of the total (bonus / choose-1-of-N)
+%   hint          force this problem's hint to show, regardless of the global toggle
+%   nohint        suppress this problem's hint, regardless of the global toggle
+%   number=2.1.8  literal display number (e.g. a textbook's); steps NO counter,
+%                 used as the \label text. Empty = the context numbers it (or not).
+%   desc={...}    parenthetical shown after the heading in a notes context.
+%   noprint       skip this import entirely (equivalently print=false): no output,
+%                 no counter step, no points, no \label -- the file is not read.
 %
 % As a shorthand, a LONE integer means points: \importproblem[5]{...}{...} is
 % exactly \importproblem[points=5]{...}{...} (this is the back-compat form and the
@@ -154,16 +184,26 @@
 \define@key{eximport}{nocount}[true]{\gdef\CurrentProblemCounts{0}}
 \define@key{eximport}{hint}[true]{\gdef\CurrentProblemHint{on}}
 \define@key{eximport}{nohint}[true]{\gdef\CurrentProblemHint{off}}
+\define@key{eximport}{number}{\gdef\CurrentProblemNumber{#1}}
+\define@key{eximport}{desc}{\gdef\CurrentProblemDesc{#1}}
+% `noprint' is the flag form (matching nocount/nohint); `print=false' the value
+% form, for toggling from a variable. Anything but "false" reads as true.
+\define@key{eximport}{noprint}[true]{\global\CurrentProblemPrintfalse}
+\define@key{eximport}{print}[true]{%
+  \ifstrequal{#1}{false}{\global\CurrentProblemPrintfalse}{\global\CurrentProblemPrinttrue}}
 
 \newcommand{\importproblem@reset}{%
   \gdef\CurrentProblemPoints{}%
   \gdef\CurrentProblemCounts{1}%
   \gdef\CurrentProblemHint{inherit}%
+  \gdef\CurrentProblemNumber{}%
+  \gdef\CurrentProblemDesc{}%
+  \global\CurrentProblemPrinttrue
 }
 \NewDocumentCommand{\importproblem}{O{} m m}{%
   \importproblem@reset
   \IfInteger{#1}{\gdef\CurrentProblemPoints{#1}}{\setkeys{eximport}{#1}}%
-  \import{#2}{#3}%
+  \ifCurrentProblemPrint\import{#2}{#3}\fi
   \importproblem@reset
 }
 
@@ -222,7 +262,7 @@
 %   \ProblemGroupHeadingFormat{STEM}  the same, for a \problemgroup's numbered stem.
 %
 %   Test.cls overrides these to "Q N" over a points \fbox hung in the left margin;
-%   LectureNotes.cls (later) to a run-in "Example.".
+%   LectureNotes.cls to a run-in "Example." (+ optional literal number / desc).
 \newcommand{\ProblemLabelWord}{Problem}
 \newcommand{\ProblemNumberText}{\ProblemLabelWord\ \theproblem}
 \newcommand{\ProblemHeadingFormat}{%
@@ -243,6 +283,12 @@
   \par
   % --- Bookkeeping.
   \ifinproblemgroup\refstepcounter{subproblem}\else\refstepcounter{problem}\fi
+  % A literal import-time number (\importproblem's `number' key) replaces the
+  % counter's value as the \label/\ref text -- so a problem shown as the text's
+  % "2.1.8" also refs as "2.1.8". The counter was still stepped just above
+  % (harmless: a notes class never prints it); only the label text changes.
+  % Empty (the usual case) keeps the counter's value.
+  \ifdefempty{\CurrentProblemNumber}{}{\protected@edef\@currentlabel{\CurrentProblemNumber}}%
   % \refstepcounter sets \@currentlabel LOCALLY, but this environment is a group
   % and the problem body arrives via \import -- so a \label written next to the
   % \importproblem (outside the group) would otherwise capture the *enclosing*
