@@ -54,8 +54,9 @@
 %             ZERO HEIGHT, painting DOWN into the \workspace reserved below them, so
 %             they never shift the layout: the solutions/instructor copy is a
 %             pixel-perfect overlay of the student copy.
-%   \solidboxes   SOLID -- those boxes render at NORMAL height and \workspace
-%             collapses to nothing: a compact answer key. Set once in the preamble.
+%   \solidboxes   SOLID -- those boxes render at NORMAL height and the reserved
+%             room (\workspace AND \blankpage) collapses to nothing: a compact
+%             answer key. Set once in the preamble.
 %   \overlayboxes -- back to the default (for completeness / local re-enable).
 %
 % \ifWorkspaceOverlay is the flag both THIS package (the \workspace collapse below)
@@ -175,15 +176,21 @@
       \BlankPageText}}}%
 }
 
+% Like \workspace, a blank page is RESERVED room (a whole page of "use this space
+% if you need it"), so it collapses under \solidboxes: the compact answer-key form
+% wants neither the reserved handwriting gaps NOR the extra-work pages. In OVERLAY
+% mode (default) it ships the page as documented; in SOLID mode it emits nothing.
 \NewDocumentCommand{\blankpage}{O{}}{%
-  \par
-  \newpage                   % ship whatever preceded (real content stays put)
+  \ifWorkspaceOverlay
+    \par
+    \newpage                 % ship whatever preceded (real content stays put)
                              % TWEAK: the blank page keeps the running page
                              % number/footer. Add \thispagestyle{empty} here for a
                              % fully bare page instead.
-  \ifstrequal{#1}{watermark}{\AddToShipoutPictureBG*{\blankpage@mark}}{}%
-  \null                      % the one box that makes the empty page actually ship
-  \newpage                   % ship the blank page; following content starts fresh
+    \ifstrequal{#1}{watermark}{\AddToShipoutPictureBG*{\blankpage@mark}}{}%
+    \null                    % the one box that makes the empty page actually ship
+    \newpage                 % ship the blank page; following content starts fresh
+  \fi
 }
 
 \endinput
