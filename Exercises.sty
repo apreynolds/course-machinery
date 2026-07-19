@@ -315,6 +315,12 @@
     colback=#1!5, colframe=#1!60,
     sharp corners, boxrule=0.2mm,
     left=6pt, right=6pt, top=10pt, bottom=6pt,
+    % Shrink the box by the active \leftskip so it never overhangs the right
+    % margin. A tcolorbox defaults to width=\linewidth, but \leftskip (e.g. the
+    % 2em problemgroup part-indent) adds glue to the line WITHOUT reducing
+    % \linewidth -- so an unshrunk box runs \leftskip past the margin (the "24pt
+    % too wide" overfull). At top level \leftskip is 0pt, so this is just \linewidth.
+    width=\dimexpr\linewidth-\leftskip\relax,
     coltitle=white, colbacktitle=#1!80,
     title={\sffamily\footnotesize #2},
     % xshift aligns the tab's LABEL TEXT with the body text's left margin (the
