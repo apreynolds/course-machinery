@@ -161,6 +161,50 @@
 \newcommand{\ProblemPointsFormat}[1]{%
   \quad\textnormal{\normalfont(#1\ \ifnum#1=1 point\else points\fi)}}
 
+% ---- Case-2 multipart points (see PROBLEM PARTS) ---------------------------
+% A case-2 problem -- ONE file, genuinely dependent parts "(a) (b) (c)" -- takes
+% its point split at the IMPORT site, keeping points extrinsic like everywhere
+% else (the file's \part's stay pure structure, no weights baked in). Two forms,
+% both handled by the `points'/`pointseach' keys below:
+%
+%   points={1,1,2}   POSITIONAL: the k-th value is the k-th part's points. The
+%                    part count must match the list length or it errors (too few
+%                    caught at \end{parts}, too many the moment a part outruns the
+%                    list); a list but no `parts' at all is caught in \end{problem}.
+%   pointseach=2     BROADCAST: every part is worth 2, whatever the count. (A bare
+%                    `points=2' can NOT mean this -- it is indistinguishable from a
+%                    single 2-point problem until the parts appear in the body,
+%                    which is too late for the heading; hence a separate key.)
+%
+% Both leave \CurrentProblemPoints EMPTY, so the STEM heading shows no mark and
+% adds nothing to the total on its own -- the parts carry the points, summing into
+% `totalpoints' as each renders. The list is stored element-by-element as
+% \ExPartPts@k with its length in \CurrentPartCount; \ifPartsListMode /
+% \ifPartsEachMode select the path; \ifPartsSeen (reset per problem) lets
+% \end{problem} catch a points spec that no `parts' environment ever consumed.
+\newif\ifPartsListMode
+\newif\ifPartsEachMode
+\newif\ifPartsSeen
+\newcommand{\CurrentPartEach}{}
+\newcommand{\CurrentPartCount}{0}
+\newcounter{exparttmp}  % scratch: counts list elements while parsing
+
+% Split a comma list "1,1,2" into \ExPartPts@1..\ExPartPts@N and record N in
+% \CurrentPartCount. Spaces are zapped first so "1, 1, 2" is accepted too. \@for
+% is the kernel comma-list walker; each element is stored GLOBALLY because the
+% list is parsed here (at the \importproblem call) but consumed later, inside the
+% problem body's `parts' environment.
+\newcommand{\ExercisesParsePointsList}[1]{%
+  \global\PartsListModetrue
+  \setcounter{exparttmp}{0}%
+  \edef\ExParts@list{\zap@space#1 \@empty}%
+  \@for\ExParts@elt:=\ExParts@list\do{%
+    \stepcounter{exparttmp}%
+    \global\csxdef{ExPartPts@\arabic{exparttmp}}{\ExParts@elt}%
+  }%
+  \xdef\CurrentPartCount{\arabic{exparttmp}}%
+}
+
 % The assessment total. \newtotcounter registers a normal counter that totcount
 % writes to the .aux at end-of-document; \total reads back the PREVIOUS run's
 % final value, so \printtotalpoints is correct even at the TOP of the page (the
@@ -174,6 +218,10 @@
 % OPTIONS is a comma-separated key=value list (keyval family `eximport'):
 %
 %   points=5      the point value (integer; summed and pluralised)
+%   points={1,1,2} case-2 POSITIONAL split: the k-th value is the k-th \part's
+%                 points (parts live in a `parts' env in the file). Count must
+%                 match the number of parts. See the POINTS / PROBLEM PARTS blocks.
+%   pointseach=2  case-2 BROADCAST: every \part is worth 2, whatever the count.
 %   nocount       show the points but keep them OUT of the total (bonus / choose-1-of-N)
 %   hint          force this problem's hint to show, regardless of the global toggle
 %   nohint        suppress this problem's hint, regardless of the global toggle
@@ -196,7 +244,20 @@
 %
 % New per-import axes slot in here as one more key (a future notes-to-marker note,
 % per-part points, ...), which is why the interface moved to keyval.
-\define@key{eximport}{points}{\gdef\CurrentProblemPoints{#1}}
+% A COMMA in the value marks a case-2 positional list (points={1,1,2}); anything
+% else is an ordinary single-problem scalar. The list branch parses into the
+% per-part store and deliberately leaves \CurrentProblemPoints empty (the parts,
+% not the stem, carry the marks). See the case-2 block in the POINTS section.
+\define@key{eximport}{points}{%
+  \IfSubStr{#1}{,}%
+    {\ExercisesParsePointsList{#1}}%
+    {\gdef\CurrentProblemPoints{#1}}%
+}
+% Broadcast form: every part of a case-2 problem is worth the same #1.
+\define@key{eximport}{pointseach}{%
+  \global\PartsEachModetrue
+  \gdef\CurrentPartEach{#1}%
+}
 \define@key{eximport}{nocount}[true]{\gdef\CurrentProblemCounts{0}}
 \define@key{eximport}{hint}[true]{\gdef\CurrentProblemHint{on}}
 \define@key{eximport}{nohint}[true]{\gdef\CurrentProblemHint{off}}
@@ -217,6 +278,11 @@
   \gdef\CurrentProblemDesc{}%
   \global\CurrentProblemPrinttrue
   \global\checkinmodefalse
+  % Case-2 multipart points (\ifPartsSeen is per-PROBLEM, reset there, not here).
+  \global\PartsListModefalse
+  \global\PartsEachModefalse
+  \gdef\CurrentPartEach{}%
+  \gdef\CurrentPartCount{0}%
 }
 % The import is wrapped in the check-in box only when `checkin' is set -- the box
 % (\CheckinBox@begin/@end) is defined in the MULTIPLE CHOICE section. Splitting
@@ -316,6 +382,9 @@
   \par
   % --- Bookkeeping.
   \ifinproblemgroup\refstepcounter{subproblem}\else\refstepcounter{problem}\fi
+  % Case-2: cleared here (per problem) so \end below can tell whether a `parts'
+  % environment actually ran to consume any multipart points spec.
+  \global\PartsSeenfalse
   % A literal import-time number (\importproblem's `number' key) replaces the
   % counter's value as the \label/\ref text -- so a problem shown as the text's
   % "2.1.8" also refs as "2.1.8". The counter was still stepped just above
@@ -343,7 +412,27 @@
     \ifcheckinmode\else\ProblemHeadingFormat\fi
   \fi
   \ignorespaces
-}{\par\gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}}
+}{%
+  \par
+  % A case-2 points spec must be consumed by a `parts' environment. If one was
+  % given (positional list or broadcast) but no parts ran, the points would
+  % silently vanish -- flag it rather than lose them.
+  \ifPartsSeen\else
+    \ifPartsListMode
+      \PackageError{Exercises}%
+        {points={...} list given but this problem has no `parts' environment}%
+        {Wrap the dependent parts in \string\begin{parts}...\string\end{parts},
+         or drop the list.}%
+    \fi
+    \ifPartsEachMode
+      \PackageError{Exercises}%
+        {pointseach given but this problem has no `parts' environment}%
+        {Wrap the dependent parts in \string\begin{parts}...\string\end{parts},
+         or drop pointseach.}%
+    \fi
+  \fi
+  \gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}%
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PROBLEM GROUPS (subquestions)
@@ -373,6 +462,103 @@
   \inproblemgrouptrue
 }{%
   \par
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PROBLEM PARTS (case 2 -- dependent parts in ONE file)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \begin{parts} \part ... \part ... \end{parts} -- the internal part list of a
+% SINGLE problem whose parts genuinely depend on a shared stem ("Let f(x)=...;
+% (a) find f', (b) the critical points, (c) classify them"). Unlike a
+% \problemgroup (case 1, which ASSEMBLES independent atomic files under a lettered
+% wrapper), these parts are ONE problem in ONE file -- so they live INSIDE the
+% `problem' body, not as separate imports:
+%
+%   \importproblem[points={1,1,2}]{DIR}{classify-critical-points.tex}
+%   % and in that file:
+%   \begin{problem}
+%     Let $f(x)=x^3-3x$.
+%     \begin{parts}
+%       \part Find $f'$.          % 1 pt
+%       \part The critical points. % 1 pt
+%       \part Classify them.       % 2 pts
+%     \end{parts}
+%   \end{problem}
+%
+% Points come from the IMPORT site (points={1,1,2} positional, pointseach=N
+% broadcast -- see the POINTS section), so the file's \part's carry no weights and
+% the extrinsic rule holds. Each part letters "(a)(b)(c)" by reusing the
+% `subproblem' counter -- so a \ref to a part reads "7(a)", exactly like a case-1
+% part -- and drops its marks through the shared \ProblemPointsFormat hook (inline
+% by default, right-margin under Test.cls). With NO points spec the parts still
+% letter, just unmarked (a valid ungraded / notes use).
+%
+% \part is \let LOCALLY here: the environment is a TeX group, so the global
+% sectioning \part is restored untouched at \end{parts}. Authors write the natural
+% \part; it means "part of this problem" only between begin and end. (An implicit
+% assumption, not defended against: a \part hidden inside a user macro/loop would
+% not be counted -- a non-issue for hand-authored case-2 files.)
+%
+% Safeguards: in positional mode the part count must equal the list length -- too
+% few is caught at \end{parts}, too many the instant a part outruns the list; a
+% non-integer value errors before it can reach \addtocounter/\ifnum; and a points
+% spec with no `parts' at all is caught in \end{problem} (see the PROBLEM env).
+\newenvironment{parts}{%
+  \global\PartsSeentrue
+  \let\part\ExPart
+  \par\addtolength{\leftskip}{2em}% indent the parts under the stem (matches \problemgroup)
+}{%
+  \par
+  % Positional mode: the number of parts seen (subproblem's value) must equal the
+  % list length. Fewer parts than values lands here; more parts errored earlier.
+  \ifPartsListMode
+    \ifnum\value{subproblem}=\CurrentPartCount\relax\else
+      \PackageError{Exercises}%
+        {points list has \CurrentPartCount\space value(s) but the problem has
+         \arabic{subproblem}\space part(s)}%
+        {The points={...} list length must equal the number of \string\part s.}%
+    \fi
+  \fi
+}
+
+% One \part: step the sub-counter (letters (a),(b),... and makes \ref read
+% "N(a)"), resolve this part's points from whichever mode is active, add them to
+% the running total, then set the run-in "(a)" label + marks. Bound to \part only
+% inside `parts'.
+\newcommand{\ExPart}{%
+  \par
+  \refstepcounter{subproblem}%
+  % Resolve this part's value by mode. Positional: the k-th list element (error if
+  % the parts outrun the list). Broadcast: the fixed per-part value. Neither:
+  % unweighted -- a bare parts list with no points spec, letters but no marks.
+  \ifPartsListMode
+    \ifnum\value{subproblem}>\CurrentPartCount\relax
+      \PackageError{Exercises}%
+        {more \string\part s than points values (list has \CurrentPartCount)}%
+        {Add values to points={...} or remove the extra \string\part.}%
+      \let\ThisPartPts\@empty
+    \else
+      \edef\ThisPartPts{\csuse{ExPartPts@\arabic{subproblem}}}%
+    \fi
+  \else
+    \ifPartsEachMode
+      \let\ThisPartPts\CurrentPartEach
+    \else
+      \let\ThisPartPts\@empty
+    \fi
+  \fi
+  % Guard the integer contract (\ifnum + \addtocounter both need one) before the
+  % value can reach either: a bad value errors and is dropped so nothing crashes.
+  \ifdefempty{\ThisPartPts}{}{%
+    \IfInteger{\ThisPartPts}%
+      {\addtocounter{totalpoints}{\ThisPartPts}}%
+      {\PackageError{Exercises}{part points `\ThisPartPts' is not an integer}%
+        {Part point values must be whole numbers.}\let\ThisPartPts\@empty}%
+  }%
+  % Presentation: run-in "(a)" + this part's marks (shared hook), then the prompt.
+  \noindent\textbf{(\alph{subproblem})}%
+  \ifdefempty{\ThisPartPts}{}{\ProblemPointsFormat{\ThisPartPts}}%
+  \quad\ignorespaces
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
