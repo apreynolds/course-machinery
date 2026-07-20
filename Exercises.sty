@@ -185,6 +185,7 @@
 \newif\ifPartsListMode
 \newif\ifPartsEachMode
 \newif\ifPartsSeen
+\newif\ifExFirstPart  % first \part runs into the stem line; the rest each break
 \newcommand{\CurrentPartEach}{}
 \newcommand{\CurrentPartCount}{0}
 \newcounter{exparttmp}  % scratch: counts list elements while parsing
@@ -332,6 +333,9 @@
 % and each top-level problem, starts its letters at (a)); \p@subproblem makes a
 % \ref to a part read "N(a)".
 \newif\ifinproblemgroup
+% Like \ifExFirstPart for case-2: the first part of a \problemgroup runs into the
+% stem line, the rest each break. Set by \problemgroup, consumed by the problem env.
+\newif\ifGroupFirstPart
 \newcounter{subproblem}[problem]
 % \thesubproblem carries the parent number ("4(a)") so a \ref to a part reads
 % "4(a)" -- the same nesting trick as \theequation under a section. The prefix
@@ -369,8 +373,10 @@
   \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
   \quad
 }
+% No trailing \par: the first part runs into this stem line (the problem env
+% suppresses its own leading break for the first part). #1 is usually empty.
 \newcommand{\ProblemGroupHeadingFormat}[1]{%
-  \noindent\textbf{\ProblemNumberText.}\quad\ignorespaces#1\par
+  \noindent\textbf{\ProblemNumberText.}\quad\ignorespaces#1%
 }
 
 % The environment separates BOOKKEEPING (counter + running total -- never
@@ -379,7 +385,13 @@
 % lettered "(a)" run-in -- the group, not the class, owns that layout -- while a
 % top-level problem goes through \ProblemHeadingFormat.
 \newenvironment{problem}{%
-  \par
+  % Leading break: a top-level problem always breaks from what precedes it; a
+  % grouped part breaks EXCEPT the first, which runs into the group's stem line.
+  \ifinproblemgroup
+    \ifGroupFirstPart\global\GroupFirstPartfalse\else\par\fi
+  \else
+    \par
+  \fi
   % --- Bookkeeping.
   \ifinproblemgroup\refstepcounter{subproblem}\else\refstepcounter{problem}\fi
   % Case-2: cleared here (per problem) so \end below can tell whether a `parts'
@@ -450,16 +462,20 @@
 % group takes no point value; the grand total sums the parts as usual, and a part
 % may be starred (\importproblem*) to sit off the books.
 %
-% Mechanism: the environment is a TeX group, so \inproblemgrouptrue and the
-% \leftskip indent below are both undone automatically at \end -- the flag falls
-% back to false for whatever follows, and the margin is restored. The stem prints
-% BEFORE the indent is set, so only the parts indent under it. The trailing \par
-% flushes the last part while the indent is still in force.
+% Mechanism: the environment is a TeX group, so \inproblemgrouptrue is undone
+% automatically at \end -- the flag falls back to false for whatever follows. The
+% parts are NOT indented (they sit flush at the text margin, matching case-2).
+% \GroupFirstParttrue lets the problem env run the FIRST part into the stem line
+% (see the problem env's leading-break branch); the rest each break. The trailing
+% \par flushes the last part.
 \newenvironment{problemgroup}[1]{%
   \par\refstepcounter{problem}%
   \ProblemGroupHeadingFormat{#1}%
-  \addtolength{\leftskip}{2em}% indent the parts under the stem (tunable)
   \inproblemgrouptrue
+  \global\GroupFirstParttrue
+  % Swallow the source whitespace before the first \importproblem, else the first
+  % part (which runs into the stem line) picks up a phantom interword indent.
+  \ignorespaces
 }{%
   \par
 }
@@ -505,8 +521,13 @@
 % spec with no `parts' at all is caught in \end{problem} (see the PROBLEM env).
 \newenvironment{parts}{%
   \global\PartsSeentrue
+  \global\ExFirstParttrue
   \let\part\ExPart
-  \par\addtolength{\leftskip}{2em}% indent the parts under the stem (matches \problemgroup)
+  % Swallow the source whitespace between \begin{parts} and the first \part.
+  % The first part runs into the heading line (horizontal mode), so that space
+  % would otherwise become a real interword space -- a ~3.6pt phantom indent on
+  % the first item only (later parts \par first, where leading space is dropped).
+  \ignorespaces
 }{%
   \par
   % Positional mode: the number of parts seen (subproblem's value) must equal the
@@ -526,7 +547,11 @@
 % the running total, then set the run-in "(a)" label + marks. Bound to \part only
 % inside `parts'.
 \newcommand{\ExPart}{%
-  \par
+  % The FIRST part runs into the stem/heading line (no break); every later part
+  % breaks to its own line. To force the first part onto its own line instead
+  % (e.g. after a long stem), leave a blank line before \begin{parts} -- that \par
+  % puts us in vertical mode, so the run-in "(a)" below starts a fresh line anyway.
+  \ifExFirstPart\global\ExFirstPartfalse\else\par\fi
   \refstepcounter{subproblem}%
   % Resolve this part's value by mode. Positional: the k-th list element (error if
   % the parts outrun the list). Broadcast: the fixed per-part value. Neither:
@@ -593,11 +618,12 @@
     colback=#1!5, colframe=#1!60,
     sharp corners, boxrule=0.2mm,
     left=6pt, right=6pt, top=10pt, bottom=6pt,
-    % Shrink the box by the active \leftskip so it never overhangs the right
-    % margin. A tcolorbox defaults to width=\linewidth, but \leftskip (e.g. the
-    % 2em problemgroup part-indent) adds glue to the line WITHOUT reducing
-    % \linewidth -- so an unshrunk box runs \leftskip past the margin (the "24pt
-    % too wide" overfull). At top level \leftskip is 0pt, so this is just \linewidth.
+    % Shrink the box by any active \leftskip so it never overhangs the right
+    % margin. A tcolorbox defaults to width=\linewidth, but a nonzero \leftskip
+    % adds glue to the line WITHOUT reducing \linewidth -- so an unshrunk box runs
+    % \leftskip past the margin (a "24pt too wide" overfull). This package's own
+    % environments no longer indent (parts/groups sit flush), so \leftskip is 0pt
+    % here and this is just \linewidth; the guard stays for any author-set \leftskip.
     width=\dimexpr\linewidth-\leftskip\relax,
   },
   ex/answertab/.style 2 args={

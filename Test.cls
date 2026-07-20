@@ -307,5 +307,5 @@
   \par\addvspace{2\baselineskip}%
   \noindent
   \llap{\smash{\textbf{\ProblemNumberText.}}\hspace{1em}}%
-  \ignorespaces#1\par
+  \ignorespaces#1%
 }
