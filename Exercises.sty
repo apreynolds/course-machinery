@@ -1052,10 +1052,12 @@
 \newcommand{\choice@layout}{stacked}
 
 % ---- Choice label style ------------------------------------------------------
-% Every layout renders its "(A)" through this ONE hook, so the label style is a
-% single knob. Default: the parenthesised letter. Check-in mode (\ifcheckinmode,
-% set by \importproblem's `checkin' key) swaps in the colored flashcard boxes.
-\newcommand{\ChoiceLabelFormat}[1]{(#1)}
+% Every layout renders its "[A]" through this ONE hook, so the label style is a
+% single knob. Default: the letter in SQUARE brackets -- round brackets are already
+% spoken for by (parts) and (points), and the Crowdmark answer sheet uses rectangular
+% bubbles, so [A][B] keeps MC options visually distinct from both. Check-in mode
+% (\ifcheckinmode) swaps in the colored flashcard boxes instead.
+\newcommand{\ChoiceLabelFormat}[1]{[#1]}
 
 % The check-in palette: one background per letter, white text on the darker three
 % for contrast (the quarry's flashcard colors, kept exactly). Only A-E are
@@ -1075,7 +1077,7 @@
 \@namedef{checkin@lab@E}{\checkin@lab{checkinE}{white}{E}}
 \newcommand{\CheckinChoiceLabel}[1]{%
   \edef\checkin@L{#1}% expand \Alph{choice} down to the bare letter (A, B, ...)
-  \@ifundefined{checkin@lab@\checkin@L}{(#1)}{\@nameuse{checkin@lab@\checkin@L}}}
+  \@ifundefined{checkin@lab@\checkin@L}{[#1]}{\@nameuse{checkin@lab@\checkin@L}}}
 
 % The "Check In" frame (see \importcheckin). Deliberately plain -- a thin grey
 % rule, no fill -- because the colored labels inside carry the visual identity.
@@ -1236,19 +1238,19 @@
 % MATCHING
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Like MC, a matching question is a normal \begin{problem} whose body is a
-% \begin{matching}: a LEFT column of items numbered (1),(2),... and a RIGHT column
-% lettered (A),(B),..., with a wide gap for students to draw connecting lines.
-% \rightcolumn splits the two. Items may be text (\leftitem/\rightitem) or graphs
-% (\leftgraph/\rightgraph, which reuse \graphchoice's sizing + centring):
+% \begin{matching}: a LEFT column of items [i],[ii],... and a RIGHT column [A],[B],...
+% with a wide gap for students to draw connecting lines. \rightcolumn splits the two.
+% Items may be text (\leftitem/\rightitem) or graphs (\leftgraph/\rightgraph, which
+% reuse \graphchoice's sizing + centring):
 %
 %   \begin{problem}
 %     Match each graph with the phrase that best describes it.
 %     \begin{matching}
-%       \leftgraph[C]{graph-1}    % this left item's match is right item C
+%       \leftgraph[C]{graph-1}    % this left item's match is right item [C]
 %       \leftgraph[A]{graph-2}
 %       \rightcolumn
-%       \rightitem{Concave up}    % (A)
-%       \rightitem{Concave down}  % (B)
+%       \rightitem{Concave up}    % [A]
+%       \rightitem{Concave down}  % [B]
 %       ...
 %     \end{matching}
 %   \end{problem}
@@ -1268,27 +1270,32 @@
 \newcommand{\MatchColWidth}{0.38\linewidth}
 \newcommand{\MatchItemSep}{2ex}
 % The match annotation is encased in the SAME green frame + light fill as every
-% other solution cue (\CorrectChoiceFormat, the solution box) -- so "-> C" reads as
-% "this is the answer" consistently. \fboxrule/\fboxsep match \CorrectChoiceFormat.
+% other solution cue (\CorrectChoiceFormat, the solution box) -- so "-> [C]" reads as
+% "this is the answer" consistently. The target is bracketed to mirror the right
+% column's own [A][B] labels. \fboxrule/\fboxsep match \CorrectChoiceFormat.
 \newcommand{\MatchKeyFormat}[1]{%
   \;\begingroup
     \setlength{\fboxrule}{0.2mm}\setlength{\fboxsep}{2pt}%
-    \fcolorbox{SolutionColor}{SolutionColor!8}{\bfseries\color{SolutionColor}$\to$#1}%
+    \fcolorbox{SolutionColor}{SolutionColor!8}{\bfseries\color{SolutionColor}$\to$[#1]}%
   \endgroup}
 
-% The match annotation rides on the NUMBER label -- "(1) -> C" -- not after the
-% content, so it always fits even when the content is a column-filling graph
-% (where trailing text would wrap below it).
+% The two columns use DISTINCT enumeration systems, both in SQUARE brackets (round
+% brackets are taken by (parts)/(points), and Crowdmark bubbles are rectangular):
+% the left items are lowercase-roman [i][ii][iii], the right items uppercase-alpha
+% [A][B][C]. Distinct styles are the classic matching convention -- "match [i] to
+% [C]" can never confuse a left label for a right one. The annotation rides on the
+% left label -- "[i] -> [C]" -- not after the content, so it always fits even when
+% the content is a column-filling graph (trailing text would wrap below it).
 \NewDocumentCommand{\leftitem}{o m}{%
   \par\stepcounter{matchleft}%
-  \noindent(\arabic{matchleft})%
+  \noindent[\roman{matchleft}]%
   \IfNoValueF{#1}{\ifsolutions\MatchKeyFormat{#1}\fi}%
   \quad #2%
   \par\vspace{\MatchItemSep}%
 }
 \NewDocumentCommand{\rightitem}{m}{%
   \par\stepcounter{matchright}%
-  \noindent(\Alph{matchright})\quad #1%
+  \noindent[\Alph{matchright}]\quad #1%
   \par\vspace{\MatchItemSep}%
 }
 \NewDocumentCommand{\leftgraph}{o m}{%
