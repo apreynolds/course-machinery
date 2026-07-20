@@ -141,6 +141,19 @@
 \newif\ifCurrentProblemPrint
 \CurrentProblemPrinttrue
 
+% Check-in mode, set by \importproblem's `checkin' key (and the \importcheckin
+% shorthand). When active, an imported multiple-choice problem is wrapped in a
+% neutral "Check In" box (a run-in "CHECK IN:" header, non-breakable), its own
+% heading is suppressed (the box header is the label), and the choice labels
+% render as the colored A/B/C flashcard boxes instead of "(A) (B) (C)" -- in
+% whatever layout the file chose (stacked/onepar/grid). A
+% notes-only flavour in practice; a bare (non-MC) problem imported this way just
+% gets the box. The colored-label machinery + the box live in the MULTIPLE
+% CHOICE section below (tcolorbox/xcolor are loaded); the flag lives here because
+% \importproblem@reset must clear it.
+\newif\ifcheckinmode
+\checkinmodefalse
+
 % How the points render next to the heading. Stylable in one place; the eventual
 % target is the quarry's margin \fbox, but an inline marker is enough for now.
 % \ifnum picks "point" vs "points" -- which is also why points must be an INTEGER
@@ -169,6 +182,9 @@
 %   desc={...}    parenthetical shown after the heading in a notes context.
 %   noprint       skip this import entirely (equivalently print=false): no output,
 %                 no counter step, no points, no \label -- the file is not read.
+%   checkin       render as a "check-in": wrap in a neutral box with a run-in
+%                 "CHECK IN:" header, suppress the problem's own heading, and color
+%                 the A/B/C labels (see \importcheckin and MULTIPLE CHOICE).
 %
 % As a shorthand, a LONE integer means points: \importproblem[5]{...}{...} is
 % exactly \importproblem[points=5]{...}{...} (this is the back-compat form and the
@@ -191,6 +207,7 @@
 \define@key{eximport}{noprint}[true]{\global\CurrentProblemPrintfalse}
 \define@key{eximport}{print}[true]{%
   \ifstrequal{#1}{false}{\global\CurrentProblemPrintfalse}{\global\CurrentProblemPrinttrue}}
+\define@key{eximport}{checkin}[true]{\global\checkinmodetrue}
 
 \newcommand{\importproblem@reset}{%
   \gdef\CurrentProblemPoints{}%
@@ -199,12 +216,28 @@
   \gdef\CurrentProblemNumber{}%
   \gdef\CurrentProblemDesc{}%
   \global\CurrentProblemPrinttrue
+  \global\checkinmodefalse
 }
+% The import is wrapped in the check-in box only when `checkin' is set -- the box
+% (\CheckinBox@begin/@end) is defined in the MULTIPLE CHOICE section. Splitting
+% the box's begin/end across \import is fine: \import introduces no group that
+% would break the environment nesting.
 \NewDocumentCommand{\importproblem}{O{} m m}{%
   \importproblem@reset
   \IfInteger{#1}{\gdef\CurrentProblemPoints{#1}}{\setkeys{eximport}{#1}}%
-  \ifCurrentProblemPrint\import{#2}{#3}\fi
+  \ifCurrentProblemPrint
+    \ifcheckinmode\CheckinBox@begin\fi
+    \import{#2}{#3}%
+    \ifcheckinmode\CheckinBox@end\fi
+  \fi
   \importproblem@reset
+}
+% \importcheckin[OPTS]{DIR}{FILE} -- shorthand for \importproblem[checkin, OPTS].
+% OPTS is key=value only (points make no sense on an ungraded notes check-in, so
+% the lone-integer shorthand is deliberately not offered here); `desc' is the
+% usual one, e.g. \importcheckin[desc={from APEX}]{...}{...}.
+\NewDocumentCommand{\importcheckin}{O{} m m}{%
+  \ifblank{#1}{\importproblem[checkin]{#2}{#3}}{\importproblem[checkin, #1]{#2}{#3}}%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -305,7 +338,9 @@
     \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
     \quad
   \else
-    \ProblemHeadingFormat
+    % Check-in mode suppresses the problem's own heading -- the enclosing "Check
+    % In" box title is the label, so an "Example."/"Q N." here would double up.
+    \ifcheckinmode\else\ProblemHeadingFormat\fi
   \fi
   \ignorespaces
 }{\par\gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}}
@@ -509,6 +544,53 @@
 \newlength{\choice@gridwidth}
 \newcommand{\choice@layout}{stacked}
 
+% ---- Choice label style ------------------------------------------------------
+% Every layout renders its "(A)" through this ONE hook, so the label style is a
+% single knob. Default: the parenthesised letter. Check-in mode (\ifcheckinmode,
+% set by \importproblem's `checkin' key) swaps in the colored flashcard boxes.
+\newcommand{\ChoiceLabelFormat}[1]{(#1)}
+
+% The check-in palette: one background per letter, white text on the darker three
+% for contrast (the quarry's flashcard colors, kept exactly). Only A-E are
+% defined -- a check-in caps at five options; a sixth+ falls back to plain "(F)".
+\definecolor{checkinA}{RGB}{247,244,58}
+\definecolor{checkinB}{RGB}{123,104,238}
+\definecolor{checkinC}{RGB}{247,58,241}
+\definecolor{checkinD}{RGB}{118,247,58}
+\definecolor{checkinE}{RGB}{247,165,58}
+\newcommand{\checkin@lab}[3]{% #1 background color, #2 text color, #3 letter
+  \begingroup\setlength{\fboxsep}{8pt}%
+  \colorbox{#1}{\sffamily\bfseries\textcolor{#2}{#3}}\endgroup}
+\@namedef{checkin@lab@A}{\checkin@lab{checkinA}{black}{A}}
+\@namedef{checkin@lab@B}{\checkin@lab{checkinB}{white}{B}}
+\@namedef{checkin@lab@C}{\checkin@lab{checkinC}{white}{C}}
+\@namedef{checkin@lab@D}{\checkin@lab{checkinD}{black}{D}}
+\@namedef{checkin@lab@E}{\checkin@lab{checkinE}{white}{E}}
+\newcommand{\CheckinChoiceLabel}[1]{%
+  \edef\checkin@L{#1}% expand \Alph{choice} down to the bare letter (A, B, ...)
+  \@ifundefined{checkin@lab@\checkin@L}{(#1)}{\@nameuse{checkin@lab@\checkin@L}}}
+
+% The "Check In" frame (see \importcheckin). Deliberately plain -- a thin grey
+% rule, no fill -- because the colored labels inside carry the visual identity.
+% NON-breakable: a check-in should not split across a page. NO title bar; instead
+% a run-in sans-serif all-caps "CHECK IN:" header at the top of the box, with
+% \importproblem's `desc' appended in parentheses if given.
+\tcbset{ex@checkin/.style={%
+  enhanced, sharp corners,
+  boxrule=2pt, colframe=black!55, colback=white,%  <-- box thickness: raise boxrule
+  left=1em, right=1em, top=0.6em, bottom=0.6em}}
+% Two tunable check-in gaps -- change the values here:
+%   \CheckinHeaderSkip  vertical space under "CHECK IN:", before the problem stem
+%   \CheckinBodySkip    vertical space after the stem, before the choices list
+\newcommand{\CheckinHeaderSkip}{\medskipamount}
+\newcommand{\CheckinBodySkip}{\bigskipamount}
+\newcommand{\CheckinBox@header}{%
+  {\sffamily\bfseries CHECK IN%
+    \ifdefempty{\CurrentProblemDesc}{}{\ \mdseries(\CurrentProblemDesc)\bfseries}%
+    :}\par\nobreak\vspace{\CheckinHeaderSkip}}
+\newcommand{\CheckinBox@begin}{\begin{tcolorbox}[ex@checkin]\CheckinBox@header}
+\newcommand{\CheckinBox@end}{\end{tcolorbox}}
+
 % How the key is boxed in a solutions build: a tight green frame + light fill
 % (matching the quarry's \Answer{} box), via \fcolorbox so no tcolorbox is needed.
 % SolutionColor is defined in the SOLUTION section above. NB \fcolorbox is an
@@ -559,10 +641,13 @@
   \csname choice@@\choice@layout\endcsname{#2}%
 }
 
-% Per-layout emitters (each gets the option text as #1).
-\newcommand{\choice@@stacked}[1]{\item[(\Alph{choice})]\choice@content{#1}}
+% Per-layout emitters (each gets the option text as #1). All route the label
+% through \ChoiceLabelFormat so the label style (plain vs check-in colors) is set
+% in one place by the enclosing environment.
+\newcommand{\choice@@stacked}[1]{%
+  \item[\ChoiceLabelFormat{\Alph{choice}}]\choice@content{#1}}
 \newcommand{\choice@@onepar}[1]{%
-  \choice@sep(\Alph{choice})~\choice@content{#1}\let\choice@sep\qquad}
+  \choice@sep\ChoiceLabelFormat{\Alph{choice}}~\choice@content{#1}\let\choice@sep\qquad}
 % Grid: separator BEFORE each cell (safe: \hfill / \par\nobreak, never & / \\).
 \newcommand{\choice@@grid}[1]{%
   \ifnum\choice@col=0 \else
@@ -573,16 +658,24 @@
     \fi
   \fi
   \ifnum\choice@col=0 \noindent\fi
-  \parbox[t]{\choice@gridwidth}{(\Alph{choice})~\choice@content{#1}}%
+  \parbox[t]{\choice@gridwidth}{\ChoiceLabelFormat{\Alph{choice}}~\choice@content{#1}}%
   \global\advance\choice@col1
 }
 
 % Per-layout environment begin/end, dispatched by the optional argument.
 \newcommand{\choices@begin@stacked}{%
   \list{}{%
-    \setlength{\leftmargin}{2.5em}\setlength{\labelwidth}{2em}%
-    \setlength{\labelsep}{0.5em}\setlength{\itemsep}{0.2ex}%
-    \setlength{\topsep}{0.4\baselineskip}}%
+    \ifcheckinmode
+      % Roomier: the colored label boxes are wider and taller than "(A)". topsep
+      % is 0 -- the gap before the list is \CheckinBodySkip, added in `choices'.
+      \setlength{\leftmargin}{3em}\setlength{\labelwidth}{2.4em}%
+      \setlength{\labelsep}{0.6em}\setlength{\itemsep}{10pt}%
+      \setlength{\topsep}{0pt}%
+    \else
+      \setlength{\leftmargin}{2.5em}\setlength{\labelwidth}{2em}%
+      \setlength{\labelsep}{0.5em}\setlength{\itemsep}{0.2ex}%
+      \setlength{\topsep}{0.4\baselineskip}%
+    \fi}%
 }
 \newcommand{\choices@end@stacked}{\endlist}
 \newcommand{\choices@begin@onepar}{\let\choice@sep\empty\noindent\ignorespaces}
@@ -595,10 +688,17 @@
 
 \NewDocumentEnvironment{choices}{O{stacked}}{%
   \par\setcounter{choice}{0}%
-  \@ifundefined{choices@begin@#1}%
-    {\PackageError{Exercises}{Unknown choices layout `#1'}%
+  \def\choices@req{#1}%
+  % Check-in only swaps the label style (colored boxes); the file's chosen layout
+  % (stacked/onepar/grid) is respected.
+  \ifcheckinmode
+    \let\ChoiceLabelFormat\CheckinChoiceLabel
+    \vspace{\CheckinBodySkip}% gap after the stem, before the choices (any layout)
+  \fi
+  \@ifundefined{choices@begin@\choices@req}%
+    {\PackageError{Exercises}{Unknown choices layout `\choices@req'}%
        {Use one of: stacked, onepar, grid.}}%
-    {\def\choice@layout{#1}\csname choices@begin@#1\endcsname}%
+    {\edef\choice@layout{\choices@req}\csname choices@begin@\choices@req\endcsname}%
 }{%
   \csname choices@end@\choice@layout\endcsname
 }
