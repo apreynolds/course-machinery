@@ -164,13 +164,13 @@
 % ---- Case-2 multipart points (see PROBLEM PARTS) ---------------------------
 % A case-2 problem -- ONE file, genuinely dependent parts "(a) (b) (c)" -- takes
 % its point split at the IMPORT site, keeping points extrinsic like everywhere
-% else (the file's \part's stay pure structure, no weights baked in). Two forms,
+% else (the file's \qpart's stay pure structure, no weights baked in). Two forms,
 % both handled by the `points'/`pointseach' keys below:
 %
 %   points={1,1,2}   POSITIONAL: the k-th value is the k-th part's points. The
 %                    part count must match the list length or it errors (too few
-%                    caught at \end{parts}, too many the moment a part outruns the
-%                    list); a list but no `parts' at all is caught in \end{problem}.
+%                    caught at \end{qparts}, too many the moment a part outruns the
+%                    list); a list but no `qparts' at all is caught in \end{problem}.
 %   pointseach=2     BROADCAST: every part is worth 2, whatever the count. (A bare
 %                    `points=2' can NOT mean this -- it is indistinguishable from a
 %                    single 2-point problem until the parts appear in the body,
@@ -181,11 +181,11 @@
 % `totalpoints' as each renders. The list is stored element-by-element as
 % \ExPartPts@k with its length in \CurrentPartCount; \ifPartsListMode /
 % \ifPartsEachMode select the path; \ifPartsSeen (reset per problem) lets
-% \end{problem} catch a points spec that no `parts' environment ever consumed.
+% \end{problem} catch a points spec that no `qparts' environment ever consumed.
 \newif\ifPartsListMode
 \newif\ifPartsEachMode
 \newif\ifPartsSeen
-\newif\ifExFirstPart  % first \part runs into the stem line; the rest each break
+\newif\ifExFirstPart  % first \qpart runs into the stem line; the rest each break
 \newcommand{\CurrentPartEach}{}
 \newcommand{\CurrentPartCount}{0}
 \newcounter{exparttmp}  % scratch: counts list elements while parsing
@@ -194,7 +194,7 @@
 % \CurrentPartCount. Spaces are zapped first so "1, 1, 2" is accepted too. \@for
 % is the kernel comma-list walker; each element is stored GLOBALLY because the
 % list is parsed here (at the \importproblem call) but consumed later, inside the
-% problem body's `parts' environment.
+% problem body's `qparts' environment.
 \newcommand{\ExercisesParsePointsList}[1]{%
   \global\PartsListModetrue
   \setcounter{exparttmp}{0}%
@@ -219,10 +219,10 @@
 % OPTIONS is a comma-separated key=value list (keyval family `eximport'):
 %
 %   points=5      the point value (integer; summed and pluralised)
-%   points={1,1,2} case-2 POSITIONAL split: the k-th value is the k-th \part's
-%                 points (parts live in a `parts' env in the file). Count must
+%   points={1,1,2} case-2 POSITIONAL split: the k-th value is the k-th \qpart's
+%                 points (parts live in a `qparts' env in the file). Count must
 %                 match the number of parts. See the POINTS / PROBLEM PARTS blocks.
-%   pointseach=2  case-2 BROADCAST: every \part is worth 2, whatever the count.
+%   pointseach=2  case-2 BROADCAST: every \qpart is worth 2, whatever the count.
 %   nocount       show the points but keep them OUT of the total (bonus / choose-1-of-N)
 %   hint          force this problem's hint to show, regardless of the global toggle
 %   nohint        suppress this problem's hint, regardless of the global toggle
@@ -394,7 +394,7 @@
   \fi
   % --- Bookkeeping.
   \ifinproblemgroup\refstepcounter{subproblem}\else\refstepcounter{problem}\fi
-  % Case-2: cleared here (per problem) so \end below can tell whether a `parts'
+  % Case-2: cleared here (per problem) so \end below can tell whether a `qparts'
   % environment actually ran to consume any multipart points spec.
   \global\PartsSeenfalse
   % A literal import-time number (\importproblem's `number' key) replaces the
@@ -426,20 +426,20 @@
   \ignorespaces
 }{%
   \par
-  % A case-2 points spec must be consumed by a `parts' environment. If one was
+  % A case-2 points spec must be consumed by a `qparts' environment. If one was
   % given (positional list or broadcast) but no parts ran, the points would
   % silently vanish -- flag it rather than lose them.
   \ifPartsSeen\else
     \ifPartsListMode
       \PackageError{Exercises}%
-        {points={...} list given but this problem has no `parts' environment}%
-        {Wrap the dependent parts in \string\begin{parts}...\string\end{parts},
+        {points={...} list given but this problem has no `qparts' environment}%
+        {Wrap the dependent parts in \string\begin{qparts}...\string\end{qparts},
          or drop the list.}%
     \fi
     \ifPartsEachMode
       \PackageError{Exercises}%
-        {pointseach given but this problem has no `parts' environment}%
-        {Wrap the dependent parts in \string\begin{parts}...\string\end{parts},
+        {pointseach given but this problem has no `qparts' environment}%
+        {Wrap the dependent parts in \string\begin{qparts}...\string\end{qparts},
          or drop pointseach.}%
     \fi
   \fi
@@ -483,7 +483,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PROBLEM PARTS (case 2 -- dependent parts in ONE file)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \begin{parts} \part ... \part ... \end{parts} -- the internal part list of a
+% \begin{qparts} \qpart ... \qpart ... \end{qparts} -- the internal part list of a
 % SINGLE problem whose parts genuinely depend on a shared stem ("Let f(x)=...;
 % (a) find f', (b) the critical points, (c) classify them"). Unlike a
 % \problemgroup (case 1, which ASSEMBLES independent atomic files under a lettered
@@ -494,36 +494,39 @@
 %   % and in that file:
 %   \begin{problem}
 %     Let $f(x)=x^3-3x$.
-%     \begin{parts}
-%       \part Find $f'$.          % 1 pt
-%       \part The critical points. % 1 pt
-%       \part Classify them.       % 2 pts
-%     \end{parts}
+%     \begin{qparts}
+%       \qpart Find $f'$.          % 1 pt
+%       \qpart The critical points. % 1 pt
+%       \qpart Classify them.       % 2 pts
+%     \end{qparts}
 %   \end{problem}
 %
 % Points come from the IMPORT site (points={1,1,2} positional, pointseach=N
-% broadcast -- see the POINTS section), so the file's \part's carry no weights and
+% broadcast -- see the POINTS section), so the file's \qpart's carry no weights and
 % the extrinsic rule holds. Each part letters "(a)(b)(c)" by reusing the
 % `subproblem' counter -- so a \ref to a part reads "7(a)", exactly like a case-1
 % part -- and drops its marks through the shared \ProblemPointsFormat hook (inline
 % by default, right-margin under Test.cls). With NO points spec the parts still
 % letter, just unmarked (a valid ungraded / notes use).
 %
-% \part is \let LOCALLY here: the environment is a TeX group, so the global
-% sectioning \part is restored untouched at \end{parts}. Authors write the natural
-% \part; it means "part of this problem" only between begin and end. (An implicit
-% assumption, not defended against: a \part hidden inside a user macro/loop would
-% not be counted -- a non-issue for hand-authored case-2 files.)
+% The item command is \qpart, NOT \part. A dedicated name (rather than locally
+% redefining LaTeX's sectioning \part) keeps the real \part untouched everywhere
+% AND stops editors from folding these as document parts (vim treats \part as a
+% sectioning command). \qpart is \let to \ExPart LOCALLY in the begin-code, so it
+% is defined only between \begin{qparts} and \end{qparts} -- using it outside gives a
+% clean "undefined" error. (An implicit assumption, not defended against: a \qpart
+% hidden inside a user macro/loop would not be counted -- a non-issue for
+% hand-authored case-2 files.)
 %
 % Safeguards: in positional mode the part count must equal the list length -- too
-% few is caught at \end{parts}, too many the instant a part outruns the list; a
+% few is caught at \end{qparts}, too many the instant a part outruns the list; a
 % non-integer value errors before it can reach \addtocounter/\ifnum; and a points
-% spec with no `parts' at all is caught in \end{problem} (see the PROBLEM env).
-\newenvironment{parts}{%
+% spec with no `qparts' at all is caught in \end{problem} (see the PROBLEM env).
+\newenvironment{qparts}{%
   \global\PartsSeentrue
   \global\ExFirstParttrue
-  \let\part\ExPart
-  % Swallow the source whitespace between \begin{parts} and the first \part.
+  \let\qpart\ExPart
+  % Swallow the source whitespace between \begin{qparts} and the first \qpart.
   % The first part runs into the heading line (horizontal mode), so that space
   % would otherwise become a real interword space -- a ~3.6pt phantom indent on
   % the first item only (later parts \par first, where leading space is dropped).
@@ -537,19 +540,19 @@
       \PackageError{Exercises}%
         {points list has \CurrentPartCount\space value(s) but the problem has
          \arabic{subproblem}\space part(s)}%
-        {The points={...} list length must equal the number of \string\part s.}%
+        {The points={...} list length must equal the number of \string\qpart s.}%
     \fi
   \fi
 }
 
-% One \part: step the sub-counter (letters (a),(b),... and makes \ref read
+% One \qpart: step the sub-counter (letters (a),(b),... and makes \ref read
 % "N(a)"), resolve this part's points from whichever mode is active, add them to
-% the running total, then set the run-in "(a)" label + marks. Bound to \part only
-% inside `parts'.
+% the running total, then set the run-in "(a)" label + marks. Bound to \qpart only
+% inside `qparts'.
 \newcommand{\ExPart}{%
   % The FIRST part runs into the stem/heading line (no break); every later part
   % breaks to its own line. To force the first part onto its own line instead
-  % (e.g. after a long stem), leave a blank line before \begin{parts} -- that \par
+  % (e.g. after a long stem), leave a blank line before \begin{qparts} -- that \par
   % puts us in vertical mode, so the run-in "(a)" below starts a fresh line anyway.
   \ifExFirstPart\global\ExFirstPartfalse\else\par\fi
   \refstepcounter{subproblem}%
@@ -559,8 +562,8 @@
   \ifPartsListMode
     \ifnum\value{subproblem}>\CurrentPartCount\relax
       \PackageError{Exercises}%
-        {more \string\part s than points values (list has \CurrentPartCount)}%
-        {Add values to points={...} or remove the extra \string\part.}%
+        {more \string\qpart s than points values (list has \CurrentPartCount)}%
+        {Add values to points={...} or remove the extra \string\qpart.}%
       \let\ThisPartPts\@empty
     \else
       \edef\ThisPartPts{\csuse{ExPartPts@\arabic{subproblem}}}%
