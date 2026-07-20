@@ -66,6 +66,39 @@
 % \LinkColor/\UrlColor likewise keep Hyperlinks' plain defaults (black/RoyalBlue).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% IMPORTED PROBLEMS AS EXAMPLES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The same problem file that is a graded "Q" on a test reads as an "Example" in
+% lecture notes. Exercises.sty leaves the presentation to the class (see its
+% "class-overridable PRESENTATION" hooks); here we set the notes look.
+%
+% The noun is a per-COURSE choice -- texts variously say Example / Exercise /
+% Problem. A course overrides it by redefining \NotesProblemLabelWord (its safe
+% home is course-vocab.tex). We route \ProblemLabelWord through that macro rather
+% than setting the word directly, so a course-vocab file shared with a TEST
+% document can retune the notes noun without disturbing Test.cls's fixed "Q"
+% (Test sets \ProblemLabelWord literally and never reads \NotesProblemLabelWord).
+\providecommand{\NotesProblemLabelWord}{Example}
+\renewcommand{\ProblemLabelWord}{\NotesProblemLabelWord}
+
+% Run-in heading: the label word, then -- only if given at import -- a literal
+% number (\importproblem[number=2.1.8], typically the textbook's) and a
+% parenthetical description (\importproblem[desc={similar to 2.1.8}]). No points
+% (notes are ungraded) and no auto counter (an unnumbered example is the default;
+% the `problem' counter still steps unseen). Renders as, e.g.:
+%   Example.            Example 2.1.8.
+%   Example (similar to 2.1.8).      Example 2.1.8 (from APEX).
+% The exact bold span / period are presentation; tune here freely.
+\renewcommand{\ProblemHeadingFormat}{%
+  \par\addvspace{\medskipamount}%
+  \noindent
+  \textbf{\ProblemLabelWord
+    \ifdefempty{\CurrentProblemNumber}{}{\space\CurrentProblemNumber}}%
+  \ifdefempty{\CurrentProblemDesc}{}{ \textnormal{(\CurrentProblemDesc)}}%
+  \textbf{.}\quad\ignorespaces
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GEOMETRY
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % textwidth follows the measure rule rather than a frozen length; see Typefaces.
