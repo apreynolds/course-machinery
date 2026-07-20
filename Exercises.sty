@@ -370,6 +370,12 @@
 % and each top-level problem, starts its letters at (a)); \p@subproblem makes a
 % \ref to a part read "N(a)".
 \newif\ifinproblemgroup
+% Choose-N-of-M grouping (see the PROBLEM CHOICE section). When active, a member's
+% points are NOT added to the exam total (the group adds select*points once), the
+% shared per-member value is filled into its margin mark, and the generated
+% instruction is printed above it. Forward-declared here because the problem env
+% (below) reads it; the machinery lives in its own section further down.
+\newif\ifinproblemchoice
 % Like \ifExFirstPart for case-2: the first part of a \problemgroup runs into the
 % stem line, the rest each break. Set by \problemgroup, consumed by the problem env.
 \newif\ifGroupFirstPart
@@ -447,15 +453,27 @@
   % file. hyperref already makes its anchor (\@currentHref) global, so this keeps
   % the ref text and the hyperlink target in sync.
   \global\let\@currentlabel\@currentlabel
-  \ifdefempty{\CurrentProblemPoints}{}{%
-    \ifdefstring{\CurrentProblemCounts}{1}{\addtocounter{totalpoints}{\CurrentProblemPoints}}{}%
-  }%
+  \ifinproblemchoice
+    % Choose-N-of-M member: fill the group's shared value for THIS member's margin
+    % mark (members carry no points= of their own), and do NOT add to the total --
+    % the group adds select*value ONCE at \end{problemchoice}. Count the member for
+    % the select<=M guard.
+    \ifdefempty{\pchoice@val}{}{\def\CurrentProblemPoints{\pchoice@val}}%
+    \stepcounter{pchoicemembers}%
+  \else
+    \ifdefempty{\CurrentProblemPoints}{}{%
+      \ifdefstring{\CurrentProblemCounts}{1}{\addtocounter{totalpoints}{\CurrentProblemPoints}}{}%
+    }%
+  \fi
   % --- Presentation.
   \ifinproblemgroup
     \noindent\textbf{(\alph{subproblem})}%
     \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
     \quad
   \else
+    % A choose-N-of-M member prints the generated instruction above its heading, so
+    % the "choose 2 of these" context repeats on every question (page-break safe).
+    \ifinproblemchoice\pchoice@emit\fi
     % Check-in mode suppresses the problem's own heading -- the enclosing "Check
     % In" box title is the label, so an "Example."/"Q N." here would double up.
     \ifcheckinmode\else\ProblemHeadingFormat\fi
@@ -670,6 +688,118 @@
   \noindent\textbf{(\alph{subproblem})}%
   \ifdefempty{\ThisPartPts}{}{\ProblemPointsFormat{\ThisPartPts}}%
   \quad\ignorespaces
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PROBLEM CHOICE (choose N of M)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \begin{problemchoice}[select=2, points=5] ... \end{problemchoice} -- the
+% "answer any 2 of Questions 7-9" pattern, with ALL the bookkeeping automated. The
+% body is a run of ordinary \importproblem members (standalone "Q N", NOT lettered
+% parts -- so, unlike qparts/problemgroup, this does NOT touch the subproblem
+% counter). Three things are automated so the author writes nothing but select/points:
+%
+%   * ACCOUNTING. Each member would normally add its points to the exam total;
+%     inside the group they do NOT (the ambient \ifinproblemchoice flag makes the
+%     problem env skip its \addtocounter). The GROUP adds select*points ONCE, so a
+%     "choose 2 of 3, 5 each" block contributes 10, not 15 -- automatically, with no
+%     hand-placed \nocount. Insert or delete a member and the total re-derives. This
+%     is what mostly retires manual `nocount' (the other case being bonus points).
+%   * THE POINT VALUE is declared ONCE here (points=5) and filled into every
+%     member's margin mark, so members carry no points= of their own. "Choose N of M"
+%     is only used when the alternatives are equal value, so one declaration fits.
+%   * THE INSTRUCTION ("Answer any two of Questions 7-9.") is generated and printed
+%     ABOVE EACH member, so the "choose 2 of these" context travels with every
+%     question across page breaks (same robustness argument as a repeated
+%     problemgroup instruction). The NUMBERS are cross-references -- \ref to the
+%     first and last member -- so they are never typed and AUTO-UPDATE when a
+%     question is inserted before the block. Cost: the usual second compile to
+%     settle them (they show "??" once, exactly like \printtotalpoints; latexmk
+%     reruns on the changed .aux). The wording is a class-overridable hook
+%     (\ProblemChoiceInstruction), so it is one consistent phrasing per course.
+%
+% Members must be single-value problems: a qparts/problemgroup member adds to the
+% total by a different path and would double-count. (Not guarded -- the normal use
+% never nests those here.)
+\newif\ifpchoicefirst        % first member drops the range's left \label; then off
+\newcounter{pchoicegroup}    % unique id per \problemchoice, for its two \labels
+\newcounter{pchoicemembers}  % members in the current group (the select<=M guard)
+\newcommand{\pchoice@select}{}
+\newcommand{\pchoice@val}{}
+\newcommand{\pchoice@id}{0}
+\define@key{pchoice}{select}{\def\pchoice@select{#1}}
+\define@key{pchoice}{points}{\def\pchoice@val{#1}}
+
+% Spell out a small count (the "two" in "any two of ..."); digits are the fallback
+% for anything past nine. \ifcase needs an integer -- select is guarded to be one.
+\newcommand{\pchoice@numword}[1]{%
+  \ifcase#1 zero\or one\or two\or three\or four\or five\or six\or seven\or
+    eight\or nine\else #1\fi}
+
+% The instruction sentence -- CLASS-OVERRIDABLE presentation (same idiom as
+% \ProblemHeadingFormat). #1 = select (as given); #2 = first member number,
+% #3 = last member number, both \ref values (hence hyperlinks, and auto-updating).
+% Restyle the wording in one place (here, or override in Test.cls/course-vocab.tex).
+\newcommand{\ProblemChoiceInstruction}[3]{%
+  \noindent\textbf{Answer any \pchoice@numword{#1} of Questions~#2--#3.}}
+
+% Printed above each member by the problem env. On the FIRST member it also drops
+% the \label the range's LEFT end reads; the RIGHT end is labelled at
+% \end{problemchoice}. The \ref to that (forward) last label is "??" until the
+% rerun -- the accepted two-pass cost, the same one \printtotalpoints pays.
+\newcommand{\pchoice@emit}{%
+  \par\addvspace{\medskipamount}%
+  \ifpchoicefirst
+    \global\pchoicefirstfalse
+    \label{pc@\pchoice@id @first}%
+  \fi
+  \ProblemChoiceInstruction{\pchoice@select}%
+    {\ref{pc@\pchoice@id @first}}{\ref{pc@\pchoice@id @last}}%
+    \vspace{-1em}\par\nobreak
+}
+
+\newcounter{pchoicetmp}  % scratch for select*value
+\NewDocumentEnvironment{problemchoice}{O{}}{%
+  \par
+  \stepcounter{pchoicegroup}%
+  \edef\pchoice@id{\arabic{pchoicegroup}}%
+  \setcounter{pchoicemembers}{0}%
+  \def\pchoice@select{}\def\pchoice@val{}%
+  \setkeys{pchoice}{#1}%
+  \inproblemchoicetrue    % LOCAL: nested member groups see it; \end auto-clears it
+  \pchoicefirsttrue
+}{%
+  \par
+  % The range's RIGHT end: the last member's number. The problem env globalised its
+  % \@currentlabel, so it is still the last member's here.
+  \label{pc@\pchoice@id @last}%
+  % Accounting: add select*value ONCE. Guard the integer contract before arithmetic.
+  \ifdefempty{\pchoice@val}{}{%
+    \ifdefempty{\pchoice@select}{%
+      \PackageError{Exercises}{problemchoice: points given but no `select'}%
+        {Add select=N to \string\begin{problemchoice}[...].}%
+    }{%
+      \IfInteger{\pchoice@select}{%
+        \IfInteger{\pchoice@val}{%
+          \setcounter{pchoicetmp}{\numexpr\pchoice@select*\pchoice@val\relax}%
+          \addtocounter{totalpoints}{\value{pchoicetmp}}%
+        }{\PackageError{Exercises}{problemchoice: points `\pchoice@val' is not an
+            integer}{Point values must be whole numbers.}}%
+      }{\PackageError{Exercises}{problemchoice: select `\pchoice@select' is not an
+          integer}{select must be a whole number.}}%
+    }%
+  }%
+  % Sanity: cannot choose more alternatives than are offered.
+  \ifdefempty{\pchoice@select}{}{%
+    \IfInteger{\pchoice@select}{%
+      \ifnum\pchoice@select>\value{pchoicemembers}\relax
+        \PackageError{Exercises}%
+          {problemchoice: select=\pchoice@select\space but only
+           \arabic{pchoicemembers}\space member(s)}%
+          {select must be <= the number of \string\importproblem\space members.}%
+      \fi
+    }{}%
+  }%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
