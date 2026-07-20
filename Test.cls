@@ -73,7 +73,7 @@
 % AFTER Typefaces per its contract (amsthm/amsmath must already be in place; it
 % pulls in tcolorbox itself). This completes the `instructor' view bundle for
 % assessments: Exercises already supplies \ShowSolutions/\ShowHints, so adding
-% InstructorNotes (\ShowInstructorNotes / \ShowPrivateNotes) means build-pdfs'
+% InstructorNotes (\ShowInstructorNotes) means build-pdfs'
 % `instructor' view yields a full -INSTRUCTOR exam copy -- answer key + hints +
 % staff notes, inside the slate "Instructor copy" page frame. The plain -SOLUTIONS
 % answer-key twin already worked without it (Exercises owns \ifsolutions); this
