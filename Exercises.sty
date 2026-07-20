@@ -190,20 +190,47 @@
 \newcommand{\CurrentPartCount}{0}
 \newcounter{exparttmp}  % scratch: counts list elements while parsing
 
-% Split a comma list "1,1,2" into \ExPartPts@1..\ExPartPts@N and record N in
-% \CurrentPartCount. Spaces are zapped first so "1, 1, 2" is accepted too. \@for
-% is the kernel comma-list walker; each element is stored GLOBALLY because the
+% ---- Case-2 per-part WORKSPACES (see PROBLEM PARTS) -------------------------
+% workspaces={1,2,3} injects a \workspace[k] after the k-th \qpart, set at the
+% IMPORT site so the content file carries no \workspace directive -- workspace
+% sizing is an ASSESSMENT concern (a lecture wants none, a test wants sized
+% blanks), extrinsic like points. POSITIONAL: one entry per \qpart, an entry of
+% 0 or empty meaning "no room for this part" (some parts -- "state the rule" --
+% need none); keyword sizes (halfpage / fullpage) are fine as entries too, since
+% commas inside the brace group cannot occur in them. Stored element-by-element
+% as \ExWs@k with the length in \CurrentWSCount; \ifWorkspacesMode selects the
+% path, and (like the points list) the count must equal the number of \qpart s.
+\newif\ifWorkspacesMode
+\newcommand{\CurrentWSCount}{0}
+
+% Split a comma list "a,b,c" into \csname<PREFIX>k\endcsname (k=1..N) and record
+% N in the count macro. Spaces are zapped first so "1, 1, 2" is accepted too.
+% \@for is the kernel comma-list walker (it copes with empty elements, e.g. the
+% skip entry in workspaces={1,,3}); each element is stored GLOBALLY because the
 % list is parsed here (at the \importproblem call) but consumed later, inside the
-% problem body's `qparts' environment.
+% problem body's `qparts' environment. Shared by the two positional lists below.
+%   #1  control-sequence-name prefix for the per-element stores (e.g. "ExPartPts@")
+%   #2  a macro \xdef'd with the element count (e.g. \CurrentPartCount)
+%   #3  the raw comma list
+\newcommand{\Exercises@parselist}[3]{%
+  \setcounter{exparttmp}{0}%
+  \edef\Ex@list{\zap@space#3 \@empty}%
+  \@for\Ex@elt:=\Ex@list\do{%
+    \stepcounter{exparttmp}%
+    \global\csxdef{#1\arabic{exparttmp}}{\Ex@elt}%
+  }%
+  \xdef#2{\arabic{exparttmp}}%
+}
+% The two callers: a positional points list (\ExPartPts@k, length \CurrentPartCount)
+% and a positional workspaces list (\ExWs@k, length \CurrentWSCount). Each flips
+% its mode flag and delegates the parse.
 \newcommand{\ExercisesParsePointsList}[1]{%
   \global\PartsListModetrue
-  \setcounter{exparttmp}{0}%
-  \edef\ExParts@list{\zap@space#1 \@empty}%
-  \@for\ExParts@elt:=\ExParts@list\do{%
-    \stepcounter{exparttmp}%
-    \global\csxdef{ExPartPts@\arabic{exparttmp}}{\ExParts@elt}%
-  }%
-  \xdef\CurrentPartCount{\arabic{exparttmp}}%
+  \Exercises@parselist{ExPartPts@}{\CurrentPartCount}{#1}%
+}
+\newcommand{\ExercisesParseWorkspaceList}[1]{%
+  \global\WorkspacesModetrue
+  \Exercises@parselist{ExWs@}{\CurrentWSCount}{#1}%
 }
 
 % The assessment total. \newtotcounter registers a normal counter that totcount
@@ -223,6 +250,8 @@
 %                 points (parts live in a `qparts' env in the file). Count must
 %                 match the number of parts. See the POINTS / PROBLEM PARTS blocks.
 %   pointseach=2  case-2 BROADCAST: every \qpart is worth 2, whatever the count.
+%   workspaces={1,2,3}  case-2 per-part handwriting room: a \workspace[k] after the
+%                 k-th \qpart (0/empty = none). Count must match the \qpart count.
 %   nocount       show the points but keep them OUT of the total (bonus / choose-1-of-N)
 %   hint          force this problem's hint to show, regardless of the global toggle
 %   nohint        suppress this problem's hint, regardless of the global toggle
@@ -259,6 +288,11 @@
   \global\PartsEachModetrue
   \gdef\CurrentPartEach{#1}%
 }
+% Per-part workspaces (case-2): workspaces={1,2,3} -> a \workspace[k] after the
+% k-th \qpart. ALWAYS a positional list (one entry per part), so -- unlike points
+% -- it needs no comma-branch: even a single-part workspaces={5} is a one-element
+% list. See the case-2 WORKSPACES block in the POINTS section and \ExEmitWorkspace.
+\define@key{eximport}{workspaces}{\ExercisesParseWorkspaceList{#1}}
 \define@key{eximport}{nocount}[true]{\gdef\CurrentProblemCounts{0}}
 \define@key{eximport}{hint}[true]{\gdef\CurrentProblemHint{on}}
 \define@key{eximport}{nohint}[true]{\gdef\CurrentProblemHint{off}}
@@ -284,6 +318,9 @@
   \global\PartsEachModefalse
   \gdef\CurrentPartEach{}%
   \gdef\CurrentPartCount{0}%
+  % Case-2 per-part workspaces.
+  \global\WorkspacesModefalse
+  \gdef\CurrentWSCount{0}%
 }
 % The import is wrapped in the check-in box only when `checkin' is set -- the box
 % (\CheckinBox@begin/@end) is defined in the MULTIPLE CHOICE section. Splitting
@@ -442,6 +479,12 @@
         {Wrap the dependent parts in \string\begin{qparts}...\string\end{qparts},
          or drop pointseach.}%
     \fi
+    \ifWorkspacesMode
+      \PackageError{Exercises}%
+        {workspaces given but this problem has no `qparts' environment}%
+        {Wrap the dependent parts in \string\begin{qparts}...\string\end{qparts},
+         or drop workspaces.}%
+    \fi
   \fi
   \gdef\CurrentProblemPoints{}\gdef\CurrentProblemCounts{1}%
 }
@@ -533,6 +576,10 @@
   \ignorespaces
 }{%
   \par
+  % The LAST part's workspace: parts 1..n-1 were emitted as each next \qpart began
+  % (in \ExPart), so the final part's room is emitted here -- after its full content
+  % (its inline solution too), the same rule as every other part.
+  \ifWorkspacesMode\ifnum\value{subproblem}>0 \ExEmitWorkspace{\arabic{subproblem}}\fi\fi
   % Positional mode: the number of parts seen (subproblem's value) must equal the
   % list length. Fewer parts than values lands here; more parts errored earlier.
   \ifPartsListMode
@@ -543,6 +590,37 @@
         {The points={...} list length must equal the number of \string\qpart s.}%
     \fi
   \fi
+  % Same one-entry-per-\qpart contract for the workspaces list.
+  \ifWorkspacesMode
+    \ifnum\value{subproblem}=\CurrentWSCount\relax\else
+      \PackageError{Exercises}%
+        {workspaces list has \CurrentWSCount\space value(s) but the problem has
+         \arabic{subproblem}\space part(s)}%
+        {The workspaces={...} list length must equal the number of \string\qpart s.}%
+    \fi
+  \fi
+}
+
+% Emit part #1's handwriting workspace, if a `workspaces' list was given at the
+% import. An entry of 0 or empty means "no room for this part". \workspace lives
+% in Workspace.sty and may be ABSENT under a class that does not load it (e.g.
+% CourseDocument): guard with \ifdef so a workspaces list is simply inert there,
+% keeping this package self-contained (mirrors the \WSZeroHeight fallback). Called
+% as each NEXT part begins and once at \end{qparts}, so a part's room always
+% follows its full content -- including any inline \begin{solution}, which in
+% overlay mode paints DOWN into exactly this reserved space.
+\newcommand{\ExEmitWorkspace}[1]{%
+  \ifWorkspacesMode
+    \edef\ExThisWS{\csuse{ExWs@#1}}%
+    \ifdefempty{\ExThisWS}{}{%
+      \ifdefstring{\ExThisWS}{0}{}{%
+        % Expand \ExThisWS into the optional arg BEFORE \workspace scans it: its
+        % keyword test (\ifstrequal{...}{halfpage}) does not expand, so a passed
+        % macro would miss the keyword branch and fall through to the numeric one.
+        \ifdef{\workspace}{\expandafter\workspace\expandafter[\ExThisWS]}{}%
+      }%
+    }%
+  \fi
 }
 
 % One \qpart: step the sub-counter (letters (a),(b),... and makes \ref read
@@ -550,6 +628,11 @@
 % the running total, then set the run-in "(a)" label + marks. Bound to \qpart only
 % inside `qparts'.
 \newcommand{\ExPart}{%
+  % Before this part opens, close out the PREVIOUS one: emit its workspace (parts
+  % 1..k-1 here, the final part at \end{qparts}). \value{subproblem} is still the
+  % previous part's index -- this part is not counted until \refstepcounter below --
+  % so 0 means there is no previous part (this is the first \qpart), nothing to emit.
+  \ifnum\value{subproblem}>0 \ExEmitWorkspace{\arabic{subproblem}}\fi
   % The FIRST part runs into the stem/heading line (no break); every later part
   % breaks to its own line. To force the first part onto its own line instead
   % (e.g. after a long stem), leave a blank line before \begin{qparts} -- that \par
