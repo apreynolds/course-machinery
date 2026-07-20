@@ -101,12 +101,21 @@
 % Whether the current problem's points count toward the total. "1" = counted
 % (the default); "0" = shown but off the books. Set by the `nocount' key of
 % \importproblem, read (and reset) in the problem environment alongside points.
-% Serves two cases with one mechanism: BONUS questions (extra, so out of the
-% denominator) and CHOOSE-1-OF-N pairs (mark all but one of the alternatives
-% off-the-books, so a 10-or-10 pair contributes 10, not 20). It deliberately does
-% NOT alter the printed marker -- "choose one" pairs must still read "(10 points)"
-% on both, and which case it is (bonus vs. choose) is carried by exam prose.
+% `nocount' is the SILENT off-books primitive: it does NOT alter the printed marker
+% -- a CHOOSE-1-OF-N pair must still read "(10 points)" on both, and which one is
+% dropped is carried by exam prose (or by \problemchoice, which owns that accounting
+% now). BONUS points are a SEPARATE mechanism -- the `*' suffix (points=2*), which is
+% off-books AND labels the marker "bonus" (see \ifCurrentProblemBonus below). So the
+% two are distinct: `nocount' = quiet, `*' = announced.
 \newcommand{\CurrentProblemCounts}{1}
+
+% Whether the current problem's points are BONUS -- set by a `*' suffix on the value
+% (points=2*, or a per-part list entry points={2,3,1*}). A bonus item is kept out of
+% the total (like nocount) AND its marker is rendered through \ProblemBonusPointsFormat
+% (the "bonus" annotation) instead of \ProblemPointsFormat. Extrinsic: the `*' is
+% detected at the import site, the content file is untouched. The scalar case sets
+% this global (in \bonus@scalar, before the import); \ExPart sets it per part, locally.
+\newif\ifCurrentProblemBonus
 
 % Per-problem override of the hints toggle, set by \importproblem's hint/nohint
 % keys and read by the hint environment. Three states: "inherit" (the default --
@@ -160,6 +169,21 @@
 % (see \importproblem): \ifnum and the \addtocounter into the total both need one.
 \newcommand{\ProblemPointsFormat}[1]{%
   \quad\textnormal{\normalfont(#1\ \ifnum#1=1 point\else points\fi)}}
+
+% How a BONUS marker (points=2*) renders. Class-overridable, the twin of
+% \ProblemPointsFormat; default is the inline mark with a ", bonus" note. Test.cls
+% overrides it with a stacked right-margin block ("(N pts)" + rule + "bonus"). The
+% value is still shown (a bonus IS worth N if earned); it is only kept OUT of the
+% total, and announced.
+\newcommand{\ProblemBonusPointsFormat}[1]{%
+  \quad\textnormal{\normalfont(#1\ \ifnum#1=1 point\else points\fi, bonus)}}
+
+% The single DISPATCH every heading calls to print a value's marker: bonus items go
+% through \ProblemBonusPointsFormat, ordinary ones through \ProblemPointsFormat. So a
+% class overrides the two FORMATS and never has to branch on bonus itself; and the
+% scalar heading, group-part, and \qpart paths all agree by routing through here.
+\newcommand{\ProblemPointsMark}[1]{%
+  \ifCurrentProblemBonus\ProblemBonusPointsFormat{#1}\else\ProblemPointsFormat{#1}\fi}
 
 % ---- Case-2 multipart points (see PROBLEM PARTS) ---------------------------
 % A case-2 problem -- ONE file, genuinely dependent parts "(a) (b) (c)" -- takes
@@ -246,13 +270,18 @@
 % OPTIONS is a comma-separated key=value list (keyval family `eximport'):
 %
 %   points=5      the point value (integer; summed and pluralised)
+%   points=2*     BONUS: shown and labelled "bonus", but kept OUT of the total (the
+%                 `*' suffix; see \ifCurrentProblemBonus). Works per-part too, below.
 %   points={1,1,2} case-2 POSITIONAL split: the k-th value is the k-th \qpart's
 %                 points (parts live in a `qparts' env in the file). Count must
-%                 match the number of parts. See the POINTS / PROBLEM PARTS blocks.
-%   pointseach=2  case-2 BROADCAST: every \qpart is worth 2, whatever the count.
+%                 match the number of parts. A `*' on an entry (points={2,3,1*})
+%                 makes THAT part bonus. See the POINTS / PROBLEM PARTS blocks.
+%   pointseach=2  case-2 BROADCAST: every \qpart is worth 2, whatever the count
+%                 (pointseach=2* makes every part bonus).
 %   workspaces={1,2,3}  case-2 per-part handwriting room: a \workspace[k] after the
 %                 k-th \qpart (0/empty = none). Count must match the \qpart count.
-%   nocount       show the points but keep them OUT of the total (bonus / choose-1-of-N)
+%   nocount       show the points but keep them OUT of the total, marker UNCHANGED
+%                 (choose-1-of-N: no "bonus" label -- that is what `*' is for)
 %   hint          force this problem's hint to show, regardless of the global toggle
 %   nohint        suppress this problem's hint, regardless of the global toggle
 %   number=2.1.8  literal display number (e.g. a textbook's); steps NO counter,
@@ -266,7 +295,8 @@
 %
 % As a shorthand, a LONE integer means points: \importproblem[5]{...}{...} is
 % exactly \importproblem[points=5]{...}{...} (this is the back-compat form and the
-% common case). To combine points with a flag, write it out: [points=5, hint].
+% common case); a lone [2*] is likewise points=2* (a bonus). To combine points with
+% a flag, write it out: [points=5, hint].
 % (A bare number mixed with flags -- [5, hint] -- is NOT valid; keyval would read
 % "5" as an unknown key. Use points=5.) Bare \import still works and yields no
 % marker (e.g. a lecture, ungraded). The trailing reset restores every default for
@@ -281,6 +311,18 @@
 \define@key{eximport}{points}{%
   \IfSubStr{#1}{,}%
     {\ExercisesParsePointsList{#1}}%
+    {\bonus@scalar{#1}}%
+}
+% Store a scalar points value, honouring a trailing `*' as the BONUS marker: strip
+% the star, keep the number in \CurrentProblemPoints, and raise \ifCurrentProblemBonus
+% (global -- the problem env reads it in a later group). Plain values pass straight
+% through. The per-PART `*' (points={2,3,1*}) is handled in \ExPart instead, since the
+% list is stored element-by-element and each part is interpreted as it renders.
+\newcommand{\bonus@scalar}[1]{%
+  \IfEndWith{#1}{*}%
+    {\StrGobbleRight{#1}{1}[\bonus@core]%
+     \global\let\CurrentProblemPoints\bonus@core
+     \global\CurrentProblemBonustrue}%
     {\gdef\CurrentProblemPoints{#1}}%
 }
 % Broadcast form: every part of a case-2 problem is worth the same #1.
@@ -313,6 +355,7 @@
   \gdef\CurrentProblemDesc{}%
   \global\CurrentProblemPrinttrue
   \global\checkinmodefalse
+  \global\CurrentProblemBonusfalse
   % Case-2 multipart points (\ifPartsSeen is per-PROBLEM, reset there, not here).
   \global\PartsListModefalse
   \global\PartsEachModefalse
@@ -322,13 +365,25 @@
   \global\WorkspacesModefalse
   \gdef\CurrentWSCount{0}%
 }
+% Parse the optional argument. The lone-value SHORTHAND covers a bare integer ([5]
+% = points=5) and a bare bonus ([2*] = points=2*); both route through \bonus@scalar
+% (which strips a `*' and raises the bonus flag). Anything else -- a real key=value
+% list, or a token merely ending in `*' that is not <int>* -- goes to \setkeys.
+\newcommand{\importproblem@opts}[1]{%
+  \IfInteger{#1}%
+    {\bonus@scalar{#1}}%
+    {\IfEndWith{#1}{*}%
+       {\StrGobbleRight{#1}{1}[\bonus@core]%
+        \IfInteger{\bonus@core}{\bonus@scalar{#1}}{\setkeys{eximport}{#1}}}%
+       {\setkeys{eximport}{#1}}}%
+}
 % The import is wrapped in the check-in box only when `checkin' is set -- the box
 % (\CheckinBox@begin/@end) is defined in the MULTIPLE CHOICE section. Splitting
 % the box's begin/end across \import is fine: \import introduces no group that
 % would break the environment nesting.
 \NewDocumentCommand{\importproblem}{O{} m m}{%
   \importproblem@reset
-  \IfInteger{#1}{\gdef\CurrentProblemPoints{#1}}{\setkeys{eximport}{#1}}%
+  \importproblem@opts{#1}%
   \ifCurrentProblemPrint
     \ifcheckinmode\CheckinBox@begin\fi
     \import{#2}{#3}%
@@ -413,7 +468,7 @@
 \newcommand{\ProblemNumberText}{\ProblemLabelWord\ \theproblem}
 \newcommand{\ProblemHeadingFormat}{%
   \noindent\textbf{\ProblemNumberText.}%
-  \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
+  \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsMark{\CurrentProblemPoints}}%
   \quad
 }
 % No trailing \par: the first part runs into this stem line (the problem env
@@ -462,13 +517,17 @@
     \stepcounter{pchoicemembers}%
   \else
     \ifdefempty{\CurrentProblemPoints}{}{%
-      \ifdefstring{\CurrentProblemCounts}{1}{\addtocounter{totalpoints}{\CurrentProblemPoints}}{}%
+      % A BONUS problem (points=2*) is off the total, like nocount, but announced by
+      % the heading's bonus marker instead of quietly. Otherwise the nocount flag decides.
+      \ifCurrentProblemBonus\else
+        \ifdefstring{\CurrentProblemCounts}{1}{\addtocounter{totalpoints}{\CurrentProblemPoints}}{}%
+      \fi
     }%
   \fi
   % --- Presentation.
   \ifinproblemgroup
     \noindent\textbf{(\alph{subproblem})}%
-    \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
+    \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsMark{\CurrentProblemPoints}}%
     \quad
   \else
     % A choose-N-of-M member prints the generated instruction above its heading, so
@@ -676,17 +735,29 @@
       \let\ThisPartPts\@empty
     \fi
   \fi
+  % A trailing `*' on this part's value (points={2,3,1*}, or pointseach=2*) marks it
+  % BONUS: strip the star and flag it, so the part stays OFF the total and renders
+  % through the bonus marker. Reuses the scalar flag \ifCurrentProblemBonus LOCALLY,
+  % so \ProblemPointsMark dispatches a part exactly like a whole problem; the local
+  % assignment reverts at \end{qparts}, and is cleared first so a plain part following
+  % a bonus one is not itself bonus.
+  \CurrentProblemBonusfalse
+  \ifdefempty{\ThisPartPts}{}{%
+    \IfEndWith{\ThisPartPts}{*}%
+      {\StrGobbleRight{\ThisPartPts}{1}[\ThisPartPts]\CurrentProblemBonustrue}{}%
+  }%
   % Guard the integer contract (\ifnum + \addtocounter both need one) before the
-  % value can reach either: a bad value errors and is dropped so nothing crashes.
+  % value can reach either: a bad value errors and is dropped so nothing crashes. A
+  % bonus part is shown but NOT added to the total.
   \ifdefempty{\ThisPartPts}{}{%
     \IfInteger{\ThisPartPts}%
-      {\addtocounter{totalpoints}{\ThisPartPts}}%
+      {\ifCurrentProblemBonus\else\addtocounter{totalpoints}{\ThisPartPts}\fi}%
       {\PackageError{Exercises}{part points `\ThisPartPts' is not an integer}%
         {Part point values must be whole numbers.}\let\ThisPartPts\@empty}%
   }%
-  % Presentation: run-in "(a)" + this part's marks (shared hook), then the prompt.
+  % Presentation: run-in "(a)" + this part's marks (shared dispatch), then the prompt.
   \noindent\textbf{(\alph{subproblem})}%
-  \ifdefempty{\ThisPartPts}{}{\ProblemPointsFormat{\ThisPartPts}}%
+  \ifdefempty{\ThisPartPts}{}{\ProblemPointsMark{\ThisPartPts}}%
   \quad\ignorespaces
 }
 

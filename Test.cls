@@ -294,11 +294,36 @@
 \renewcommand{\ProblemPointsFormat}[1]{%
   \marginnote{\small\bfseries (#1\ \ifnum#1=1 pt\else pts\fi)}%
 }
+% ---- Bonus marks (points=2*) -----------------------------------------------
+% A BONUS item stacks its "(N pts)" mark and a "bonus" label -- a short rule between
+% -- in the same right-margin MARKS rail. Two arrangements, flipped with ONE command
+% in the document preamble so they are easy to compare:
+%   \BonusMarksOnTop   (the default)     (N pts) / --- / bonus
+%   \BonusLabelOnTop                      BONUS  / --- / (N pts)
+% Each preset also sets the label casing to suit its position (a header "BONUS" on
+% top, a quiet "bonus" below); after choosing, \renewcommand\BonusMarginLabel for
+% other wording, or \BonusMarginRule for the divider. Bookkeeping (off-the-total) is
+% already done in the problem env -- this is display only, the twin of the mark above.
+\newif\ifBonusLabelTop
+\newcommand{\BonusMarginLabel}{bonus}
+\newcommand{\BonusMarginRule}{\rule{2.6em}{0.4pt}}
+\newcommand{\bonus@marks}[1]{(#1\ \ifnum#1=1 pt\else pts\fi)}
+\newcommand{\BonusMarksOnTop}{\BonusLabelTopfalse\renewcommand{\BonusMarginLabel}{bonus}}
+\newcommand{\BonusLabelOnTop}{\BonusLabelToptrue\renewcommand{\BonusMarginLabel}{BONUS}}
+\BonusMarksOnTop   % default arrangement
+\renewcommand{\ProblemBonusPointsFormat}[1]{%
+  \marginnote{\small\bfseries
+    \ifBonusLabelTop
+      \shortstack{\BonusMarginLabel\\ \BonusMarginRule\\ \bonus@marks{#1}}%
+    \else
+      \shortstack{\bonus@marks{#1}\\ \BonusMarginRule\\ \BonusMarginLabel}%
+    \fi}%
+}
 \renewcommand{\ProblemHeadingFormat}{%
   \par\addvspace{2\baselineskip}%
   \noindent
   \llap{\smash{\textbf{\ProblemNumberText.}}\hspace{1em}}%
-  \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsFormat{\CurrentProblemPoints}}%
+  \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsMark{\CurrentProblemPoints}}%
 }
 % The group's numbered stem gets the SAME margin placement (number hung left, no
 % points box -- the parts carry the points), so a grouped question lines up with
