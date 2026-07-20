@@ -435,13 +435,21 @@
 % stem line, the rest each break. Set by \problemgroup, consumed by the problem env.
 \newif\ifGroupFirstPart
 \newcounter{subproblem}[problem]
+% How a part is lettered -- the counter-formatting command applied to `subproblem'.
+% Class/course-overridable (the same idiom as \ProblemLabelWord): \alph -> (a)(b)(c)
+% (the default), \Alph -> (A)(B)(C), \roman -> (i)(ii)(iii), etc. Used in ALL THREE
+% places a part label appears -- the \ref text (\thesubproblem), the case-2 \qpart
+% run-in, and the case-1 \problemgroup run-in -- so the printed "(a)" and a \ref's
+% "N(a)" always agree. Set once, e.g. \renewcommand{\QPartLabelFormat}{\Alph} in
+% course-vocab.tex or a class.
+\newcommand{\QPartLabelFormat}{\alph}
 % \thesubproblem carries the parent number ("4(a)") so a \ref to a part reads
 % "4(a)" -- the same nesting trick as \theequation under a section. The prefix
 % must live INSIDE \thesubproblem, not in \p@subproblem: routed through \p@ the
 % \number scan inside \arabic{problem} swallows the following token and the
-% letter is lost. The heading prints just "(a)" via \alph directly (below), so the
-% two representations differ on purpose -- short label on the page, full ref.
-\renewcommand{\thesubproblem}{\theproblem(\alph{subproblem})}
+% letter is lost. The heading prints just "(a)" via \QPartLabelFormat directly
+% (below), so the two representations differ on purpose -- short label, full ref.
+\renewcommand{\thesubproblem}{\theproblem(\QPartLabelFormat{subproblem})}
 
 % ---- Heading: class-overridable PRESENTATION -------------------------------
 % A problem file is context-neutral -- \begin{problem} names no label of its own,
@@ -526,7 +534,7 @@
   \fi
   % --- Presentation.
   \ifinproblemgroup
-    \noindent\textbf{(\alph{subproblem})}%
+    \noindent\textbf{(\QPartLabelFormat{subproblem})}%
     \ifdefempty{\CurrentProblemPoints}{}{\ProblemPointsMark{\CurrentProblemPoints}}%
     \quad
   \else
@@ -756,7 +764,7 @@
         {Part point values must be whole numbers.}\let\ThisPartPts\@empty}%
   }%
   % Presentation: run-in "(a)" + this part's marks (shared dispatch), then the prompt.
-  \noindent\textbf{(\alph{subproblem})}%
+  \noindent\textbf{(\QPartLabelFormat{subproblem})}%
   \ifdefempty{\ThisPartPts}{}{\ProblemPointsMark{\ThisPartPts}}%
   \quad\ignorespaces
 }
@@ -1259,7 +1267,14 @@
 \newlength{\match@colwidth}
 \newcommand{\MatchColWidth}{0.38\linewidth}
 \newcommand{\MatchItemSep}{2ex}
-\newcommand{\MatchKeyFormat}[1]{\;{\bfseries\color{SolutionColor}$\to$#1}}
+% The match annotation is encased in the SAME green frame + light fill as every
+% other solution cue (\CorrectChoiceFormat, the solution box) -- so "-> C" reads as
+% "this is the answer" consistently. \fboxrule/\fboxsep match \CorrectChoiceFormat.
+\newcommand{\MatchKeyFormat}[1]{%
+  \;\begingroup
+    \setlength{\fboxrule}{0.2mm}\setlength{\fboxsep}{2pt}%
+    \fcolorbox{SolutionColor}{SolutionColor!8}{\bfseries\color{SolutionColor}$\to$#1}%
+  \endgroup}
 
 % The match annotation rides on the NUMBER label -- "(1) -> C" -- not after the
 % content, so it always fits even when the content is a column-filling graph
