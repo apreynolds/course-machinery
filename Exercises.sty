@@ -1225,8 +1225,12 @@
   \ifdefstring{\GraphChoiceValign}{t}{\raisebox{-\height}{#1}}{%
     \ifdefstring{\GraphChoiceValign}{b}{#1}{\raisebox{-0.5\height}{#1}}}%
 }
+% Width reserved beside a graph for its label, so image + label fit the column.
+% Tuned for MC's narrow "(A)" labels; \renewcommand to widen where labels are
+% wider (the matching env bumps it for its [iii]-class \roman labels).
+\newcommand{\GraphLabelReserve}{2.4em}
 \newcommand{\graphchoice@box}[1]{%
-  \graphchoice@raise{\includegraphics[width=\dimexpr\linewidth-2.4em\relax]{#1}}%
+  \graphchoice@raise{\includegraphics[width=\dimexpr\linewidth-\GraphLabelReserve\relax]{#1}}%
 }
 \NewDocumentCommand{\graphchoice}{o m}{%
   \IfNoValueTF{#1}%
@@ -1262,8 +1266,14 @@
 % compile). Left/right counts may differ (distractors). Tunables: \MatchColWidth
 % (each column; the remainder is the gap), \MatchItemSep, \MatchKeyFormat.
 %
-% Two columns are two side-by-side \minipage[t]s; \rightcolumn ends the left one
+% Two columns are two side-by-side \minipage[c]s; \rightcolumn ends the left one
 % and opens the right (raw \minipage/\endminipage so the split can straddle it).
+% [c] (not [t]) so the columns center against each other: when one side is short
+% (e.g. phrases) and the other tall (e.g. graphs), the short column floats to the
+% vertical middle of the tall one, giving a symmetric connecting-line gap instead
+% of a lopsided bottom wedge. Degrades gracefully with unequal counts -- no row
+% pairing is assumed. (If even spacing within the columns is later wanted, that is
+% the heavier measure-both-then-distribute job; see NOTE-PROBLEMS.md item 4.)
 \newcounter{matchleft}
 \newcounter{matchright}
 \newlength{\match@colwidth}
@@ -1305,11 +1315,14 @@
 }
 \newcommand{\rightgraph}[1]{\rightitem{\graphchoice@box{#1}}}
 
-\newcommand{\rightcolumn}{\endminipage\hfill\minipage[t]{\match@colwidth}}
+\newcommand{\rightcolumn}{\endminipage\hfill\minipage[c]{\match@colwidth}}
 \newenvironment{matching}{%
   \par\setcounter{matchleft}{0}\setcounter{matchright}{0}%
   \setlength{\match@colwidth}{\MatchColWidth}%
-  \par\noindent\minipage[t]{\match@colwidth}%
+  % [iii]-class \roman labels + \quad are wider than MC's "(A)"; give a left graph
+  % more label room so [iii]\quad<graph> doesn't overrun the column (local to env).
+  \renewcommand{\GraphLabelReserve}{3em}%
+  \par\noindent\minipage[c]{\match@colwidth}%
 }{%
   \endminipage\par
 }
