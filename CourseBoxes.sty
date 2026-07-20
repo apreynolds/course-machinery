@@ -86,8 +86,12 @@
 %%%   cbthm     italic body, bold serif head        (theorem/prop/lemma/corollary)
 %%%   cbdefn    upright body, bold serif head        (definition/example/remark)
 %%%   cbaside   upright body, sans-bold black head    (generic aside)
-%%%   cbnote    upright body, sans-bold BLUE head     (Key Idea, Tip -- boxed)
+%%%   cbnote    upright body, sans-bold BLUE head     (Key Idea, Takeaway, Prepwork)
+%%%   cbnotecolon as cbnote but a COLON head-punct    (Your turn:)
 %%%   cbcaution upright body, sans-bold RED head      (Caution)
+%%%
+%%% HEAD PUNCTUATION is the 6th \newtheoremstyle arg -- the {.} / {:} after the
+%%% head font. Change it to switch a style's punctuation (e.g. to {!}).
 \newtheoremstyle{cbthm}
   {\topsep}{\topsep}{\itshape}{}{\bfseries}{.}
   {5pt plus 1pt minus 1pt}{\thmname{#1}\thmnote{ #3}}
@@ -100,11 +104,14 @@
 \newtheoremstyle{cbnote}
   {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{NoteColor}}{.}
   {.5em}{\thmname{#1}\thmnote{ #3}}
-\newtheoremstyle{cbcaution}
-  {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{CautionColor}}{.}
+\newtheoremstyle{cbnotecolon}%                    <-- head punct ":" (Your turn:)
+  {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{NoteColor}}{:}
   {.5em}{\thmname{#1}\thmnote{ #3}}
-\newtheoremstyle{cbtip}
-  {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{TipTextColor}}{.}
+\newtheoremstyle{cbcaution}%                       <-- head punct ":" (CAUTION:)
+  {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{CautionColor}}{:}
+  {.5em}{\thmname{#1}\thmnote{ #3}}
+\newtheoremstyle{cbtip}%                           <-- head punct: change {:} to {!} etc.
+  {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{TipTextColor}}{:}
   {.5em}{\thmname{#1}\thmnote{ #3}}
 
 %%% --- The factories ----------------------------------------------------------
@@ -166,10 +173,10 @@
 %%% multiple-choice problem (\importcheckin, in Exercises.sty): a neutral titled
 %%% box whose choice labels are the colored A/B/C flashcard boxes. The old prose
 %%% \begin{checkin} aside is retired.
-\NewAside[cbcaution]{caution} {\faExclamationTriangle\ Caution}{cb/caution}
-\NewAside[cbnote]   {takeaway}{Takeaway}                       {cb/note}
-\NewAside[cbnote]   {yourturn}{\faPenFancy\ Your Turn}         {cb/note}
-\NewAside[cbnote]   {prepwork}{\faBookOpen\ Prepwork}          {cb/note}
+\NewAside[cbcaution]  {caution} {\faExclamationTriangle\ CAUTION}{cb/caution}
+\NewAside[cbnote]     {takeaway}{TAKEAWAY}                       {cb/note}
+\NewAside[cbnotecolon]{yourturn}{\faPenFancy\ Your turn}        {cb/note}
+\NewAside[cbnote]     {prepwork}{\faBookOpen\ Prepwork}          {cb/note}
 
 %%% Tip -- a shared aside with an OPTIONAL audience tier. \begin{tip} is neutral;
 %%% [surviving] / [thriving] append "for the <tier>" to the head. Built by hand
@@ -185,8 +192,8 @@
   \protected@edef\@currentlabel{[unlabelled aside]}%
   \def\cb@tiphead{Tip}%
   \def\cb@aud{#1}%
-  \ifx\cb@aud\cb@survkey  \def\cb@tiphead{Tip for the surviving}\fi
-  \ifx\cb@aud\cb@thrivkey \def\cb@tiphead{Tip for the thriving}\fi
+  \ifx\cb@aud\cb@survkey  \def\cb@tiphead{Tip for the \textit{surviving}}\fi
+  \ifx\cb@aud\cb@thrivkey \def\cb@tiphead{Tip for the \textit{thriving}}\fi
   \begin{cb@tip}%
 }{%
   \end{cb@tip}%
