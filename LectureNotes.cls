@@ -46,6 +46,11 @@
 % and defines \alphabet (measured in the real body font -- so it must come
 % after \LoadClass, and the geometry below must come after it).
 \RequirePackage{Typefaces}
+
+% Shared math notation (\lz, \norm, \deriv, ...). AFTER Typefaces per its
+% contract: amsmath/newtxmath must already be loaded; MathStuff adds mathtools.
+\RequirePackage{MathStuff}
+
 \RequirePackage{Titling}
 \RequirePackage{Hyperlinks}
 

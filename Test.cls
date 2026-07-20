@@ -69,6 +69,10 @@
 % Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
 \RequirePackage{Typefaces}
 
+% Shared math notation (\lz, \norm, \deriv, ...). AFTER Typefaces per its
+% contract: amsmath/newtxmath must already be loaded; MathStuff adds mathtools.
+\RequirePackage{MathStuff}
+
 % Instructor-only notes layer, shared with LectureNotes and CourseDocument. Loaded
 % AFTER Typefaces per its contract (amsthm/amsmath must already be in place; it
 % pulls in tcolorbox itself). This completes the `instructor' view bundle for

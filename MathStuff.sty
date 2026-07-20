@@ -1,0 +1,88 @@
+\ProvidesPackage{MathStuff}[2026/07/20 shared math notation]
+
+%%% ===========================================================================
+%%% MathStuff -- the shared math-NOTATION layer: derivative / limit / series /
+%%% operator / delimiter shorthands used across lectures, tests, and problems.
+%%%
+%%% ORGANIZING PRINCIPLE: this file holds pure MACRO notation only. Defining a
+%%% \newcommand is essentially free (a hash entry + a body), so ALL notation
+%%% lives here in one always-loaded package -- no per-subject split, because
+%%% \norm / \abs / \deriv are shared across calculus, linear algebra, and
+%%% geometry anyway. Anything that must \RequirePackage a nontrivial package
+%%% (systeme, nicematrix, tikz-geometry) does NOT belong here: package loads
+%%% carry real cost (compile time, load-order, option clashes), so they stay
+%%% gated behind a class option or their own opt-in .sty.
+%%%
+%%% SCOPE: Calc I/II notation. The Calc III vector/multivariable macros from the
+%%% harvest source were culled (re-add a marked \vec... section here if a
+%%% multivariable course appears -- it's free). Matrix notation is deferred to a
+%%% future linear-algebra option (systeme + nicematrix).
+%%%
+%%% CONTRACT (load order): amsmath + newtxmath must ALREADY be loaded (Typefaces
+%%% owns that ordering), so REQUIRE MathStuff AFTER Typefaces. This file loads
+%%% mathtools (for \DeclarePairedDelimiter) -- which needs amsmath, already in
+%%% place. Do NOT load amsmath/amsthm/amssymb here: the classes forbid it and
+%%% newtxmath supplies the symbols.
+%%% ===========================================================================
+
+\RequirePackage{mathtools}   % \DeclarePairedDelimiter; amsmath already in place
+
+%%% --- Display shorthand ------------------------------------------------------
+\newcommand{\ds}{\displaystyle}
+
+%%% --- Derivatives: Leibniz d/dx forms ----------------------------------------
+%%% \lz{y}{x}     -> dy/dx            \lzo{x}    -> d/dx
+%%% \lzn{2}{y}{x} -> d^2 y / dx^2     \lzoo{x}{f}-> (d/dx)(f)
+%%% \lzon{2}{x}   -> d^2/dx^2         \lzoa{y}{x}{a} -> dy/dx |_{a} (evaluated at)
+\newcommand{\lz}[2]{\frac{d#1}{d#2}}
+\newcommand{\lzn}[3]{\frac{d^{#1}#2}{d#3^{#1}}}
+\newcommand{\lzo}[1]{\frac{d}{d#1}}
+\newcommand{\lzoo}[2]{{\frac{d}{d#1}}{\left(#2\right)}}
+\newcommand{\lzon}[2]{\frac{d^{#1}}{d#2^{#1}}}
+\newcommand{\lzoa}[3]{\left.{\frac{d#1}{d#2}}\right|_{#3}}
+
+%%% --- Primed functions -------------------------------------------------------
+%%% \primeskip is a hair of space so the prime does not crowd the letter.
+\newcommand{\primeskip}{\hskip.75pt}
+\newcommand{\fp}{f'}
+\newcommand{\fpp}{f''}
+\newcommand{\Fp}{F\primeskip'}
+\newcommand{\Fpp}{F\primeskip''}
+\newcommand{\yp}{y\primeskip'}
+\newcommand{\gp}{g\primeskip'}
+
+%%% --- Limits & series --------------------------------------------------------
+%%% \inflim -> lim_{n->\infty} (optional arg changes the variable: \inflim[x]).
+%%% \infser -> \sum_{n=1}^\infty (optional arg changes the lower index).
+\newcommand{\inflim}[1][n]{\lim\limits_{#1 \to \infty}}
+\newcommand{\infser}[1][1]{\sum_{n=#1}^\infty}
+
+%%% --- Displayed derivative / integral statements -----------------------------
+%%% \deriv{x^2}{2x} -> d/dx(x^2) = 2x   \myint{2x}{x^2} -> \int 2x\,dx = x^2
+%%% (The harvest used an undefined \myds here; it meant \displaystyle, i.e. \ds.)
+\newcommand{\deriv}[2]{\ds\frac{d}{dx}\left(#1\right)=#2}
+\newcommand{\myint}[2]{\ds\int #1\, dx= {\ds #2}}
+
+%%% --- Operators (amsmath idiom: proper spacing, upright name) ----------------
+\DeclareMathOperator{\sech}{sech}
+\DeclareMathOperator{\csch}{csch}
+
+%%% --- Paired delimiters (mathtools) ------------------------------------------
+%%% \abs{x} / \norm{v} give fixed-size bars; the STARRED forms \abs*{x} /
+%%% \norm*{v} auto-scale to their content (\left..\right), and \abs[\big]{x}
+%%% picks an explicit size. Replaces the harvest's hand-rolled \left\lVert forms.
+\DeclarePairedDelimiter\abs{\lvert}{\rvert}
+\DeclarePairedDelimiter\norm{\lVert}{\rVert}
+
+%%% --- Misc notation ----------------------------------------------------------
+\newcommand{\mathN}{\mathbb{N}}          % naturals
+\newcommand{\lsim}{\mathord{\sim}}       % tilde as logical negation
+\newcommand{\hreq}{\overset{HR}{=}}      % "=" by l'Hopital's rule
+\newcommand{\thet}{\theta}               % shorthand
+\newcommand{\dx}{\Delta x}
+\newcommand{\dy}{\Delta y}
+\newcommand{\ddz}{\Delta z}
+%%% The indeterminate form "0/0", set for display (quotes hung above the bar).
+\newcommand{\zerooverzero}{\ds \raisebox{8pt}{\text{``\ }}\frac{0}{0}\raisebox{8pt}{\textit{ ''}}}
+
+\endinput
