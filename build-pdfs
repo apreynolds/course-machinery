@@ -39,10 +39,11 @@
 #                injected so the `LectureNotes' class switches to the room copy
 #                (17pt, wider text, tighter top margin) instead of the handout.
 #   instructor-> also build FILE-INSTRUCTOR.pdf, the instructor bundle: injects
-#                \ShowSolutions + \ShowHints + \ShowInstructorNotes + \ShowPrivateNotes,
-#                so the instructor copy shows solutions, hints, the slate instructor
-#                notes -- staff AND private -- and the page-edge frame. A view is a
-#                bundle of layers; a future `marker' view would drop \ShowPrivateNotes.
+#                \ShowSolutions + \ShowHints + \ShowInstructorNotes, so the
+#                instructor copy shows solutions, hints, the slate staff notes,
+#                and the page-edge frame. A view is a bundle of layers. (The
+#                instructor copy IS the staff copy -- TAs get it too; there is no
+#                separate marker tier.)
 # Any other view name warns and is skipped.
 # View PDFs follow the same OUTDIR / BOTH handling as the default build.
 #
@@ -267,7 +268,7 @@ build_file() {
         instructor)
           varaux="$HOME/.cache/latexmk/${PWD##*/}-$jobname-INSTRUCTOR"
           mkdir -p "$varaux" || exit
-          compile_view "$jobname" "$base" "$varaux" "-INSTRUCTOR" "\\def\\ShowSolutions{}\\def\\ShowHints{}\\def\\ShowInstructorNotes{}\\def\\ShowPrivateNotes{}" "$movedir" || exit
+          compile_view "$jobname" "$base" "$varaux" "-INSTRUCTOR" "\\def\\ShowSolutions{}\\def\\ShowHints{}\\def\\ShowInstructorNotes{}" "$movedir" || exit
           echo "    + $jobname-INSTRUCTOR.pdf (instructor)"
           if [[ $mode == BOTH ]]; then cp -- "$jobname-INSTRUCTOR.pdf" "$outdir/" || exit; fi
           ;;
