@@ -160,9 +160,13 @@
 %%% These are the instructor's interjections, not the text's, so they ship here
 %%% (shared) rather than in course-vocab. A fontawesome glyph in the head inherits
 %%% the head colour and is the colour-independent cue -- kept on Caution / Your Turn
-%%% / Prepwork, dropped on Check In and Takeaway.
+%%% / Prepwork, dropped on Takeaway.
+%%%
+%%% "Check In" is NO LONGER an aside here. A check-in is now an imported
+%%% multiple-choice problem (\importcheckin, in Exercises.sty): a neutral titled
+%%% box whose choice labels are the colored A/B/C flashcard boxes. The old prose
+%%% \begin{checkin} aside is retired.
 \NewAside[cbcaution]{caution} {\faExclamationTriangle\ Caution}{cb/caution}
-\NewAside[cbnote]   {checkin} {Check In}                       {cb/note}
 \NewAside[cbnote]   {takeaway}{Takeaway}                       {cb/note}
 \NewAside[cbnote]   {yourturn}{\faPenFancy\ Your Turn}         {cb/note}
 \NewAside[cbnote]   {prepwork}{\faBookOpen\ Prepwork}          {cb/note}
