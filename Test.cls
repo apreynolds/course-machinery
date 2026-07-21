@@ -53,6 +53,14 @@
 % common needs; both are enumitem options, not stock list features.
 \RequirePackage{enumitem}
 
+% Used DIRECTLY by this class: \ifdefempty guards the optional cover fields,
+% \marginnote drops the marks in the right-margin rail (PROBLEM LABELS below).
+% Both would arrive indirectly anyway (Exercises loads etoolbox, InstructorNotes
+% loads marginnote), but the class states its own dependencies so unloading a
+% package cannot silently take these with it.
+\RequirePackage{etoolbox}
+\RequirePackage{marginnote}
+
 % The exercise system. Two independent packages, essential first:
 %   Exercises  -- \begin{problem}/\begin{solution} + the solutions toggle. The
 %                 part the course can't be taught without.
@@ -282,7 +290,7 @@
 %
 % \llap hangs the number block in the left margin; \smash keeps it off the line's
 % height so the body's first line is not pushed down; the \hspace opens a gap to
-% the text. \marginnote (from InstructorNotes' marginnote) drops the marks in the
+% the text. \marginnote (loaded at the top of this class) drops the marks in the
 % outer = right margin, aligned with the heading line and without floating. Point
 % BOOKKEEPING is already done by the problem environment, so these hooks DISPLAY only.
 %
