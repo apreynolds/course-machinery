@@ -222,6 +222,31 @@
    }}}%
 }
 
+% The title ROW: the centred title, with the [tuesday]/[thursday] day box beside
+% it when set (TUE left, THU right) or the bare title otherwise. The empty side
+% carries a phantom of the box's width so the title stays page-centred either
+% way. Factored out so the [automatch] band can wrap EITHER form -- the day box
+% and the matching band now COMPOSE (a Thursday test can still be Crowdmark-
+% scanned); previously Tue/Thu silently suppressed the band.
+\newcommand{\AssessmentTitle@titlerow}{%
+  \ifTueThu
+    \sbox\TueThu@box{\TueThu@daybox}%
+    \noindent\makebox[\linewidth]{%
+      \ifThursday
+        \hspace{\wd\TueThu@box}\hfill
+        \begin{minipage}[c]{10cm}\AssessmentTitle@titlebody\end{minipage}%
+        \hfill\usebox\TueThu@box
+      \else
+        \usebox\TueThu@box\hfill
+        \begin{minipage}[c]{10cm}\AssessmentTitle@titlebody\end{minipage}%
+        \hfill\hspace{\wd\TueThu@box}%
+      \fi
+    }\par
+  \else
+    \AssessmentTitle@titlebody
+  \fi
+}
+
 \newcommand{\AssessmentTitle}{%
   % 1. NAME / ID box, lifted into the top margin band (kept clear for Crowdmark's
   % QR on interior pages) so it sits near the top edge, beside where the QR lands.
@@ -240,33 +265,19 @@
     }%
     \par\bigskip
   \fi\fi
-  % 2. Centred title. [tuesday]/[thursday] set a framed day box beside it -- TUE
-  % left, THU right, the side being the at-a-glance version signal; [automatch]
-  % boxes it to a fixed height so the matching band below stays blank; otherwise it
-  % is set normally. (Tue/Thu and automatch are not meant to combine; Tue/Thu wins
-  % the title layout if both are somehow set.) The empty side carries a phantom of
-  % the box's width so the title stays centred on the page either way.
-  \ifTueThu
-    \sbox\TueThu@box{\TueThu@daybox}%
-    \noindent\makebox[\linewidth]{%
-      \ifThursday
-        \hspace{\wd\TueThu@box}\hfill
-        \begin{minipage}[c]{10cm}\AssessmentTitle@titlebody\end{minipage}%
-        \hfill\usebox\TueThu@box
-      \else
-        \usebox\TueThu@box\hfill
-        \begin{minipage}[c]{10cm}\AssessmentTitle@titlebody\end{minipage}%
-        \hfill\hspace{\wd\TueThu@box}%
-      \fi
-    }\par
-  \else\ifAutoMatch
+  % 2. Centred title row (the title, plus a [tuesday]/[thursday] day box beside
+  % it -- see \AssessmentTitle@titlerow). Under [automatch] the whole row is
+  % boxed to a fixed height so the matching band below it stays blank; otherwise
+  % the row is set normally. The two compose: [thursday,automatch] gives the THU
+  % box AND the blank Crowdmark band.
+  \ifAutoMatch
     \noindent
     \begin{minipage}[t][\dimexpr\AutoMatchBottom-\ExamTopMargin\relax][t]{\linewidth}%
-      \AssessmentTitle@titlebody
+      \AssessmentTitle@titlerow
     \end{minipage}\par
   \else
-    \AssessmentTitle@titlebody
-  \fi\fi
+    \AssessmentTitle@titlerow
+  \fi
   % 3. Instructions (optional) -- no heading; the content stands on its own. Under
   % [automatch] they fall below the matching band, just above the questions.
   \ifdefempty{\assess@instructions}{}{%
