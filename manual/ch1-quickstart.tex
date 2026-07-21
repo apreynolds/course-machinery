@@ -10,12 +10,11 @@ course-demo/
   .latexmkrc           puts the machinery on TEXINPUTS
   .CLOUDDIR            optional PDF mirror destination
   course-vocab.tex     per-course vocabulary
-  differentiation/     a topic
+  derivatives/         a topic (a course has several, same shape)
     problems/          problem bank: one problem per file
     lectures/          LectureNotes masters (+ .latexmkrc)
     facts/             preamble-less snippets to \import
     images/
-  curve-sketching/     ... more topics, same shape ...
   _assessment/         Assessment masters (+ .latexmkrc)
   _syllabus/           CourseDocument masters (+ .latexmkrc)
 \end{manexsource}
@@ -51,8 +50,8 @@ walks up to the repo root and puts \file{.course-machinery//} on
 topic folder means copying one file in.
 
 Cross-file inclusion uses the \file{import} package's relative paths:
-a lecture pulls \file{../problems/find-derivative.tex}, the midterm pulls
-\file{../differentiation/problems/}\allowbreak\file{find-derivative.tex} --
+a lecture pulls \file{../problems/power-rule-basic.tex}, the quiz pulls
+\file{../derivatives/problems/}\allowbreak\file{power-rule-basic.tex} --
 the \emph{same} file, and any images that file loads resolve against the
 \emph{file's own} directory, so one source serves every consumer.
 

@@ -2,17 +2,17 @@
 
 An assessment -- test, final, quiz, homework -- is an \file{Assessment}
 document: an assembly file that sets up a cover, then imports problems from
-the bank with points attached. The skeleton, from the demo repo's
-\file{_assessment/midterm.tex}:
+the bank with points attached. The skeleton, modelled on the demo's
+\file{_assessment/test.tex}:
 
 \begin{manexsource}
-%! views: solutions, hints, instructor
-\documentclass[12pt,thursday]{Assessment}
+%! views: solutions, instructor
+\documentclass[12pt,thursday,automatch]{Assessment}
 \assessmentsetup{
   course = {MATH 101},
   term   = {Fall 2026},
-  name   = {Midterm},
-  date   = {17 Oct},
+  name   = {Term Test 1},
+  date   = {16 Oct},
   instructions = {
     \textbf{\sffamily Instructions:}
     \begin{itemize}[nosep]
@@ -25,7 +25,7 @@ the bank with points attached. The skeleton, from the demo repo's
 \AssessmentTitle
 \newpage
 \importproblem[points=5]
-  {../differentiation/problems/}{chain-rule-basic.tex}
+  {../derivatives/problems/}{chain-rule.tex}
 \workspace[5]
 ...
 \end{document}
@@ -35,8 +35,8 @@ The class renders questions as ``Q\,$N$'' hung in the \emph{left} margin with
 their point marks ``($N$ pts)'' in the \emph{right} margin -- numbers left,
 marks right, so standalone questions and lettered group parts drop their marks
 into the same rail. None of that appears in this manual's examples (which
-render with the neutral ``Problem $N$.''\ style); build the demo midterm to
-see the real thing.
+render with the neutral ``Problem $N$.''\ style); build the demo's
+\file{test.tex} to see the real thing.
 
 \subsection{Class options}
 
@@ -132,10 +132,10 @@ else:
 \begin{manexsource}
 \begin{problemgroup}{Evaluate}
   \importproblem[points=5, hint]
-    {../differentiation/problems/}{find-derivative.tex}
+    {../derivatives/problems/}{quotient-rule.tex}
   \workspace[3]
   \importproblem[5]
-    {../differentiation/problems/}{find-derivative2.tex}
+    {../derivatives/problems/}{second-derivative.tex}
   \workspace[2]
 \end{problemgroup}
 \end{manexsource}
@@ -152,13 +152,13 @@ like any other.)
 \begin{manexsource}
 \begin{problemchoice}[select=2, points=5]
   \importproblem[]
-    {../differentiation/problems/}{mc-graph-grid.tex}
+    {../derivatives/problems/}{mc-domain.tex}
   \FreshPage
   \importproblem[]
-    {../differentiation/problems/}{multiple-choice-example.tex}
+    {../derivatives/problems/}{mc-tangent-slope.tex}
   \FreshPage
   \importproblem[]
-    {../differentiation/problems/}{multiple-choice-example2.tex}
+    {../derivatives/problems/}{mc-select-all.tex}
 \end{problemchoice}
 \end{manexsource}
 
@@ -186,11 +186,11 @@ complete at a glance) and no running head.
 
 \subsection{Views of one assessment}
 
-With \texttt{\%! views: solutions, hints, instructor} in the magic comment,
-one midterm source builds four PDFs: the student paper, an answer key
-(\file{-SOLUTIONS}), a hints copy (\file{-HINTS}), and the staff bundle
-(\file{-INSTRUCTOR}: solutions + hints + instructor notes, inside the
-page-edge \emph{Instructor copy} frame). Under the default overlay mode all
-four have \emph{identical page breaks} -- the whole point of
-section~\ref{sec:overlay}. Build mechanics are in
-section~\ref{sec:build-and-find}.
+With \texttt{\%! views: solutions, instructor} in the magic comment, the
+demo's \file{test.tex} builds three PDFs: the student paper, an answer key
+(\file{-SOLUTIONS}), and the staff bundle (\file{-INSTRUCTOR}: solutions +
+hints + instructor notes, inside the page-edge \emph{Instructor copy} frame).
+Under the default overlay mode all three have \emph{identical page breaks} --
+the whole point of section~\ref{sec:overlay}. (Add \texttt{hints} to the list
+-- as the demo's \file{quiz.tex} does -- for a fourth, student-facing
+\file{-HINTS} copy.) Build mechanics are in section~\ref{sec:build-and-find}.

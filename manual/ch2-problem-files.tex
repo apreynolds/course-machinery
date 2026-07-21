@@ -48,7 +48,7 @@ store-only), the problem numbered itself, and -- because this manual forces all
 layers on -- the hint and solution both display. In a student build both
 disappear without a trace.
 
-To start a new problem, copy an existing file: \file{differentiation/problems/}
+To start a new problem, copy an existing file: \file{derivatives/problems/}
 in the demo course repo holds one build-tested file of every type.
 
 \subsection{The metadata block}\label{sec:problemmeta}
@@ -226,10 +226,11 @@ misread. The columns may have different lengths (distractors on the right, as
 above), and \cs{rightcolumn} splits them with a wide gap for students to draw
 their connecting lines in. Graph items reuse the \cs{graphchoice} sizing:
 \cs{leftgraph}\texttt{[X]\{FILE\}} / \cs{rightgraph}\texttt{\{FILE\}} put
-graphs on either side (see \file{mc-matching-graphs.tex} and
-\file{mc-matching-phrases.tex} in the demo repo for both orientations). There
-are deliberately no drawn answer arrows -- the inline key on the left item is
-the answer, and skipping arrows keeps the system TikZ-free.
+graphs in either column. The demo's \file{match-graphs-phrases.tex} keeps the
+graphs on the \emph{right} so the answer key rides the roomy text column rather
+than a column-width image; \file{match-trig-derivatives.tex} matches text to
+text. There are deliberately no drawn answer arrows -- the inline key on the
+left item is the answer, and skipping arrows keeps the system TikZ-free.
 
 \subsection{Finding problems in the bank}\label{sec:find-problems-taste}
 
