@@ -58,6 +58,12 @@
 
 set -uo pipefail
 
+# Unwrap pdflatex's 79-column log lines so multi-line warnings keep their
+# "on input line N" tails intact for log parsers -- vim's quickfix reads these
+# logs (custom/vimtex.vim), and vimtex exports the same value for its own
+# compiles. pdflatex picks the value up from the environment (kpathsea).
+export max_print_line=2000
+
 usage() {
   # Reprint the header block (line 2 to the first blank line), stripping the
   # leading "# ", so -h stays in sync with the comment above.
