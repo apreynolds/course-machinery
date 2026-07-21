@@ -15,9 +15,9 @@
 \PassOptionsToPackage{dvipsnames}{xcolor}
 \ProcessOptions\relax
 
-% Same shape as Test.cls's \ShowSolutions: build-pdfs' view loop can inject
-% \def\ProjectorView{} before \documentclass is read, so the view needs no class
-% option at the call site. (Build arms still unwired -- see NOTE.md.)
+% Same shape as Test.cls's \ShowSolutions: build-pdfs' view loop injects
+% \def\ProjectorView{} before \documentclass is read (its `projector' view), so
+% the view needs no class option at the call site.
 \ifdefined\ProjectorView \Projectortrue \fi
 
 \ifProjector
@@ -101,6 +101,16 @@
     \ifdefempty{\CurrentProblemNumber}{}{\space\CurrentProblemNumber}}%
   \ifdefempty{\CurrentProblemDesc}{}{ \textnormal{(\CurrentProblemDesc)}}%
   \textbf{.}\quad\ignorespaces
+}
+
+% The GROUP stem follows the same unnumbered rule: a bare bold label word, then
+% the stem (the parts letter themselves (a),(b),... as usual). Without this
+% override, Exercises' default stem would print the invisibly-stepped counter
+% -- "Example 3." -- beside standalone examples that show no number at all.
+% (number=/desc= are per-member import keys, so the stem has none to show.)
+\renewcommand{\ProblemGroupHeadingFormat}[1]{%
+  \par\addvspace{\medskipamount}%
+  \noindent\textbf{\ProblemLabelWord.}\quad\ignorespaces#1%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
