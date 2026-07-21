@@ -13,7 +13,7 @@ section~\ref{sec:assessments}.
 \subsection*{Class options}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.62\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \texttt{noid} & no student identity collected (homework, worksheets, MC
   practice): drops the NAME/ID box and the deep scanner top margin.\\
 \texttt{automatch} & Crowdmark auto-matching: keeps the deep top margin,
@@ -24,7 +24,7 @@ section~\ref{sec:assessments}.
   writing room.\\
 \emph{(other)} & forwarded to \file{article} (\texttt{12pt},
   \texttt{twoside}, \dots).\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 The default (no options) is the fully-furnished identified exam --
@@ -34,7 +34,7 @@ an exam.
 \subsection*{Commands}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{assessmentsetup}\texttt{\{...\}} & keyval cover setter: \env{course},
   \env{term}, \env{name}, \env{date}, \env{instructions}; all optional,
   unset fields vanish cleanly.\\
@@ -48,7 +48,7 @@ an exam.
   restyle the divider rule.\\
 \cs{ExamTopMargin} & the deep-top length (3.7\,cm), single-sourced for
   geometry and the \texttt{[automatch]} band; rarely touched.\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \subsection*{Presentation choices}

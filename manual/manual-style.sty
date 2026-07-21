@@ -80,5 +80,44 @@
 \DeclareUrlCommand\file{\urlstyle{tt}}
 
 % The prose is dense with unbreakable typewriter names; let a tight line
-% stretch a little rather than overflow.
+% stretch a little rather than overflow. The price of \emergencystretch is
+% that slightly-loose lines exist, and the default \hbadness=1000 reports
+% every one of them -- raise the threshold so the log only flags lines that
+% are genuinely gappy, not merely eased.
 \setlength{\emergencystretch}{1.5em}
+\hbadness=3000
+
+% Reference tables. Y is a description column that takes exactly the measure
+% left over by the name column(s) (tabularx) and sets RAGGED RIGHT --
+% justifying a narrow column against unbreakable typewriter names is what
+% produced the badness-10000 underfull warnings.
+\RequirePackage{tabularx}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{R}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+% Centre a block WIDER than the measure -- symmetric overhang into both
+% margins, no Overfull warning: the box handed to the paragraph is exactly
+% \linewidth wide, so TeX sees a legal line; the content simply paints
+% equally beyond both edges. For the rare table that cannot fit the measure.
+\newcommand{\WideCenter}[1]{\par\medskip\noindent\makebox[\linewidth][c]{#1}\par\medskip}
+
+% \part: article leaves it an in-flow heading and CourseDocument never
+% styles it (course documents have no parts -- the manual is the first user,
+% so per the extract-on-second-use rule the styling lives here, not in the
+% class).
+%
+% The page break needs the \titleclass line, not just a format: in a
+% chapterless class titlesec puts \part in its own "part" class
+% (ttl@part@ii), which typesets IN FLOW and consults no \<name>break hook at
+% all -- that hook exists only in the straight and top classes. Reclassing
+% \part as "top" (the \chapter-like class: break to a fresh page, content
+% follows on it) makes the break happen and \partbreak the override point --
+% the same hook idiom as LectureNotes' \subsectionbreak. \partbreak is kept
+% explicitly \clearpage: top's built-in default reads \if@openright, which a
+% chapterless article never sets.
+\titleclass{\part}{top}
+\titleformat{\part}[display]
+  {\sffamily\bfseries\color{HeadingColor}}
+  {\Large\partname~\thepart}{0.7em}{\Huge}
+\titlespacing*{\part}{0pt}{0pt}{6ex}
+\newcommand{\partbreak}{\clearpage}

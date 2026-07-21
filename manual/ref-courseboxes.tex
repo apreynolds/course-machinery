@@ -40,14 +40,14 @@ the factories below (section~\ref{sec:extending}).
 \subsection*{The factories}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.5\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{NewTextResult}\texttt{[head]\{env\}\{Name\}\{box\}} & declare a
   numbered text result; call site
   \texttt{\char`\\begin\{env\}\{num\}[name]}. Default head \env{cbdefn}
   (upright); pass \env{cbthm} for italic.\\
 \cs{NewAside}\texttt{[head]\{env\}\{Name\}\{box\}} & declare an unnumbered
   aside. Default head \env{cbaside} (black sans).\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \subsection*{Restyling knobs}
@@ -55,7 +55,7 @@ the factories below (section~\ref{sec:extending}).
 Named once, referenced everywhere -- each is a one-line edit:
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 tcolorbox styles & \env{cb/textresult} (quiet grey L-rule),
   \env{cb/note} (blue box), \env{cb/caution} (red), \env{cb/tip}
   (orange).\\
@@ -67,5 +67,5 @@ colours & \env{ThmColor} (grey), \env{NoteColor} (royal blue),
   (orange; the darker text value keeps WCAG contrast). Provisional
   pending a colour-blind-safe palette pass; the head glyphs
   (fontawesome, monochrome) are the colour-independent channel.\\
-\end{tabular}
+\end{tabularx}
 \end{center}

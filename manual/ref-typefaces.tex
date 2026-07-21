@@ -18,12 +18,12 @@ section~\ref{sec:load-order}.
 \subsection*{Options}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.6\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \texttt{osf} & old-style figures in serif body text (CourseDocument
   passes it -- prose documents).\\
 \texttt{lining} & the default, spelt out (LectureNotes, Assessment --
   figures are information).\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \subsection*{The four-knob figure model}
@@ -32,12 +32,12 @@ Figures appear in four places; each has exactly one independent control,
 and only the first varies by document type:
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 serif body prose & the \texttt{[osf]} option -- \emph{the only knob}.\\
 sans (headings, \cs{course}) & pinned lining, always.\\
 math & always lining (newtxmath).\\
 tabular contents & always lining, via an every-\env{tabular} hook.\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 So under \texttt{[osf]}, running prose gets old-style figures while course
@@ -49,7 +49,7 @@ did not load. Local overrides: \cs{liningnums}\texttt{\{2026\}} /
 \subsection*{Commands and lengths}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{course}\texttt{[MATH]\{1013\}} & the course designation in sans; the
   optional prefix defaults to MATH. Sans is load-bearing: it routes the
   numerals through the lining-pinned Merriweather.\\
@@ -58,5 +58,5 @@ did not load. Local overrides: \cs{liningnums}\texttt{\{2026\}} /
   66$ characters, the classic readable measure) -- a \emph{rule} that
   re-derives itself when the font or size changes, where a frozen length
   would silently stop tracking.\\
-\end{tabular}
+\end{tabularx}
 \end{center}

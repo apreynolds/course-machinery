@@ -8,7 +8,7 @@ surface.
 \subsection*{Commands}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{workspace} & 8 lines of handwriting room (the default).\\
 \cs{workspace}\texttt{[12]} & that many \cs{HandwritingLine}s.\\
 \cs{workspace}\texttt{[halfpage]} & half the text block, less one line --
@@ -25,7 +25,7 @@ surface.
   diagonal \cs{BlankPageText}.\\
 \cs{solidboxes} / \cs{overlayboxes} & the document-wide mode switch
   (section~\ref{sec:overlay}).\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 A leaf command, never a wrapper: \cs{workspace} sits \emph{between}
@@ -36,7 +36,7 @@ collapse.
 \subsection*{Knobs}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{HandwritingLine} & the unit (0.9\,cm); every line-count workspace
   scales with it.\\
 \cs{WSOverlayGap} & how far below the previous line an overlay box paints
@@ -44,7 +44,7 @@ collapse.
   modes look alike.\\
 \cs{BlankPageText} & the watermark wording (``Blank page for extra
   work'').\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \subsection*{For package authors}

@@ -100,10 +100,11 @@ no restyle can corrupt it. The instances:
     \cs{NotesProblemLabelWord}, while Assessment sets it literally to
     ``Q'' -- so a \file{course-vocab.tex} shared by both can retune the
     notes noun with no risk of renaming exam questions.
-  \item \textbf{Titles and links.} \cs{TitleColor}, \cs{TitleStamp},
-    \cs{LinkColor}, \cs{UrlColor}: plain defaults in the base packages,
-    coloured only by CourseDocument. \cs{TitleColor} is a \emph{style}
-    hook, not a colour name, precisely so Titling needs no xcolor.
+  \item \textbf{Titles and links.} The hooks \cs{TitleColor},
+    \cs{TitleStamp}, \cs{LinkColor} and \cs{UrlColor} have plain defaults
+    in the base packages and are coloured only by CourseDocument.
+    \cs{TitleColor} is a \emph{style} hook, not a colour name, precisely
+    so Titling needs no xcolor.
   \item \textbf{\cs{WSZeroHeight}.} Exercises and InstructorNotes route
     their boxes through Workspace's overlay seam -- but each carries an
     \cs{AtBeginDocument} \cs{providecommand} identity fallback, so

@@ -28,7 +28,9 @@ Primed shorthands \cs{fp} \cs{fpp} \cs{Fp} \cs{Fpp} \cs{yp} \cs{gp}
 
 \subsection*{Limits, series, statements}
 
-\begin{center}
+% Display-style math in the right column runs a few points past the
+% measure; \WideCenter absorbs it symmetrically.
+\WideCenter{%
 \begin{tabular}{@{}l l@{}}
 \cs{inflim} / \cs{inflim}\texttt{[x]} & $\inflim x_n$, \ $\inflim[x] f(x)$
   (optional argument = the variable)\\[1ex]
@@ -36,13 +38,12 @@ Primed shorthands \cs{fp} \cs{fpp} \cs{Fp} \cs{Fpp} \cs{yp} \cs{gp}
   argument = the lower index)\\[1ex]
 \cs{deriv}\texttt{\{x\^{}2\}\{2x\}} & $\deriv{x^2}{2x}$\\[1ex]
 \cs{myint}\texttt{\{2x\}\{x\^{}2\}} & $\myint{2x}{x^2}$\\
-\end{tabular}
-\end{center}
+\end{tabular}}
 
 \subsection*{Delimiters, operators, misc}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{abs}, \cs{norm} & paired delimiters: $\abs{x}$, $\norm{v}$; starred
   forms auto-scale (\cs{abs*}\texttt{\{...\}}), and an optional
   \texttt{[\char`\\big]} picks a size.\\
@@ -56,7 +57,7 @@ Primed shorthands \cs{fp} \cs{fpp} \cs{Fp} \cs{Fpp} \cs{yp} \cs{gp}
 \cs{dx}, \cs{dy}, \cs{ddz} & $\dx$, $\dy$, $\ddz$.\\
 \cs{zerooverzero} & the quoted indeterminate form
   $\zerooverzero$.\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 (\cs{oldstylenums} and \cs{liningnums} look like notation but live in

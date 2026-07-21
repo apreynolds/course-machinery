@@ -12,7 +12,7 @@ it: an assessment opens with \cs{AssessmentTitle}, a different artefact.)
 Also home of \file{datetime2}, the date's formatter.
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{subtitle}\texttt{\{...\}} & the subtitle line(s); set before
   \cs{maketitle}.\\
 \cs{TitleColor} & a \emph{style} hook (e.g.\
@@ -22,7 +22,7 @@ Also home of \file{datetime2}, the date's formatter.
   $\langle$time$\rangle$''). Default: empty.\\
 \cs{TitleMarker} & follows the stamp; currently a free hook -- the
   instructor-copy signal moved to the page frame. Default: empty.\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \subsection*{Hyperlinks}
@@ -36,7 +36,7 @@ loads too, not merely after the class
 \texttt{dvipsnames} to xcolor beforehand.
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{LinkColor} & internal links (default \texttt{black}; CourseDocument
   sets its identity colour). Read late, so overrides anywhere in the
   preamble win.\\
@@ -45,5 +45,5 @@ loads too, not merely after the class
   anchor (the projector footer's grey arrow).\\
 \cs{TopAnchorName} & the anchor's name (\texttt{CourseTop}), placed at
   the very top of the body.\\
-\end{tabular}
+\end{tabularx}
 \end{center}

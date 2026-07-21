@@ -12,7 +12,7 @@ section~\ref{sec:assessments}.
 \subsection*{Environments}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.58\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \env{problem} & a numbered, cross-referenceable problem (flat document-wide
   counter; \cs{counterwithin} to restart per section).\\
 \env{problemgroup}\texttt{\{STEM\}} & assembly-time grouping: ``Problem
@@ -35,18 +35,18 @@ section~\ref{sec:assessments}.
   \texttt{[X]} names the match, shown only in solutions.\\
 \env{problemchoice}\texttt{[select=, points=]} & choose-$N$-of-$M$: emits
   the instruction on every member, counts select$\times$points once.\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \subsection*{Import commands}
 
-\cs{importproblem}\texttt{[OPTIONS]\{DIR\}\{FILE\}} wraps the \file{import}
-package's \cs{import} with per-import settings (keyval family
-\env{eximport}); \cs{importcheckin} is the same with the check-in flavour
-pre-set. Bare \cs{import} still works and yields no marker.
+\cs{importproblem} wraps the \file{import} package's \cs{import} with
+per-import settings (keyval family \env{eximport});
+\cs{importcheckin} is the same with the check-in flavour pre-set. Bare
+\cs{import} still works and yields no marker.
 
 \begin{center}
-\begin{tabular}{@{}l p{0.58\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \texttt{points=5} & the value (integer); a lone integer \texttt{[5]} is
   shorthand for it -- but \emph{only} alone: \texttt{[5, hint]} errors,
   write \texttt{[points=5, hint]}.\\
@@ -67,7 +67,7 @@ pre-set. Bare \cs{import} still works and yields no marker.
   points, no label (deliberately not typeset-then-hide).\\
 \texttt{checkin} & wrap in the ``CHECK IN'' box with coloured A--E labels
   (what \cs{importcheckin} sets).\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 Keys a context ignores are tolerated by design -- \texttt{points=} under
@@ -80,10 +80,10 @@ automatically).
 
 \subsection*{Toggles}
 
-\cs{ifsolutions} / \cs{ifhints} drive the two layers; they default from
-\cs{ShowSolutions} / \cs{ShowHints}, which build-pdfs injects per view
-(section~\ref{sec:build-and-find}). Hint visibility is three-state: the
-per-import keys override the document toggle.
+The \cs{ifsolutions} and \cs{ifhints} conditionals drive the two layers,
+defaulting from \cs{ShowSolutions} and \cs{ShowHints}, which build-pdfs
+injects per view (section~\ref{sec:build-and-find}). Hint visibility is
+three-state: the per-import keys override the document toggle.
 
 \subsection*{Presentation hooks}
 
@@ -92,7 +92,7 @@ break the count (defaults in parentheses; the class overrides are in
 sections \ref{sec:ref-assessment} and \ref{sec:ref-lecturenotes}):
 
 \begin{center}
-\begin{tabular}{@{}l p{0.5\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{ProblemLabelWord} & the noun (\emph{Problem}).\\
 \cs{ProblemNumberText} & the formatted number (\emph{Problem N}) -- one
   macro, so standalone headings and group stems always agree.\\
@@ -127,5 +127,5 @@ sections \ref{sec:ref-assessment} and \ref{sec:ref-lecturenotes}):
   boxes; F onward falls back to plain).\\
 \cs{CheckinHeaderSkip}, \cs{CheckinBodySkip} & vertical gaps inside the
   check-in box.\\
-\end{tabular}
+\end{tabularx}
 \end{center}

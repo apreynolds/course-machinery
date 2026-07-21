@@ -4,8 +4,11 @@ Every author-tunable knob in one table, by home file. Each is a
 \cs{renewcommand} (or \cs{setlength} for lengths) in a document preamble
 or \file{course-vocab.tex} -- details in the file's own section.
 
-\begin{center}
-\begin{tabular}{@{}l l p{0.42\linewidth}@{}}
+% This table is wider than the measure by design (three columns of long
+% names); \WideCenter overhangs both margins equally, without an Overfull
+% complaint -- see manual-style.sty.
+\WideCenter{%
+\begin{tabular}{@{}l l R{0.42\linewidth}@{}}
 \textbf{Knob} & \textbf{Home} & \textbf{What it tunes}\\[0.5ex]
 \cs{HandwritingLine} & Workspace & the workspace unit (0.9\,cm).\\
 \cs{WSOverlayGap} & Workspace & gap above an overlay box.\\
@@ -44,5 +47,4 @@ or \file{course-vocab.tex} -- details in the file's own section.
   identity colour.\\
 tcb styles \env{cb/*}, head styles \env{cb*} & CourseBoxes & box and
   head looks (section~\ref{sec:ref-courseboxes}).\\
-\end{tabular}
-\end{center}
+\end{tabular}}

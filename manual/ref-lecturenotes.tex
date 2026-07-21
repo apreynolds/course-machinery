@@ -9,24 +9,24 @@ stack. Workflow: section~\ref{sec:lectures}.
 \subsection*{Class options}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.62\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \texttt{projector} & the in-room copy: 17\,pt, tighter top margin, no
   marginpar column, no page number, grey back-to-top arrow in the footer.
   Normally you never write it -- the build's \env{projector} view injects
   \cs{ProjectorView} and the class switches by itself.\\
 \emph{(other)} & forwarded to \file{extarticle}.\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \subsection*{Commands and hooks}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{NotesProblemLabelWord} & the noun imported problems render as
   (default \emph{Example}); redefine per course in \file{course-vocab.tex}.
   Routed into \cs{ProblemLabelWord} so a shared vocab file cannot disturb
   Assessment's fixed ``Q''.\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \subsection*{Presentation choices}

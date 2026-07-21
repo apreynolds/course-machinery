@@ -1,8 +1,8 @@
 \section{InstructorNotes.sty}\label{sec:ref-instructornotes}
 
-The instructor-only content layer. Everything here is gated on
-\cs{ifinstructornotes} and \emph{fully gobbled} when off -- a student build
-carries no trace. The flag defaults on when \cs{ShowInstructorNotes} is
+The instructor-only content layer. Everything here is gated on one flag,
+\cs{ifinstructornotes}, and \emph{fully gobbled} when off -- a student
+build carries no trace. The flag defaults on when \cs{ShowInstructorNotes} is
 defined, which the build's \env{instructor} view injects
 (section~\ref{sec:build-and-find}). One staff tier only: the instructor
 copy \emph{is} the staff copy (TAs included); anything unfit for a TA stays
@@ -11,7 +11,7 @@ out of the source.
 \subsection*{The three shapes}
 
 \begin{center}
-\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{InstructorInline}\texttt{\{...\}} & slate run-in inside the paragraph;
   wraps across lines. For quick in-flow asides -- anything you will want to
   \emph{find} again belongs in a box or the margin.\\
@@ -20,7 +20,7 @@ out of the source.
   (default) or \emph{marking}. The word differentiates, not the colour.\\
 \cs{InstructorMargin}\texttt{\{...\}} & bold slate sans in the margin
   (via \cs{marginnote}, so it never floats).\\
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 Everything is slate (\env{InstructorInk}) on purpose: staff content is
