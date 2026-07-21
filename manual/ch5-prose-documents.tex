@@ -1,0 +1,76 @@
+\section{Prose documents}\label{sec:prose-documents}
+
+Syllabi, TA information sheets, course policies -- continuous prose rather
+than problems -- are \file{CourseDocument} documents. It is the ``designed''
+class of the three: coloured headings, a titled cover, a table of contents,
+and a text measure tuned for reading. (This manual is itself a
+CourseDocument.) The demo repo's \file{_syllabus/syllabus.tex}:
+
+\begin{manexsource}
+%! views: instructor
+\documentclass[11pt]{CourseDocument}
+
+\title{\course{101} --- Syllabus}
+\subtitle{%
+  Fall 2026, University of New Brunswick \\[1ex]
+  \normalfont\normalsize\itshape Sections FR01 and FR02.
+}
+
+\begin{document}
+
+\maketitle
+\pagestyle{toc}
+\tableofcontents
+
+\newpage
+\pagestyle{myfancy}
+
+In \course[MATH]{1013} we will be investigating...
+
+\end{document}
+\end{manexsource}
+
+That opening sequence is the documented idiom, worth copying verbatim.
+\cs{maketitle} runs while the page style is still \texttt{plain}, so the
+title page stays bare; the contents page then opts into \texttt{toc}
+(footer page number only); and \texttt{myfancy} -- a small-caps running
+head with the current section, page number in the footer -- starts with the
+body. Neither named style activates itself: each document chooses when.
+
+The pieces in play:
+
+\begin{itemize}
+  \item \cs{title} and \cs{subtitle} feed a shared title block that also
+    stamps \emph{Updated \textnormal{(date, time)}} -- these documents are
+    living and revised mid-term, and the stamp says which printing is
+    current. The subtitle's second line above shows the usual trick for a
+    quieter sub-subtitle: reset the font inline.
+  \item \cs{course}\texttt{[MATH]\{1013\}} sets a course designation in
+    sans with lining numerals -- consistent wherever it appears, prose or
+    title. The bracket defaults to the course's own prefix, so
+    \cs{course}\texttt{\{101\}} works too.
+  \item Headings and internal links pick up the course identity colour --
+    named \emph{once} (\env{CourseIdentity}, a mahogany) and derived
+    everywhere, so restyling a course document is a one-line change.
+    Deliberately \emph{not} green: green means ``solutions, not for
+    students'' everywhere else in the toolkit, so a student-facing document
+    must not read as green.
+  \item \texttt{[legalpaper]} is available, as on assessments; stock
+    \file{article} options pass through.
+\end{itemize}
+
+Body text in this class uses old-style figures -- the numerals with
+ascenders and descenders you see in this manual's prose -- because these
+documents are continuous reading. Dates, office numbers and the like sit
+quietly in the text; \cs{liningnums}\texttt{\{2026\}} forces lining figures
+where a number should read as data, and math and \cs{course} numerals stay
+lining automatically. The full figure policy lives with
+\file{Typefaces.sty} (section~\ref{sec:ref-typefaces}).
+
+Two things CourseDocument deliberately lacks: the exercise system (a
+syllabus imports no problems -- the class loads no Exercises/Workspace
+machinery), and any use of \cs{workspace}. It \emph{does} carry the
+instructor-notes layer, so a syllabus can hold staff-only annotations --
+office-hour strategy, grading-scheme rationale -- and ship an
+\file{-INSTRUCTOR} view like any other document
+(section~\ref{sec:build-and-find}).

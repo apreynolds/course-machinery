@@ -1,0 +1,109 @@
+\section{The overlay/solid contract}\label{sec:overlay}
+
+This chapter explains the deepest design idea in the toolkit -- why a
+solutions copy can show every answer without moving a single page break --
+and the one switch that controls it.
+
+\subsection{Reserved space: \cs{workspace}}
+
+Assessments and lectures need copious blank room for handwriting, which is
+not the LaTeX norm. \cs{workspace} reserves it \emph{explicitly and visibly
+in the source}, as a leaf command between content (never a wrapper around
+it), so the source stays readable and the space can be tuned in the editor:
+
+\begin{manexsource}
+\workspace            % 8 lines (the default)
+\workspace[12]        % 12 lines
+\workspace[halfpage]  % about half the text block
+\workspace[fullpage]  % the whole text block
+\workspace*           % fill to the bottom of this page
+\end{manexsource}
+
+The unit is a \emph{line of handwriting} (\cs{HandwritingLine}, about
+0.9\,cm) because ``about ten lines'' is how you actually think about writing
+room -- centimetres are not. Retune \cs{HandwritingLine} once and
+every line-count workspace follows.
+
+One deliberate simplicity: a workspace is plain vertical space, with
+\emph{no carry-over}. If it exceeds the room left on the page, the overflow
+is dropped and the next content starts the next page -- the gap does not
+reappear overleaf. The rare page where that matters is re-spaced by hand,
+rather than letting a half-page gap silently wander onto the next page. (A
+consequence: like any top-of-page glue, a workspace at the very top of a
+page is discarded -- put content above it, or use \cs{workspace*}.)
+
+\cs{FreshPage} completes the spacing toolkit with collapsible page breaks:
+bare \cs{FreshPage} breaks to a fresh page that content then flows onto;
+\cs{FreshPage}\texttt{[blank]} ships a dedicated empty page;
+\texttt{[watermark]} stamps that page with a faint diagonal ``Blank page for
+extra work.'' Plain \cs{newpage} remains untouched, for the rare break that
+must never collapse.
+
+\subsection{Overlay mode: the default}
+
+Here is the contract. In the default \emph{overlay} mode, the gated boxes --
+\env{solution} and \env{InstructorBox} -- render at \textbf{zero height},
+painting \emph{downward into the workspace reserved below them} instead of
+displacing anything. The reserved space is identical in every build, so:
+
+\begin{center}
+  \emph{the solutions or instructor copy is a pixel-perfect overlay\\
+  of the student copy -- same layout, same page breaks, same page count.}
+\end{center}
+
+That is why one midterm source can ship four view PDFs
+(section~\ref{sec:assessments}) whose page numbers always agree: page 9 of
+the answer key \emph{is} page 9 of the student paper, with answers painted
+into its blank space. A quick check after any layout change: the four PDFs
+must have the same page count. If they differ, something has broken the
+contract.
+
+Seeing it live -- this example flips the manual back to overlay mode
+locally. The solution box adds no height of its own; it simply paints into
+the four workspace lines that follow, exactly where a student would write:
+
+\begin{manexample}
+\overlayboxes
+\begin{problem}
+  Differentiate $h(x) = x^{5}$.
+\end{problem}
+\begin{solution}[notitle]
+  $h'(x) = 5x^{4}$.
+\end{solution}
+\workspace[4]
+\end{manexample}
+
+In the student build the same four lines are simply blank. Two consequences
+follow, both intentional:
+
+\begin{itemize}
+  \item \textbf{A solution taller than its workspace overprints the content
+    below it.} That collision is the alarm -- it says \emph{leave more room
+    for this answer} -- not a bug. Fix it by growing the workspace, never by
+    shrinking the answer.
+  \item \textbf{Hints are not overlays.} A hint is student-facing help that
+    should push content down normally in its build -- it participates in
+    layout, unlike the answer key painted over blank space.
+\end{itemize}
+
+\subsection{Solid mode: the compact answer key}
+
+Sometimes the spaced layout is wrong: an answer-key handout to post online,
+or lecture notes (this manual runs in solid mode too). One preamble switch:
+
+\begin{manexsource}
+\solidboxes    % boxes at natural height; workspace and
+               % \FreshPage collapse to nothing
+\overlayboxes  % back to the default overlay mode
+\end{manexsource}
+
+Under \cs{solidboxes} the boxes carry their own height and \emph{all} the
+reserved room -- every \cs{workspace}, every \cs{FreshPage} break and blank
+page -- collapses to nothing: the same source becomes a compact document
+with answers inline. The collapse happens only under this explicit,
+document-wide switch, never silently per-build; within one mode, every view
+of a document lays out identically.
+
+The demo midterm keeps \cs{overlayboxes} written out in its preamble even
+though it is the default -- a one-line smoke test that the switch pair
+round-trips, and a visible declaration of which mode the document is in.

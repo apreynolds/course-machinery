@@ -1,0 +1,196 @@
+\section{Building an assessment}\label{sec:assessments}
+
+An assessment -- test, final, quiz, homework -- is an \file{Assessment}
+document: an assembly file that sets up a cover, then imports problems from
+the bank with points attached. The skeleton, from the demo repo's
+\file{_assessment/midterm.tex}:
+
+\begin{manexsource}
+%! views: solutions, hints, instructor
+\documentclass[12pt,thursday]{Assessment}
+\assessmentsetup{
+  course = {MATH 101},
+  term   = {Fall 2026},
+  name   = {Midterm},
+  date   = {17 Oct},
+  instructions = {
+    \textbf{\sffamily Instructions:}
+    \begin{itemize}[nosep]
+      \item \printtotalpoints\ points.
+      \item Closed book. No calculators.
+      \item Show all work for full marks.
+  \end{itemize}},
+}
+\begin{document}
+\AssessmentTitle
+\newpage
+\importproblem[points=5]
+  {../differentiation/problems/}{chain-rule-basic.tex}
+\workspace[5]
+...
+\end{document}
+\end{manexsource}
+
+The class renders questions as ``Q\,$N$'' hung in the \emph{left} margin with
+their point marks ``($N$ pts)'' in the \emph{right} margin -- numbers left,
+marks right, so standalone questions and lettered group parts drop their marks
+into the same rail. None of that appears in this manual's examples (which
+render with the neutral ``Problem $N$.''\ style); build the demo midterm to
+see the real thing.
+
+\subsection{Class options}
+
+\begin{itemize}
+  \item \texttt{[noid]} -- for documents that collect no student identity:
+    homework, in-class worksheets, MC practice. Drops the NAME/ID box and the
+    deep scanner top margin. The \emph{default} is the fully-furnished
+    identified exam, on purpose: forgetting \texttt{[noid]} merely
+    over-furnishes homework with an unused ID box, whereas the opposite
+    default could ship a real exam with no ID box at all -- the safe mistake
+    is the easy one to make.
+  \item \texttt{[automatch]} -- for Crowdmark's automatic name matching:
+    keeps the deep top margin (the QR code still lands there) but replaces
+    the NAME/ID box with a blank mid-cover band (9--18\,cm down the page, per
+    spec) where students write their identity for the scanner.
+  \item \texttt{[tuesday]} / \texttt{[thursday]} -- a framed day box beside
+    the title: TUE on the \emph{left}, THU on the \emph{right}, so two
+    section piles sort at a glance by which side the box sits on, without
+    reading a word.
+  \item \texttt{[legalpaper]} -- legal stock; the margins stay absolute, so
+    the extra three inches become writing room.
+  \item Stock \file{article} options pass through (\texttt{[12pt]},
+    \texttt{[twoside]}, \dots).
+\end{itemize}
+
+About that deep top margin: Crowdmark stamps a QR code into the top band of
+every page at upload, so the band stays clear of content throughout, and the
+cover's NAME/ID box is lifted up \emph{into} it, beside where the QR lands.
+
+\subsection{The cover}
+
+\cs{assessmentsetup} takes the five fields you saw above -- \env{course},
+\env{term}, \env{name}, \env{date}, \env{instructions} -- every one optional;
+an unset field prints nothing, brackets and all. Anything else an exam cover
+might say (time allowed, formula-sheet note, coverage) is just prose in
+\env{instructions}, which needs no dedicated keys. \cs{AssessmentTitle} then
+emits the cover: NAME/ID box, centred title, instructions.
+
+Note what is \emph{not} a field: the point total. Write
+\cs{printtotalpoints} in the instructions (as above) and the printed total is
+summed from the imported problems themselves -- it can never disagree with
+the paper. (Both this total and the ``Page $N$ of $M$'' footer are two-pass
+values: a first compile shows \texttt{??}, and the build's latexmk rerun
+settles it.)
+
+In a solutions build, the cover also stamps itself
+{\sffamily\bfseries\color{SolutionColor}SOLUTIONS} -- the answer key
+announces itself.
+
+\subsection{Points at the import site}
+
+Points are attached where a problem is imported, never stored in the problem
+file (section~\ref{sec:problem-files}). The grammar, in increasing order of
+ceremony:
+
+\begin{manexsource}
+\importproblem[5]{DIR}{FILE}          % shorthand: points=5
+\importproblem[points=5]{DIR}{FILE}   % the same, spelt out
+\importproblem[points=2*]{DIR}{FILE}  % announced BONUS: off the total
+\importproblem[points=5, nocount]{DIR}{FILE}  % quiet: off the total
+\importproblem[points={2,1*}, workspaces={4,4}]{DIR}{FILE}
+                                      % per-part (a qparts file)
+\importproblem[pointseach=2]{DIR}{FILE}   % broadcast to every part
+\importproblem[points=5, hint]{DIR}{FILE} % force this hint ON
+\end{manexsource}
+
+\begin{itemize}
+  \item \textbf{Values are integers} -- the total accumulator and the
+    singular/plural logic both require it; \texttt{points=2.5} errors.
+  \item \textbf{The \texttt{*} suffix means announced bonus}: the value is
+    shown (a bonus \emph{is} worth $N$ if earned), labelled \emph{bonus} in
+    the margin, and kept out of \cs{printtotalpoints}. In a per-part list,
+    star just the bonus part: \texttt{points=\{2,3,1*\}} makes only part (c)
+    bonus.
+  \item \textbf{\texttt{nocount} is the quiet off-books case} -- marker
+    unchanged, total untouched. Its main use is choose-$N$-of-$M$ accounting,
+    where \env{problemchoice} below applies it for you.
+  \item \textbf{One seam to know}: the lone-integer shorthand only fires when
+    the whole option is one integer, so \texttt{[5, hint]} errors -- write
+    \texttt{[points=5, hint]}.
+  \item \texttt{hint} / \texttt{nohint} force one problem's hint on or off
+    against the document toggle -- a worked example on a test, or a hint
+    withheld in an otherwise-hinted homework.
+\end{itemize}
+
+\subsection{Grouping: \env{problemgroup} and \env{problemchoice}}
+
+\env{problemgroup} assembles \emph{independent} one-file problems into one
+numbered question with lettered parts -- the parts stay atomic files in the
+bank, and each import inside carries its own points, exactly as anywhere
+else:
+
+\begin{manexsource}
+\begin{problemgroup}{Evaluate}
+  \importproblem[points=5, hint]
+    {../differentiation/problems/}{find-derivative.tex}
+  \workspace[3]
+  \importproblem[5]
+    {../differentiation/problems/}{find-derivative2.tex}
+  \workspace[2]
+\end{problemgroup}
+\end{manexsource}
+
+This renders as ``Q\,$N$.\ Evaluate'' with parts (a), (b); a \cs{ref} to a
+part reads ``$N$(a)''. To \cs{label} the \emph{group}, put the label just
+inside \env{problemgroup}, before the first part -- after \cs{end} it would
+catch the last part instead. (Genuinely dependent sub-questions are one file
+with \env{qparts}, section~\ref{sec:problem-files} -- import that file here
+like any other.)
+
+\env{problemchoice} is the choose-$N$-of-$M$ wrapper:
+
+\begin{manexsource}
+\begin{problemchoice}[select=2, points=5]
+  \importproblem[]
+    {../differentiation/problems/}{mc-graph-grid.tex}
+  \FreshPage
+  \importproblem[]
+    {../differentiation/problems/}{multiple-choice-example.tex}
+  \FreshPage
+  \importproblem[]
+    {../differentiation/problems/}{multiple-choice-example2.tex}
+\end{problemchoice}
+\end{manexsource}
+
+Each member question repeats the generated instruction (``Answer any two of
+Questions $N$--$M$.''\ -- page-break safe), every member shows the shared
+per-question value, and the total counts it $\text{select} \times
+\text{points}$ once, not per member. Members therefore carry no
+\texttt{points=} of their own (one that does triggers a warning, since it
+would silently diverge from the shared value).
+
+\subsection{Answer space and page furniture}
+
+\cs{workspace}\texttt{[N]} reserves $N$ lines of handwriting after a question
+(also \texttt{[halfpage]}, \texttt{[fullpage]}, or \cs{workspace*} to fill
+the rest of the page); \cs{FreshPage} is a collapsible page break;
+\cs{FreshPage}\texttt{[blank]} and \texttt{[watermark]} emit a dedicated
+blank page, the latter stamped ``Blank page for extra work.'' All of this is
+Workspace machinery with one deep design idea -- reserved space that
+solutions can paint into without moving a single page break -- explained in
+section~\ref{sec:overlay}.
+
+The class's own page furniture is minimal and load-bearing: a ``Page $N$ of
+$M$'' footer on every page (a student can check the stapled packet is
+complete at a glance) and no running head.
+
+\subsection{Views of one assessment}
+
+With \texttt{\%! views: solutions, hints, instructor} in the magic comment,
+one midterm source builds four PDFs: the student paper, an answer key
+(\file{-SOLUTIONS}), a hints copy (\file{-HINTS}), and the staff bundle
+(\file{-INSTRUCTOR}: solutions + hints + instructor notes, inside the
+page-edge \emph{Instructor copy} frame). Under the default overlay mode all
+four have \emph{identical page breaks} -- the whole point of
+section~\ref{sec:overlay}. Build mechanics are in
+section~\ref{sec:build-and-find}.

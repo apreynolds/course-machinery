@@ -1,0 +1,70 @@
+\section{Assessment.cls}\label{sec:ref-assessment}
+
+The graded-document class: tests, finals, quizzes, homework, worksheets.
+Article-based. Loads Exercises, ProblemMeta, Workspace, Typefaces (lining
+figures), MathStuff and InstructorNotes; deliberately \emph{not} Titling --
+an assessment opens with \cs{AssessmentTitle}, a different artefact from a
+styled title. Every page carries a ``Page $N$ of $M$'' footer (two-pass via
+\file{lastpage}) and no running head. The text block stays wide, near
+article's stock margins: an exam is not continuous prose, so the room goes
+to the student's writing, not to a reading measure. Workflow:
+section~\ref{sec:assessments}.
+
+\subsection*{Class options}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.62\linewidth}@{}}
+\texttt{noid} & no student identity collected (homework, worksheets, MC
+  practice): drops the NAME/ID box and the deep scanner top margin.\\
+\texttt{automatch} & Crowdmark auto-matching: keeps the deep top margin,
+  replaces the NAME/ID box with a blank 9--18\,cm mid-cover band.\\
+\texttt{tuesday}, \texttt{thursday} & framed day box beside the title, TUE
+  left / THU right -- sort two section piles by sight.\\
+\texttt{legalpaper} & legal stock; absolute margins, so the extra height is
+  writing room.\\
+\emph{(other)} & forwarded to \file{article} (\texttt{12pt},
+  \texttt{twoside}, \dots).\\
+\end{tabular}
+\end{center}
+
+The default (no options) is the fully-furnished identified exam --
+forgetting an option over-furnishes homework harmlessly, never under-equips
+an exam.
+
+\subsection*{Commands}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{assessmentsetup}\texttt{\{...\}} & keyval cover setter: \env{course},
+  \env{term}, \env{name}, \env{date}, \env{instructions}; all optional,
+  unset fields vanish cleanly.\\
+\cs{AssessmentTitle} & emits the cover: NAME/ID box (unless suppressed),
+  centred title, instructions; adds a \emph{SOLUTIONS} stamp in a solutions
+  build.\\
+\cs{BonusMarksOnTop} & bonus margin block as ``(N pts)'' over rule over
+  ``bonus'' (the default).\\
+\cs{BonusLabelOnTop} & the flip: ``BONUS'' over rule over ``(N pts)''.\\
+\cs{BonusMarginLabel}, \cs{BonusMarginRule} & reword the bonus label /
+  restyle the divider rule.\\
+\cs{ExamTopMargin} & the deep-top length (3.7\,cm), single-sourced for
+  geometry and the \texttt{[automatch]} band; rarely touched.\\
+\end{tabular}
+\end{center}
+
+\subsection*{Presentation choices}
+
+The class overrides the Exercises hooks (section~\ref{sec:hooks}) to the
+exam look: questions render as \textbf{Q$N$} hung in the left margin
+(\cs{ProblemLabelWord} is \texttt{Q}; \cs{ProblemNumberText} is the tight
+``Q$N$'', no space), and every scored item drops its ``($N$ pts)'' mark
+into the right margin rail (\cs{ProblemPointsFormat} via \cs{marginnote}) --
+numbers left, marks right, so standalone questions and lettered group parts
+line up in the same rails. Bonus items stack their mark and label in that
+same right rail (\cs{ProblemBonusPointsFormat}). \texttt{number=} and
+\texttt{desc=} import keys are ignored: an exam owns its numbering and does
+not annotate its questions.
+
+One geometry fact worth knowing rather than rediscovering: the deep
+3.7\,cm top margin exists because Crowdmark stamps a QR code into the top
+band of \emph{every} page at upload -- interior pages keep the band empty,
+and the cover lifts its NAME/ID box up into it, beside the QR.

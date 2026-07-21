@@ -1,0 +1,120 @@
+\section{Building and finding: the two scripts}\label{sec:build-and-find}
+
+Two executables ship with the machinery. \file{build-pdfs} compiles course
+documents (with their views, and with output routed where you want it);
+\file{find-problems} searches the problem bank. Both print their full
+reference with \texttt{-{}-help}.
+
+\subsection{\texorpdfstring{\texttt{build-pdfs}}{build-pdfs}}
+
+\begin{manexsource}
+$ build-pdfs              # compile every .tex in this directory
+$ build-pdfs midterm.tex  # just this one (FILE.tex -> FILE.pdf)
+\end{manexsource}
+
+The script runs latexmk from each file's own directory, so relative imports
+resolve and the directory's \file{.latexmkrc} puts the machinery on
+\env{TEXINPUTS}. Auxiliary files (\file{.aux}, \file{.log}, \dots) go to a
+per-directory folder under \file{~/.cache/latexmk/} -- they clutter neither
+the repo nor the output directory -- keyed by the directory's repo-relative
+path, so two topics' same-named \file{problems/} folders never share
+latexmk state.
+
+\subsubsection{Views: one source, several PDFs}
+
+A magic comment in a source's \emph{leading} comment block (it must precede
+\cs{documentclass}) requests extra PDFs:
+
+\begin{manexsource}
+%! views: solutions, hints, instructor
+\documentclass[12pt,thursday]{Assessment}
+\end{manexsource}
+
+Four views are wired, each injecting a layer definition ahead of the source
+so the call site needs no class option:
+
+\begin{itemize}
+  \item \env{solutions} $\to$ \file{FILE-SOLUTIONS.pdf}: defines
+    \cs{ShowSolutions}, so \env{solution} bodies and the boxed MC keys
+    print.
+  \item \env{hints} $\to$ \file{FILE-HINTS.pdf}: defines \cs{ShowHints}.
+    Independent of solutions -- a hint is student-facing help, so list both
+    views if you want both PDFs.
+  \item \env{projector} $\to$ \file{FILE-PROJECTOR.pdf}: defines
+    \cs{ProjectorView}, switching \file{LectureNotes} to the 17\,pt room
+    copy.
+  \item \env{instructor} $\to$ \file{FILE-INSTRUCTOR.pdf}: the staff
+    bundle -- solutions $+$ hints $+$ instructor notes, inside the
+    page-edge frame. A view is a \emph{bundle of layers}; the instructor
+    copy is the staff copy (TAs get it too -- there is no separate marker
+    tier).
+\end{itemize}
+
+An unrecognised view name warns and is skipped; the student PDF always
+builds. Under the default overlay mode, every view of a document has
+identical page breaks (section~\ref{sec:overlay}).
+
+\subsubsection{Where the PDFs go}
+
+Three tiers, decided per build directory -- the first that applies wins:
+
+\begin{enumerate}
+  \item \textbf{An \file{OUTDIR} (or \file{.OUTDIR}) file in the build
+    directory} names a destination directory, one path on its own line
+    (leading \texttt{\~{}} expanded). By default the PDF goes \emph{straight
+    there}, with no local copy; add a line reading \texttt{BOTH} to build
+    locally \emph{and} copy. Blank and \texttt{\#}-comment lines are
+    ignored; path and keyword may come in either order; a missing or
+    non-directory path warns and falls back to local.
+    \file{SAMPLE-OUTDIR}, shipped with the machinery, is the commented
+    template -- copy it into place and uncomment. \file{OUTDIR} and
+    \file{.OUTDIR} are meant to be git-ignored: each machine points its
+    own way.
+  \item \textbf{A \file{.CLOUDDIR} file at the repo top level} names a base
+    directory that \emph{mirrors the repo tree}: a source built in
+    \file{REPO/integrals/lectures} ships its PDF to
+    \file{BASE/integrals/lectures}. Same file format as OUTDIR. The mirror
+    subdirectory is created if absent, but the base itself must exist --
+    if the cloud drive is unmounted, the script warns and builds locally
+    rather than scattering a stray tree. This is the set-and-forget tier:
+    one file at the repo root, and every build lands in the synced copy.
+  \item \textbf{Neither} -- the PDF lands next to its source.
+\end{enumerate}
+
+\subsection{\texorpdfstring{\texttt{find-problems}}{find-problems}}
+
+\begin{manexsource}
+$ find-problems [--topic PAT] [--tag PAT] [--difficulty PAT]
+                [--source PAT] [--untagged] [--vocab] [--import]
+                [DIR ...]
+\end{manexsource}
+
+Reads the \cs{ProblemMeta} block off every \file{.tex} file under each
+\env{DIR} (default: the current directory, recursively) and reports the
+matches -- without running LaTeX, which is the point
+(section~\ref{sec:problem-files}). With no filters, it lists every file
+that has a block.
+
+The four filters combine with AND. \env{PAT} is an extended regular
+expression matched case-insensitively against each comma-separated item, so
+\texttt{-{}-topic power} finds \texttt{power-rule} and
+\texttt{-{}-topic '\^{}power-rule\$'} matches exactly. A filter on a key a
+file does not set never matches -- \texttt{-{}-difficulty basic} will not
+sweep in untagged files.
+
+Three modes round it out:
+
+\begin{itemize}
+  \item \texttt{-{}-vocab} ignores the filters and prints the tag and topic
+    vocabulary in use, with counts -- the antidote to a bank where half the
+    problems say \emph{integration} and half say \emph{integrals}. Read it
+    before inventing a tag.
+  \item \texttt{-{}-untagged} inverts: files with \emph{no} metadata block
+    at all -- the tagging backlog.
+  \item \texttt{-{}-import} prints the matches as \cs{import} lines ready
+    to paste into a document.
+\end{itemize}
+
+The parser is textual and deliberately simple, which is where the
+one-key-per-line discipline of section~\ref{sec:problem-files} comes from:
+a reflowed block still compiles, but this script no longer sees it.

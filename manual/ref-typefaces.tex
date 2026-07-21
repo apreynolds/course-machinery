@@ -1,0 +1,62 @@
+\section{Typefaces.sty}\label{sec:ref-typefaces}
+
+The typeface stack, chosen once for every course document: Libertinus
+serif (semibold for bold), Merriweather sans (scaled to sit between the
+serifs' lowercase and uppercase heights), \file{newtxtt} mono, and
+newtxmath in its \texttt{libertinus} dress -- plus \file{mathalpha} for
+distinct $\mathcal{C}$/$\mathscr{S}$/$\mathfrak{f}$/$\mathbb{B}$
+alphabets, \file{microtype}, and \file{bm}.
+
+This package \emph{owns the load-order contract}: it loads amsmath first,
+then newtxmath with its \texttt{amsthm} option -- the one point in
+newtxmath's load where amsthm can arrive in the right order. Classes and
+packages must therefore never load amsmath or amsthm themselves, and
+MathStuff, CourseBoxes and InstructorNotes all require Typefaces before
+them (each enforces it with a \cs{PackageError}). The full story:
+section~\ref{sec:load-order}.
+
+\subsection*{Options}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.6\linewidth}@{}}
+\texttt{osf} & old-style figures in serif body text (CourseDocument
+  passes it -- prose documents).\\
+\texttt{lining} & the default, spelt out (LectureNotes, Assessment --
+  figures are information).\\
+\end{tabular}
+\end{center}
+
+\subsection*{The four-knob figure model}
+
+Figures appear in four places; each has exactly one independent control,
+and only the first varies by document type:
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+serif body prose & the \texttt{[osf]} option -- \emph{the only knob}.\\
+sans (headings, \cs{course}) & pinned lining, always.\\
+math & always lining (newtxmath).\\
+tabular contents & always lining, via an every-\env{tabular} hook.\\
+\end{tabular}
+\end{center}
+
+So under \texttt{[osf]}, running prose gets old-style figures while course
+numbers, math and tables stay lining -- the sans pinning is what keeps
+\cs{course} lining, since \cs{useosf} cannot reach a sans that Libertinus
+did not load. Local overrides: \cs{liningnums}\texttt{\{2026\}} /
+\cs{oldstylenums}\texttt{\{2026\}}.
+
+\subsection*{Commands and lengths}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{course}\texttt{[MATH]\{1013\}} & the course designation in sans; the
+  optional prefix defaults to MATH. Sans is load-bearing: it routes the
+  numerals through the lining-pinned Merriweather.\\
+\cs{alphabet} & the measured width of the lowercase alphabet in the real
+  body font. Classes set \texttt{textwidth} $= 2.6$\cs{alphabet} ($\approx
+  66$ characters, the classic readable measure) -- a \emph{rule} that
+  re-derives itself when the font or size changes, where a frozen length
+  would silently stop tracking.\\
+\end{tabular}
+\end{center}

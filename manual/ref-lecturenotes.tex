@@ -1,0 +1,55 @@
+\section{LectureNotes.cls}\label{sec:ref-lecturenotes}
+
+The lecture class: handouts and their projector twin, from one source.
+Based on \file{extarticle} for the large sizes -- 14\,pt handout, 17\,pt
+projector. Loads Exercises, ProblemMeta, Workspace, Typefaces (lining),
+MathStuff, Titling, Hyperlinks, CourseBoxes and InstructorNotes -- the full
+stack. Workflow: section~\ref{sec:lectures}.
+
+\subsection*{Class options}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.62\linewidth}@{}}
+\texttt{projector} & the in-room copy: 17\,pt, tighter top margin, no
+  marginpar column, no page number, grey back-to-top arrow in the footer.
+  Normally you never write it -- the build's \env{projector} view injects
+  \cs{ProjectorView} and the class switches by itself.\\
+\emph{(other)} & forwarded to \file{extarticle}.\\
+\end{tabular}
+\end{center}
+
+\subsection*{Commands and hooks}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{NotesProblemLabelWord} & the noun imported problems render as
+  (default \emph{Example}); redefine per course in \file{course-vocab.tex}.
+  Routed into \cs{ProblemLabelWord} so a shared vocab file cannot disturb
+  Assessment's fixed ``Q''.\\
+\end{tabular}
+\end{center}
+
+\subsection*{Presentation choices}
+
+Imported problems render with a run-in bold heading, unnumbered by default:
+\textbf{Example.}\ -- plus the literal \texttt{number=} and parenthetical
+\texttt{desc=} if the import supplied them (``Example 2.1.8 (from
+APEX).'').\ The problem counter still steps invisibly, so cross-references
+stay sound. The \env{problemgroup} stem takes the same unnumbered form.
+Points keys are ignored -- notes are ungraded.
+
+Other deliberate class behaviour:
+
+\begin{itemize}
+  \item \cs{subsectionbreak} is \cs{clearpage}: every subsection starts a
+    fresh page (a lecture subsection is a screenful/boardful).
+  \item Only \cs{section} is numbered (\env{secnumdepth} 1); the TOC shows
+    three levels.
+  \item Paragraph spacing is airier than the parskip default
+    (\texttt{skip=1em}) -- room to annotate, legible from the back row.
+  \item No running head; the handout has a centred page number, the
+    projector copy none (it is scrolled, not paged -- hence the back-to-top
+    footer arrow instead).
+  \item Headings and links stay black: lectures sit with assessments on
+    the ``clear, not fancy'' side; colour belongs to CourseDocument.
+\end{itemize}

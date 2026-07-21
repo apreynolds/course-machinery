@@ -1,0 +1,49 @@
+\section{InstructorNotes.sty}\label{sec:ref-instructornotes}
+
+The instructor-only content layer. Everything here is gated on
+\cs{ifinstructornotes} and \emph{fully gobbled} when off -- a student build
+carries no trace. The flag defaults on when \cs{ShowInstructorNotes} is
+defined, which the build's \env{instructor} view injects
+(section~\ref{sec:build-and-find}). One staff tier only: the instructor
+copy \emph{is} the staff copy (TAs included); anything unfit for a TA stays
+out of the source.
+
+\subsection*{The three shapes}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{InstructorInline}\texttt{\{...\}} & slate run-in inside the paragraph;
+  wraps across lines. For quick in-flow asides -- anything you will want to
+  \emph{find} again belongs in a box or the margin.\\
+\env{InstructorBox}\texttt{[marking]} & the side-barred block: pale slate
+  fill, a slate bar in the left margin with a rotated word -- \emph{note}
+  (default) or \emph{marking}. The word differentiates, not the colour.\\
+\cs{InstructorMargin}\texttt{\{...\}} & bold slate sans in the margin
+  (via \cs{marginnote}, so it never floats).\\
+\end{tabular}
+\end{center}
+
+Everything is slate (\env{InstructorInk}) on purpose: staff content is
+``editorial, behind the scenes,'' one neutral colour with one meaning --
+distinct from the student palette and from green $=$ solutions.
+
+\subsection*{The page frame}
+
+In an instructor build, every page carries a slate frame just inside the
+page edge with an \emph{Instructor copy} tab at bottom right (clear of the
+centred page-number footers). An ever-present, low-distraction marker --
+it replaced both a title stamp (visible only on page 1) and a watermark
+(fights the content). Knobs: \cs{InstructorFrameInset} (edge gap, 2.5\,mm)
+and \cs{InstructorFrameRule} (thickness, 1.5\,mm).
+
+Note the frame installs \emph{at load time}, keyed to the injected flag --
+which is why this manual demonstrates the boxes by flipping
+\cs{instructornotestrue} locally (the environments test the flag at use
+time) without ever defining \cs{ShowInstructorNotes}.
+
+\subsection*{Interaction with Workspace}
+
+\env{InstructorBox} routes through \cs{WSZeroHeight}: in overlay mode it is
+a zero-height overlay like \env{solution} (section~\ref{sec:overlay}). The
+package stays self-contained via a fallback -- under CourseDocument, which
+has no Workspace, boxes simply render at normal height.

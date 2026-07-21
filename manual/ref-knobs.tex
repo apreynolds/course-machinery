@@ -1,0 +1,48 @@
+\section{Tunable knobs, consolidated}\label{sec:ref-knobs}
+
+Every author-tunable knob in one table, by home file. Each is a
+\cs{renewcommand} (or \cs{setlength} for lengths) in a document preamble
+or \file{course-vocab.tex} -- details in the file's own section.
+
+\begin{center}
+\begin{tabular}{@{}l l p{0.42\linewidth}@{}}
+\textbf{Knob} & \textbf{Home} & \textbf{What it tunes}\\[0.5ex]
+\cs{HandwritingLine} & Workspace & the workspace unit (0.9\,cm).\\
+\cs{WSOverlayGap} & Workspace & gap above an overlay box.\\
+\cs{BlankPageText} & Workspace & the blank-page watermark wording.\\[0.5ex]
+\cs{ProblemLabelWord} & Exercises & the problem noun (per class).\\
+\cs{NotesProblemLabelWord} & LectureNotes & the notes noun, per course
+  (\file{course-vocab.tex}).\\
+\cs{ProblemNumberText} & Exercises & the formatted number.\\
+\cs{ProblemHeadingFormat} & Exercises & a problem's whole heading.\\
+\cs{ProblemGroupHeadingFormat} & Exercises & the group stem heading.\\
+\cs{ProblemPointsFormat} & Exercises & how points render.\\
+\cs{ProblemBonusPointsFormat} & Exercises & how bonus points render.\\
+\cs{QPartLabelFormat} & Exercises & part letters (\cs{alph}).\\
+\cs{ProblemChoiceInstruction} & Exercises & choose-$N$-of-$M$ wording.\\
+\cs{HintLabel} & Exercises & the hint run-in label.\\
+\cs{ChoicesGridCols} & Exercises & MC grid columns (2).\\
+\cs{ChoiceLabelFormat} & Exercises & MC option labels ([A]).\\
+\cs{GraphChoiceValign} & Exercises & graph-option label alignment.\\
+\cs{GraphLabelReserve} & Exercises & label room beside a graph.\\
+\cs{MatchColWidth}, \cs{MatchItemSep} & Exercises & matching columns.\\
+\cs{MatchKeyFormat} & Exercises & the matching answer cue.\\
+\cs{SolutionCueRule}, \cs{SolutionCueSep} & Exercises & the shared green
+  answer-cue frame.\\
+\cs{CheckinHeaderSkip}, \cs{CheckinBodySkip} & Exercises & check-in box
+  gaps.\\[0.5ex]
+\cs{BonusMarksOnTop}, \cs{BonusLabelOnTop} & Assessment & bonus margin
+  arrangement.\\
+\cs{BonusMarginLabel}, \cs{BonusMarginRule} & Assessment & bonus wording
+  / divider.\\[0.5ex]
+\cs{TitleColor}, \cs{TitleStamp}, \cs{TitleMarker} & Titling & title
+  styling hooks.\\
+\cs{LinkColor}, \cs{UrlColor} & Hyperlinks & link colours.\\[0.5ex]
+\cs{InstructorFrameInset}, \cs{InstructorFrameRule} & InstructorNotes &
+  the instructor page frame.\\[0.5ex]
+\env{CourseIdentity} (\cs{colorlet}) & CourseDocument & the course
+  identity colour.\\
+tcb styles \env{cb/*}, head styles \env{cb*} & CourseBoxes & box and
+  head looks (section~\ref{sec:ref-courseboxes}).\\
+\end{tabular}
+\end{center}

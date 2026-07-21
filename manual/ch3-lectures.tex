@@ -1,0 +1,169 @@
+\section{Writing a lecture}\label{sec:lectures}
+
+A lecture is a \file{LectureNotes} document. The class comes in two sizes from
+one source: the default 14\,pt \emph{handout} (printed or posted for students),
+and a 17\,pt \emph{projector} copy for the room, built automatically as a view
+(section~\ref{sec:build-and-find}). A typical master, from the demo repo's
+\file{differentiation/lectures/1.1-IntroToDerivatives.tex}:
+
+\begin{manexsource}
+%! views: projector, instructor
+\documentclass{LectureNotes}
+\solidboxes
+
+% Per-course text-result vocabulary (e.g. APEX's "Key Idea").
+\input{../../course-vocab}
+
+\begin{document}
+\section*{Introduction to Derivatives}
+...
+\end{document}
+\end{manexsource}
+
+Three preamble notes. The \texttt{\%! views:} comment declares which extra PDFs
+the build script produces (here a projector copy and an instructor copy). The
+\cs{solidboxes} switch selects natural-height boxes -- the right mode when the
+notes carry no reserved whitespace; see section~\ref{sec:overlay} for the
+whole story. And \file{course-vocab.tex} is \cs{input} \emph{in the preamble}
+(its box declarations must run before the document starts), via a relative
+path from the repo root -- section~\ref{sec:extending} explains what belongs
+in that file.
+
+\subsection{Text results: boxes with declared numbers}
+
+\file{CourseBoxes} provides the boxed results -- and its numbering model is
+the one thing to internalise: box numbers are \emph{declared, not counted}.
+You type the number, matching the course text, and \cs{label}/\cs{ref} work as
+usual:
+
+\begin{manexample}
+\begin{definition}{2.1.1}[Derivative]\label{def:deriv}
+  The derivative of $f$ at $x$ is
+  $f'(x) = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h}$,
+  provided the limit exists.
+\end{definition}
+
+\begin{theorem}{2.1.4}[Power Rule]\label{thm:power}
+  For any real constant $n$, $\lzo{x}\,x^{n} = n\,x^{n-1}$.
+\end{theorem}
+
+Theorem~\ref{thm:power} rests on Definition~\ref{def:deriv}; the
+text's 2.1.2 and 2.1.3 are simply skipped.
+\end{manexample}
+
+Because nothing is counted, the notes mirror the textbook's own numbering and
+may skip freely -- the gap above is the feature, not a bug. Keeping LaTeX's
+automatic counters aligned with a textbook means fighting them document-wide;
+declaring the number is one argument at the call site.
+Section~\ref{sec:extending} covers the mechanism and how to add
+course-specific vocabulary (\env{keyidea}, \env{axiom}, \dots).
+
+The universal environments, always available: \env{theorem},
+\env{proposition}, \env{lemma}, \env{corollary}, \env{definition},
+\env{example}, and \env{remark}, all with the same
+\texttt{\{number\}[optional name]} signature.
+
+\subsection{Pedagogical asides}
+
+Asides are the \emph{author's} voice -- unnumbered, never referenced, and
+deliberately not \cs{label}-able (they are commentary, not results). Two of
+the five, live:
+
+\begin{manexample}
+\begin{caution}
+  The Power Rule is for a \emph{variable base, constant
+  exponent}. It does not apply to $2^{x}$.
+\end{caution}
+
+\begin{tip}[surviving]
+  Remember: $\frac{1}{a+b} \neq \frac{1}{a} + \frac{1}{b}$.
+\end{tip}
+\end{manexample}
+
+The full set: \env{caution}, \env{takeaway}, \env{yourturn}, \env{prepwork},
+and \env{tip} -- where \env{tip} takes an optional audience tier,
+\texttt{[surviving]} or \texttt{[thriving]}, that stamps the box for the
+struggling or the confident reader respectively (a bare \env{tip} is for
+everyone).
+
+\subsection{Importing problems as examples}
+
+The same problem files that grade as ``Q'' on a test
+(section~\ref{sec:assessments}) read as worked examples in notes. The class
+renders an imported problem with a run-in \textbf{Example.} heading --
+unnumbered by default, because the default example is improvised board work,
+not a text citation:
+
+\begin{manexsource}
+\importproblem{../problems/}{find-derivative.tex}
+% -> "Example.  Differentiate f(x) = ..."
+
+\importproblem[number={2.1.8}, desc={from APEX}]
+  {../problems/}{find-derivative.tex}
+% -> "Example 2.1.8 (from APEX).  Differentiate f(x) = ..."
+\end{manexsource}
+
+The \texttt{number=} key sets a \emph{literal} display number (typically the
+textbook's -- the same declared-number philosophy as the boxes; a \cs{ref} to
+the problem reads ``2.1.8'' too), and \texttt{desc=} adds a parenthetical
+note. Points keys are simply ignored in notes -- the same import line can
+move between a test and a lecture unchanged.
+
+Two more import forms round out the lecture repertoire:
+
+\begin{itemize}
+  \item \cs{importcheckin} (same arguments as \cs{importproblem}) wraps an
+    imported multiple-choice problem in a framed ``CHECK IN:'' box with
+    coloured A--E flashcard labels -- the in-class poll format. Same file,
+    third appearance.
+  \item \env{problemgroup} assembles independent one-file problems under a
+    shared stem; in notes the stem stays an unnumbered ``Example.''\ and the
+    members letter themselves (a), (b) (see section~\ref{sec:assessments}
+    for the graded version).
+\end{itemize}
+
+The ``Example'' noun itself is a per-course choice (texts say Example /
+Exercise / Problem): redefine \cs{NotesProblemLabelWord} in
+\file{course-vocab.tex} and every lecture follows, without touching the fixed
+``Q'' on assessments.
+
+\subsection{Instructor-only annotations}
+
+Lectures carry notes-to-self and co-teacher asides that students must never
+see. Three shapes, all in slate and all invisible outside an instructor build
+(the flag is flipped locally here to show them):
+
+\begin{manexample}
+\instructornotestrue
+Some lecture prose.
+\InstructorInline{Most will try to memorise this before
+understanding it -- resist that.}
+
+\begin{InstructorBox}[marking]
+  Budget a full board example on expanding-then-cancelling
+  before the Power Rule.
+\end{InstructorBox}
+\end{manexample}
+
+The \cs{InstructorInline} note is a run-in aside in the paragraph flow;
+\env{InstructorBox} is a side-barred block (the rotated word says \emph{note},
+or \emph{marking} with the optional argument); \cs{InstructorMargin} drops a
+bold sans note in the margin (not shown live -- this manual's example boxes
+sit too far from the page margin for it to land sensibly). In an instructor
+build, every page also gets a page-edge frame reading \emph{Instructor copy}
+-- the copy identifies itself even from a glance at a single page.
+
+\subsection{Board space and the projector copy}
+
+\cs{workspace}\texttt{[N]} reserves $N$ lines of handwriting room -- in
+lectures, space to improvise at the board while students follow on the
+handout. It is the same command assessments use for answer space;
+section~\ref{sec:overlay} explains it (and how solutions can \emph{overlay}
+that space without moving anything).
+
+The projector view needs no source changes at all: \texttt{\%! views:
+projector} makes the build script produce \file{...-PROJECTOR.pdf} alongside
+the handout -- 17\,pt type, tighter margins, no page number, and a grey
+back-to-top arrow in the footer (the room copy is scrolled, not paged). Two
+class behaviours worth knowing: every \cs{subsection} starts a fresh page (a
+lecture section is a screenful), and only \cs{section} is numbered.

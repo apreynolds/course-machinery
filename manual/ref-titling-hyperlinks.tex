@@ -1,0 +1,49 @@
+\section{Titling.sty and Hyperlinks.sty}\label{sec:ref-titling}
+
+Two small base packages, both built on the same hook pattern: plain
+defaults here, a class overrides with \cs{renewcommand}.
+
+\subsection*{Titling}
+
+The shared title block for LectureNotes and CourseDocument -- title,
+subtitle, ``Updated $\langle$date$\rangle$'' -- structure written once,
+class differences reduced to hooks. (Assessment deliberately does not load
+it: an assessment opens with \cs{AssessmentTitle}, a different artefact.)
+Also home of \file{datetime2}, the date's formatter.
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{subtitle}\texttt{\{...\}} & the subtitle line(s); set before
+  \cs{maketitle}.\\
+\cs{TitleColor} & a \emph{style} hook (e.g.\
+  \cs{color}\texttt{\{HeadingColor\}}), deliberately not a colour name --
+  it keeps Titling free of any xcolor dependency. Default: empty.\\
+\cs{TitleStamp} & follows the date (CourseDocument sets ``at
+  $\langle$time$\rangle$''). Default: empty.\\
+\cs{TitleMarker} & follows the stamp; currently a free hook -- the
+  instructor-copy signal moved to the page frame. Default: empty.\\
+\end{tabular}
+\end{center}
+
+\subsection*{Hyperlinks}
+
+hyperref plus a back-to-top anchor. The load itself is the point:
+hyperref patches much of LaTeX, so anything loaded after it can silently
+undo those patches -- Hyperlinks therefore defers it with
+\cs{AtEndPreamble}, which runs after every package the \emph{document}
+loads too, not merely after the class
+(section~\ref{sec:load-order}). Requires the class to have passed
+\texttt{dvipsnames} to xcolor beforehand.
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{LinkColor} & internal links (default \texttt{black}; CourseDocument
+  sets its identity colour). Read late, so overrides anywhere in the
+  preamble win.\\
+\cs{UrlColor} & external URLs (default \texttt{RoyalBlue}).\\
+\cs{BackToTopLink}\texttt{\{...\}} & wrap anything in a jump to the top
+  anchor (the projector footer's grey arrow).\\
+\cs{TopAnchorName} & the anchor's name (\texttt{CourseTop}), placed at
+  the very top of the body.\\
+\end{tabular}
+\end{center}

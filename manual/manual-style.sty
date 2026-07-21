@@ -1,0 +1,84 @@
+\ProvidesPackage{manual-style}[2026/07/20]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% WHAT THIS IS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Example machinery for the manual ONLY -- not part of the shipped toolkit
+% interface, never loaded by a class. Documents in a course repo must not use
+% anything defined here.
+%
+% The core device is `manexample': its body is written ONCE and shown twice --
+% verbatim source on top, the compiled result below -- via tcolorbox's listings
+% library (the same technique tcolorbox's own manual uses). Because the body is
+% a single source, the displayed source and the rendered result can never drift
+% apart.
+
+% tcolorbox is already a hard dependency of the toolkit (CourseBoxes,
+% InstructorNotes, Exercises); only the `listings' package is new, and it is
+% TeX Live core with no shell-escape requirement.
+\RequirePackage{tcolorbox}
+\tcbuselibrary{listings}
+\tcbuselibrary{breakable}
+
+% Sober source styling: typewriter, light comments, no keyword rainbow. The
+% rendered pane below the listing is the star; the source should read like
+% something typed into an editor.
+\lstdefinestyle{manlatex}{%
+  language=[LaTeX]{TeX},
+  basicstyle=\ttfamily\small,
+  columns=flexible,
+  keepspaces=true,
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  commentstyle=\color{black!55},
+  keywordstyle=\ttfamily,
+}
+
+% Source on top, compiled result below. Breakable: examples may cross a page.
+%
+% NO optional argument, deliberately: an optional-argument lookahead peeks at
+% the first body token BEFORE verbatim recording starts, and when that token is
+% a control sequence (\begin{problem}...) it is tokenized and silently LOST from
+% the recorded source. A body may therefore start with anything.
+\newtcblisting{manexample}{%
+  listing and text,
+  colback=white,
+  colframe=black!30,
+  boxrule=0.4pt,
+  arc=1pt,
+  left=2mm, right=2mm, top=1mm, bottom=1mm,
+  listing options={style=manlatex},
+  breakable}
+
+% Source only -- for constructs that cannot render inside this manual (the
+% Assessment cover, \FreshPage, the projector view, the instructor page frame).
+% Prose points at the demo course repo for the live artifact instead.
+% Same no-optional-argument rule as manexample.
+\newtcblisting{manexsource}{%
+  listing only,
+  colback=white,
+  colframe=black!30,
+  boxrule=0.4pt,
+  arc=1pt,
+  left=2mm, right=2mm, top=1mm, bottom=1mm,
+  listing options={style=manlatex},
+  breakable}
+
+% Inline notation helpers for the PROSE ONLY -- never use these inside a
+% manexample/manexsource body: example source must stay copy-pasteable into a
+% course document, where nothing from this file exists.
+%   \cs{workspace}      -> \workspace   (a command name)
+%   \env{problem}       -> problem      (an environment name)
+%   \file{Exercises.sty}                (a file name)
+% \file is a url-package command: it takes _ and # literally and allows line
+% breaks after / and . -- long paths would otherwise overflow the measure.
+% Like \url, it must not appear in moving arguments (titles, TOC entries).
+\newcommand{\cs}[1]{\texttt{\textbackslash #1}}
+\newcommand{\env}[1]{\texttt{#1}}
+\RequirePackage{url}
+\DeclareUrlCommand\file{\urlstyle{tt}}
+
+% The prose is dense with unbreakable typewriter names; let a tight line
+% stretch a little rather than overflow.
+\setlength{\emergencystretch}{1.5em}

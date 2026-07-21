@@ -1,0 +1,247 @@
+\section{Authoring a problem file}\label{sec:problem-files}
+
+The problem bank is the heart of the system: \emph{one problem per file}, no
+preamble, sitting in a topic's \file{problems/} folder. The same file is pulled
+into an assessment as a graded question, into a lecture as a worked example, and
+into a check-in as a flashcard exercise -- the file itself never changes, only
+the import site decides how it appears. Two rules follow from that:
+
+\begin{itemize}
+  \item \textbf{A problem file is context-neutral.} It names no label
+    (``Q''\,/\,``Example''), no number, and no point value. The consuming class
+    supplies the label and number style; the import site supplies the points.
+  \item \textbf{A problem file carries what is intrinsically its own}: the
+    statement, its hint and solution, and its metadata (topics, tags,
+    difficulty, source). Those belong to the problem forever, wherever it is
+    used.
+\end{itemize}
+
+This intrinsic/extrinsic split is load-bearing. Points are \emph{extrinsic} --
+the same problem is worth 5 on one test and 7 on another -- so points are given
+where the problem is imported (section~\ref{sec:assessments}), and are
+deliberately \emph{not} a metadata field.
+
+\subsection{Anatomy of a problem file}
+
+A complete file, exactly as it sits in the bank:
+
+\begin{manexample}
+\ProblemMeta{
+  topics     = {differentiation, power-rule},
+  tags       = {polynomial, routine},
+  difficulty = {basic},
+  source     = {own},
+}
+\begin{problem}
+  Differentiate $f(x) = 3x^{4} - 5x^{2} + 2$.
+\end{problem}
+\begin{hint}
+  Differentiate term by term.
+\end{hint}
+\begin{solution}
+  $f'(x) = 12x^{3} - 10x$.
+\end{solution}
+\end{manexample}
+
+Note what rendered: the metadata block typeset \emph{nothing} (it is
+store-only), the problem numbered itself, and -- because this manual forces all
+layers on -- the hint and solution both display. In a student build both
+disappear without a trace.
+
+To start a new problem, copy an existing file: \file{differentiation/problems/}
+in the demo course repo holds one build-tested file of every type.
+
+\subsection{The metadata block}\label{sec:problemmeta}
+
+\cs{ProblemMeta} exists so that ``which problems do I have about the chain
+rule?'' is answerable \emph{without running LaTeX} -- nothing has \cs{input}
+those files at the moment you are deciding what goes on the test. The
+companion script \file{find-problems} answers it by reading the block straight
+off disk (section~\ref{sec:find-problems-taste}).
+
+That design puts one discipline on the author -- the block is parsed
+\emph{textually}, line by line:
+
+\begin{itemize}
+  \item \textbf{One key per line, values braced}, as in the example above. A
+    block reflowed onto a single line still \emph{compiles} fine, but the
+    problem silently vanishes from the script's index -- the one way to get the
+    two readers out of step.
+  \item \textbf{Write \texttt{\char`\\\#} for \texttt{\#}} (LaTeX requires it;
+    the script strips the backslash back out when reporting, so
+    \texttt{source = \{Stewart 3.1 \char`\\\#7\}} reports as
+    \texttt{Stewart 3.1 \#7}).
+\end{itemize}
+
+The recognised keys are \env{topics}, \env{tags}, \env{difficulty},
+\env{source}, and \env{id}. On the LaTeX side they are validated but discarded
+-- a mistyped key (\env{topic} for \env{topics}) errors at compile time, so
+typos cannot silently un-index a problem. Before inventing a new tag, run
+\texttt{find-problems -{}-vocab} to see the vocabulary already in use, and reuse
+it.
+
+The block is also optional insurance, not a hard dependency: the exercise
+system compiles problem files with or without \file{ProblemMeta.sty} loaded (a
+stub swallows the block), so tagging can be adopted -- or abandoned --
+without touching the bank.
+
+\subsection{Problems, hints, and solutions}
+
+\env{problem} numbers itself on a document-wide counter and is
+cross-referenceable. How the heading \emph{looks} -- ``Problem 7.'' here,
+``Q\,7'' with margin marks on a test, a run-in ``Example.'' in lecture notes --
+is the consuming class's business, through presentation hooks
+(section~\ref{sec:hooks}); the numbering and points bookkeeping stay in the
+environment, so no restyle can break the count.
+
+\env{hint} and \env{solution} ride along in the same file, each gated by its
+own layer:
+
+\begin{itemize}
+  \item \textbf{A solution is the answer key} -- shown only in a solutions
+    build, set in the green box you saw above. \env{solution}\texttt{[notitle]}
+    drops the corner tab, leaving a bare box.
+  \item \textbf{A hint is student-facing help} -- shown only in a hints build,
+    as a light run-in (deliberately plainer than a solution: a nudge, not the
+    answer). It sits inline where written, not collected at the end.
+\end{itemize}
+
+The two layers are independent: a hints build is not a solutions build, and a
+per-import key can force one problem's hint on or off against the document
+toggle (section~\ref{sec:assessments}).
+
+\subsection{Dependent parts in one file: \env{qparts}}
+
+When parts genuinely depend on each other -- one stem, sub-questions (a), (b),
+(c) -- they are \emph{one} problem and belong in \emph{one} file, with the
+parts marked by \cs{qpart}:
+
+\begin{manexample}
+\begin{problem}
+  Evaluate.
+  \begin{qparts}
+    \qpart Find $\lzoo{x}{x^{2}e^{x}}$.
+    \begin{solution}[notitle]
+      $2x\,e^{x} + x^{2}e^{x} = x\,e^{x}(x+2)$.
+    \end{solution}
+    \qpart Find $\lzoo{x}{x^{3}e^{x}}$.
+  \end{qparts}
+\end{problem}
+\end{manexample}
+
+Each part letters itself, and a solution (or hint) can follow its own
+\cs{qpart}. Per-part points and per-part workspace are supplied at the import
+site, for example \texttt{points=\{2,1\}} and \texttt{workspaces=\{4,4\}} --
+keeping even part-level grading extrinsic (section~\ref{sec:assessments}).
+
+The other thing people call ``parts'' -- \emph{independent} problems grouped
+under a shared instruction (``Evaluate the following:'') -- is not this. Those
+stay atomic one-problem files and are grouped at assembly time with
+\env{problemgroup} (section~\ref{sec:assessments}).
+
+\subsection{Multiple choice}
+
+An MC question is \emph{not} a separate problem type: it is a normal
+\env{problem} whose body carries a \env{choices} list -- so it numbers, grades,
+tags and imports exactly like everything else. Mark the key with the optional
+argument:
+
+\begin{manexample}
+\begin{problem}
+  What is the domain of $f(x)=\dfrac{\sqrt{x+1}}{x-7}$?
+  \begin{choices}
+    \choice{$\{x : x \ge -1\}$}
+    \choice{$\{x : x > -1\}$}
+    \choice[correct]{$\{x : x \ge -1,\ x \ne 7\}$}
+    \choice{$\{x : x > -1,\ x \ne 7\}$}
+  \end{choices}
+\end{problem}
+\end{manexample}
+
+The key is boxed \emph{only} in a solutions build (the green cue above -- gated
+by the same toggle as \env{solution}, so the answer never leaks into a student
+copy), and swapping which option is correct is an in-place edit. Marking
+several options \texttt{[correct]} makes a select-all-that-apply.
+
+One environment, three layouts:
+
+\begin{manexample}
+Is $f(x) = x^{3}$ even, odd, both, or neither?
+\begin{choices}[onepar]
+  \choice{Even}
+  \choice[correct]{Odd}
+  \choice{Both}
+  \choice{Neither}
+\end{choices}
+\end{manexample}
+
+\begin{itemize}
+  \item \emph{(default)} -- one option per line, for long options;
+  \item \texttt{[onepar]} -- inline, for short options as above;
+  \item \texttt{[grid]} -- a grid, \cs{ChoicesGridCols} wide (default 2),
+    row-major.
+\end{itemize}
+
+For a grid of \emph{graphs}, \cs{graphchoice}\texttt{[correct]\{FILE\}} is a
+\cs{choice} that sizes its image to the column and sets the letter beside it.
+This manual has no image files, so the grid below is source-only; the live
+version is \file{mc-graph-grid.tex} in the demo repo:
+
+\begin{manexsource}
+\begin{problem}
+  The graph of $y = f(x)$ has a horizontal tangent at $x = 1$. Which of
+  the following could be the graph of $y = f'(x)$?
+  \begin{choices}[grid]
+    \graphchoice{../images/cubic}
+    \graphchoice[correct]{../images/tangent}
+    \graphchoice{../images/parabola}
+    \graphchoice{../images/step}
+  \end{choices}
+\end{problem}
+\end{manexsource}
+
+\subsection{Matching}
+
+A matching question is likewise a normal \env{problem}. Left items carry the
+answer key intrinsically -- each names its match in the optional argument, shown
+(green-boxed) only in a solutions build:
+
+\begin{manexample}
+Match each function with its derivative.
+\begin{matching}
+  \leftitem[B]{$\sin x$}
+  \leftitem[C]{$\cos x$}
+  \leftitem[A]{$\tan x$}
+  \rightcolumn
+  \rightitem{$\sec^{2} x$}
+  \rightitem{$\cos x$}
+  \rightitem{$-\sin x$}
+  \rightitem{$\sec x \tan x$}
+\end{matching}
+\end{manexample}
+
+Left items letter in lowercase roman, right items in uppercase alphabetic --
+two visibly different systems, so ``match [i] with [C]'' can never be
+misread. The columns may have different lengths (distractors on the right, as
+above), and \cs{rightcolumn} splits them with a wide gap for students to draw
+their connecting lines in. Graph items reuse the \cs{graphchoice} sizing:
+\cs{leftgraph}\texttt{[X]\{FILE\}} / \cs{rightgraph}\texttt{\{FILE\}} put
+graphs on either side (see \file{mc-matching-graphs.tex} and
+\file{mc-matching-phrases.tex} in the demo repo for both orientations). There
+are deliberately no drawn answer arrows -- the inline key on the left item is
+the answer, and skipping arrows keeps the system TikZ-free.
+
+\subsection{Finding problems in the bank}\label{sec:find-problems-taste}
+
+The payoff for the metadata discipline -- from anywhere in the course repo:
+
+\begin{manexsource}
+$ find-problems --topic chain-rule --difficulty basic
+$ find-problems --vocab      # the tag vocabulary in use, with counts
+$ find-problems --untagged   # the tagging backlog
+$ find-problems --import     # print matches as paste-ready \import lines
+\end{manexsource}
+
+Filters combine (AND), match case-insensitively as regular expressions, and
+never run LaTeX. The full command reference is in
+section~\ref{sec:build-and-find}.

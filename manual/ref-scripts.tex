@@ -1,0 +1,46 @@
+\section{build-pdfs and find-problems}\label{sec:ref-scripts}
+
+Both scripts are documented in workflow terms in
+section~\ref{sec:build-and-find}; this is the terse recap. Each prints its
+full header with \texttt{-{}-help}.
+
+\subsection*{build-pdfs}
+
+\begin{manexsource}
+build-pdfs [FILE.tex ...]    # no args: every .tex in the cwd
+\end{manexsource}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.58\linewidth}@{}}
+views & \texttt{\%!\ views: solutions, hints, projector, instructor} in
+  the leading comment block; each produces \file{FILE-VIEW.pdf} by
+  injecting its layer definition(s). Unknown views warn and skip.\\
+output & per build directory: \file{OUTDIR}/\file{.OUTDIR} file
+  (path $+$ optional \texttt{BOTH}) $\to$ repo-root \file{.CLOUDDIR}
+  (tree-mirroring base) $\to$ local. Missing destinations warn and fall
+  back to local. \file{SAMPLE-OUTDIR} is the template.\\
+aux files & \file{~/.cache/latexmk/$\langle$repo-relative
+  key$\rangle$-$\langle$job$\rangle$/}.\\
+\end{tabular}
+\end{center}
+
+\subsection*{find-problems}
+
+\begin{manexsource}
+find-problems [--topic PAT] [--tag PAT] [--difficulty PAT]
+              [--source PAT] [--untagged] [--vocab] [--import]
+              [DIR ...]
+\end{manexsource}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.6\linewidth}@{}}
+\texttt{-{}-topic}, \texttt{-{}-tag}, \texttt{-{}-difficulty},
+  \texttt{-{}-source} & AND-combined filters; PAT is a case-insensitive
+  ERE matched per comma-separated item.\\
+\texttt{-{}-vocab} & print the tag/topic vocabulary with counts (filters
+  ignored).\\
+\texttt{-{}-untagged} & files with no \cs{ProblemMeta} block -- the
+  backlog.\\
+\texttt{-{}-import} & matches as paste-ready \cs{import} lines.\\
+\end{tabular}
+\end{center}

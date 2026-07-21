@@ -1,0 +1,131 @@
+\section{Exercises.sty}\label{sec:ref-exercises}
+
+The exercise system -- the \emph{essential} package, the one the course
+cannot be taught without. Small on purpose: counters, a handful of
+environments, conditionals and one import wrapper, in plain LaTeX.
+Self-contained: it does not depend on ProblemMeta (a stub swallows stray
+\cs{ProblemMeta} blocks if that package is absent), owns its own colour and
+tcolorbox loads, and works under any class. Authoring workflow:
+section~\ref{sec:problem-files}; assembly workflow:
+section~\ref{sec:assessments}.
+
+\subsection*{Environments}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.58\linewidth}@{}}
+\env{problem} & a numbered, cross-referenceable problem (flat document-wide
+  counter; \cs{counterwithin} to restart per section).\\
+\env{problemgroup}\texttt{\{STEM\}} & assembly-time grouping: ``Problem
+  $N$.''\ $+$ stem, members render as parts (a), (b). Label the group
+  \emph{inside} it, before the first part.\\
+\env{qparts} / \cs{qpart} & dependent parts \emph{within} one problem file,
+  lettered (a), (b); per-part points/workspace supplied at import.\\
+\env{solution}\texttt{[notitle]} & printed only in a solutions build;
+  the green box (\texttt{notitle} drops the corner tab). Zero-height
+  overlay by default (section~\ref{sec:overlay}).\\
+\env{hint} & printed only when this problem's hints are on; plain italic
+  run-in under a \cs{HintLabel}. Never an overlay.\\
+\env{choices}\texttt{[stacked$\vert$onepar$\vert$grid]} & lettered MC
+  options; \cs{choice}\texttt{[correct]\{...\}} marks the key (boxed only
+  in solutions), \cs{graphchoice}\texttt{[correct]\{FILE\}} is a graph
+  option.\\
+\env{matching} & two-column matching: \cs{leftitem}\texttt{[X]\{...\}} /
+  \cs{leftgraph}\texttt{[X]\{FILE\}}, then \cs{rightcolumn}, then
+  \cs{rightitem}\texttt{\{...\}} / \cs{rightgraph}\texttt{\{FILE\}}. The
+  \texttt{[X]} names the match, shown only in solutions.\\
+\env{problemchoice}\texttt{[select=, points=]} & choose-$N$-of-$M$: emits
+  the instruction on every member, counts select$\times$points once.\\
+\end{tabular}
+\end{center}
+
+\subsection*{Import commands}
+
+\cs{importproblem}\texttt{[OPTIONS]\{DIR\}\{FILE\}} wraps the \file{import}
+package's \cs{import} with per-import settings (keyval family
+\env{eximport}); \cs{importcheckin} is the same with the check-in flavour
+pre-set. Bare \cs{import} still works and yields no marker.
+
+\begin{center}
+\begin{tabular}{@{}l p{0.58\linewidth}@{}}
+\texttt{points=5} & the value (integer); a lone integer \texttt{[5]} is
+  shorthand for it -- but \emph{only} alone: \texttt{[5, hint]} errors,
+  write \texttt{[points=5, hint]}.\\
+\texttt{points=2*} & announced bonus: shown, labelled, off the total.\\
+\texttt{points=\{2,1*\}} & per-part list for a \env{qparts} file; star
+  individual parts.\\
+\texttt{pointseach=2} & the same value broadcast to every part.\\
+\texttt{workspaces=\{4,4\}} & per-part handwriting space, in
+  \cs{HandwritingLine}s.\\
+\texttt{nocount} & shown but off the total, marker unchanged (the quiet
+  variant; \texttt{*} is the announced one).\\
+\texttt{hint} / \texttt{nohint} & force this file's hint on/off against
+  the document toggle.\\
+\texttt{number=\{2.1.8\}} & literal display number (notes): heading and
+  \cs{ref} both read ``2.1.8''; no counter shown.\\
+\texttt{desc=\{...\}} & parenthetical after the heading (notes).\\
+\texttt{noprint} & skip the file entirely -- not read, no counter step, no
+  points, no label (deliberately not typeset-then-hide).\\
+\texttt{checkin} & wrap in the ``CHECK IN'' box with coloured A--E labels
+  (what \cs{importcheckin} sets).\\
+\end{tabular}
+\end{center}
+
+Keys a context ignores are tolerated by design -- \texttt{points=} under
+LectureNotes, \texttt{number=}/\texttt{desc=} under Assessment -- so one
+import line moves between documents unchanged.
+
+\cs{printtotalpoints} prints the two-pass sum of every \emph{counted,
+printed} problem (\texttt{??} on the first compile; latexmk reruns
+automatically).
+
+\subsection*{Toggles}
+
+\cs{ifsolutions} / \cs{ifhints} drive the two layers; they default from
+\cs{ShowSolutions} / \cs{ShowHints}, which build-pdfs injects per view
+(section~\ref{sec:build-and-find}). Hint visibility is three-state: the
+per-import keys override the document toggle.
+
+\subsection*{Presentation hooks}
+
+All display, no bookkeeping -- a class restyles these freely and can never
+break the count (defaults in parentheses; the class overrides are in
+sections \ref{sec:ref-assessment} and \ref{sec:ref-lecturenotes}):
+
+\begin{center}
+\begin{tabular}{@{}l p{0.5\linewidth}@{}}
+\cs{ProblemLabelWord} & the noun (\emph{Problem}).\\
+\cs{ProblemNumberText} & the formatted number (\emph{Problem N}) -- one
+  macro, so standalone headings and group stems always agree.\\
+\cs{ProblemHeadingFormat} & a top-level problem's whole heading (run-in
+  bold ``Problem N.''\ $+$ inline points).\\
+\cs{ProblemGroupHeadingFormat}\texttt{\{stem\}} & the group stem's
+  heading.\\
+\cs{ProblemPointsFormat}\texttt{\{n\}} & how points render (inline
+  ``($n$ points)'').\\
+\cs{ProblemBonusPointsFormat}\texttt{\{n\}} & the bonus twin (inline
+  ``($n$ points, bonus)'').\\
+\cs{QPartLabelFormat} & the part-letter style (\cs{alph}; also used by
+  refs, so ``N(a)'' agrees everywhere).\\
+\cs{ProblemChoiceInstruction} & the choose-$N$-of-$M$ wording (``Answer
+  any two of Questions 3--5.'').\\
+\cs{HintLabel} & the hint run-in (\textbf{HINT:}).\\
+\cs{ChoicesGridCols} & grid columns (2).\\
+\cs{ChoiceLabelFormat}\texttt{\{A\}} & the option label ([A] -- square:
+  round brackets are taken by parts and points, and Crowdmark bubbles are
+  rectangular).\\
+\cs{GraphChoiceValign} & label-to-graph alignment (\texttt{c}; \texttt{t}
+  / \texttt{b}).\\
+\cs{GraphLabelReserve} & width reserved beside a graph for its label
+  (2.4\,em).\\
+\cs{MatchColWidth}, \cs{MatchItemSep} & matching column width
+  (0.38\cs{linewidth}) and item gap (2\,ex).\\
+\cs{MatchKeyFormat}, \cs{CorrectChoiceFormat} & how the solutions-build
+  answer cues render -- both route through the shared green
+  \cs{SolutionCueBox}, so the two cues cannot drift apart
+  (knobs: \cs{SolutionCueRule}, \cs{SolutionCueSep}).\\
+\cs{CheckinChoiceLabel} & the check-in flashcard label (coloured A--E
+  boxes; F onward falls back to plain).\\
+\cs{CheckinHeaderSkip}, \cs{CheckinBodySkip} & vertical gaps inside the
+  check-in box.\\
+\end{tabular}
+\end{center}

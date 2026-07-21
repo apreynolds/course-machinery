@@ -1,0 +1,37 @@
+\section{ProblemMeta.sty}\label{sec:ref-problemmeta}
+
+Greppable problem metadata -- \emph{store-only}, and the nice-to-have half
+of the exercise system (Exercises works without it). One command:
+
+\begin{manexsource}
+\ProblemMeta{
+  topics     = {differentiation, power-rule},
+  tags       = {polynomial, routine},
+  difficulty = {basic},
+  source     = {Stewart 3.1 \#7},
+}
+\end{manexsource}
+
+Keys: \env{topics}, \env{tags}, \env{difficulty}, \env{source}, \env{id}.
+On the LaTeX side the block is \emph{validated but discarded}: a mistyped
+key errors at compile time; nothing is typeset. The real reader is
+\file{find-problems}, which parses the block textually off disk -- hence
+the two disciplines (one key per line with braced values, and \texttt{\#}
+written \texttt{\char`\\\#}) explained in section~\ref{sec:problemmeta}.
+
+Design notes worth keeping in mind:
+
+\begin{itemize}
+  \item \textbf{Intrinsic only.} Topics, tags, difficulty and source belong
+    to a problem forever. Points do not -- they are extrinsic, set at the
+    import site, and deliberately not a key here.
+  \item \textbf{Keys reset per block}, so a file that omits \env{source}
+    never inherits the previous import's value when several problems land
+    in one document.
+  \item \textbf{Removable.} If tagging is abandoned, delete the package:
+    Exercises' \cs{AtBeginDocument} stub swallows leftover blocks and every
+    document still builds.
+  \item A display layer (metadata printed in the margin of staff copies)
+    existed and was removed once no view wanted it; git history has it if
+    it is ever missed.
+\end{itemize}

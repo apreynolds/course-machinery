@@ -1,0 +1,61 @@
+\section{Workspace.sty}\label{sec:ref-workspace}
+
+Explicit handwriting whitespace, and the home of the overlay/solid
+machinery. The concepts -- reserved space, the overlay contract, solid
+mode -- are chapter~material (section~\ref{sec:overlay}); this is the
+surface.
+
+\subsection*{Commands}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{workspace} & 8 lines of handwriting room (the default).\\
+\cs{workspace}\texttt{[12]} & that many \cs{HandwritingLine}s.\\
+\cs{workspace}\texttt{[halfpage]} & half the text block, less one line --
+  so a line at the page top sits vertically centred.\\
+\cs{workspace}\texttt{[fullpage]} & the whole text block (text height, not
+  paper).\\
+\cs{workspace*} & fill to the bottom of the page (\cs{vfill}).\\
+\cs{FreshPage} & collapsible page break; content flows onto the fresh
+  page.\\
+\cs{FreshPage}\texttt{[blank]} & a dedicated empty page; content starts
+  the page after. The keyword is a visible reminder the blank is
+  deliberate.\\
+\cs{FreshPage}\texttt{[watermark]} & the blank page stamped with a faint
+  diagonal \cs{BlankPageText}.\\
+\cs{solidboxes} / \cs{overlayboxes} & the document-wide mode switch
+  (section~\ref{sec:overlay}).\\
+\end{tabular}
+\end{center}
+
+A leaf command, never a wrapper: \cs{workspace} sits \emph{between}
+content, so sources folded by content environments stay readable. Plain
+\cs{newpage} is untouched -- use it for the rare break that must never
+collapse.
+
+\subsection*{Knobs}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{HandwritingLine} & the unit (0.9\,cm); every line-count workspace
+  scales with it.\\
+\cs{WSOverlayGap} & how far below the previous line an overlay box paints
+  (\cs{medskipamount}), matched to the solid-mode top skip so the two
+  modes look alike.\\
+\cs{BlankPageText} & the watermark wording (``Blank page for extra
+  work'').\\
+\end{tabular}
+\end{center}
+
+\subsection*{For package authors}
+
+\cs{WSZeroHeight}\texttt{\{$\langle$a complete tcolorbox$\rangle$\}} is the
+seam the box packages use: in overlay mode it emits the box at zero height
+and depth, painting downward, with the following content placed exactly as
+if nothing had been emitted; in solid mode it is a pass-through. Exercises
+and InstructorNotes each carry an \cs{AtBeginDocument}
+\cs{providecommand} identity fallback, so they work without this package
+-- the narrow-coupling pattern discussed in
+section~\ref{sec:architecture}. Two properties follow from the mechanism:
+an overlay box never page-breaks (it is a fixed stamp), and one taller
+than its workspace overprints -- the intended alarm.

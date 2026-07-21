@@ -1,0 +1,57 @@
+\section{CourseDocument.cls}\label{sec:ref-coursedocument}
+
+The prose class: syllabus, TA information, policies -- and this manual.
+Article-based. Loads Typefaces \texttt{[osf]} (the only class with
+old-style body figures), Titling, Hyperlinks and InstructorNotes; no
+exercise machinery (a syllabus imports no problems -- add the packages in
+the preamble if a prose document ever needs them, as this manual does).
+Workflow: section~\ref{sec:prose-documents}.
+
+\subsection*{Class options}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.62\linewidth}@{}}
+\texttt{legalpaper} & legal stock.\\
+\emph{(other)} & forwarded to \file{article} (\texttt{11pt},
+  \texttt{twoside}, \dots).\\
+\end{tabular}
+\end{center}
+
+\subsection*{Colours, one name}
+
+The course identity colour is named once -- \env{CourseIdentity}, a
+mahogany -- and everything derives from it: \env{HeadingColor} and
+\env{TitleColour} (darkened blends), internal link colour, headings.
+Restyling a course document is a one-line \cs{colorlet}. The identity is
+deliberately not green: green means \emph{solutions / not for students}
+across the toolkit (\env{SolutionColor}), and a student-facing document
+must not read as green.
+
+\subsection*{Page styles}
+
+Two named styles, neither auto-activated -- \cs{maketitle} runs on
+\texttt{plain} so the title page stays bare, then each document opts in:
+
+\begin{center}
+\begin{tabular}{@{}l p{0.6\linewidth}@{}}
+\texttt{toc} & footer page number only; for the contents pages.\\
+\texttt{myfancy} & small-caps running section head, footer page number;
+  for the body.\\
+\end{tabular}
+\end{center}
+
+The canonical opening (used by the syllabus and this manual):
+\cs{maketitle}, \cs{pagestyle}\texttt{\{toc\}}, \cs{tableofcontents},
+\cs{newpage}, \cs{pagestyle}\texttt{\{myfancy\}}.
+
+\subsection*{Presentation choices}
+
+Sections are numbered three levels deep, set in coloured bold sans via
+\file{titlesec}. Paragraphs separate by a blank line, not an indent
+(\file{parskip} -- loaded \emph{before} titlesec; the order matters, see
+the gotchas in section~\ref{sec:gotchas}). The measure follows the
+toolkit-wide rule (\texttt{textwidth} $= 2.6\times$\cs{alphabet},
+section~\ref{sec:ref-typefaces}); margins balance 1:1 one-sided and 2:3
+two-sided, with a generous marginpar column for instructor notes. The
+Titling hooks are set to colour the title and stamp it \emph{at (time)} --
+these documents revise mid-term, and the stamp identifies the printing.

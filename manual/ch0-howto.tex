@@ -1,0 +1,37 @@
+\section{How to read this manual}
+
+This manual is compiled \emph{with} the toolkit it documents: its class is the
+shipped \file{CourseDocument}, its packages are the shipped ones, and every
+rendered example below is typeset by the real machinery at build time. If the
+manual builds, the toolkit works.
+
+Examples appear in boxes like this one -- the source on top is the \emph{same
+text} that produced the rendered result underneath, so the two can never drift
+apart:
+
+\begin{manexample}
+A limit shorthand from MathStuff:
+$\inflim \frac{1}{n} = 0$.
+\end{manexample}
+
+Three things to keep in mind while reading:
+
+\begin{itemize}
+  \item \textbf{Every content layer is switched on.} This manual forces
+    solutions, hints and (locally) instructor notes to display, because its job
+    is to show them. In a real course document these layers are \emph{off}; the
+    build script turns them on per view, producing separate student, solutions,
+    hints and instructor PDFs from one source. Part 1 explains that model.
+  \item \textbf{Counters are live.} A rendered \env{problem} steps the real
+    problem counter, so example problems number consecutively through the
+    manual, exactly as they would in a course document.
+  \item \textbf{Solid mode is active.} Boxes here occupy their natural height.
+    The default \emph{overlay} mode -- solution boxes of zero height that paint
+    into reserved whitespace so every view has identical page breaks -- has its
+    own chapter, and one live demonstration there.
+\end{itemize}
+
+Where to start: section~\ref{sec:quickstart} for the shape of a course
+repo, then whichever workflow you are sitting down to do. The reference
+(Part~\ref{part:reference}) and the architecture notes
+(Part~\ref{part:architecture}) are for looking things up later.

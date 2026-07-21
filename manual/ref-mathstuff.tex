@@ -1,0 +1,63 @@
+\section{MathStuff.sty}\label{sec:ref-mathstuff}
+
+The shared math-notation layer: pure \emph{macro} notation, always loaded,
+one file. The organising principle: a \cs{newcommand} is essentially free,
+so \emph{all} notation lives here with no per-subject split -- but anything
+that would \cs{RequirePackage} a nontrivial package (matrix tools,
+geometry) does \emph{not} belong here; package loads carry real cost and
+stay behind their own opt-in. Scope today: Calc I/II. Loads
+\file{mathtools}; must come after Typefaces (enforced by a
+\cs{PackageError}).
+
+\subsection*{Derivatives (Leibniz forms)}
+
+\begin{center}
+\begin{tabular}{@{}l l l@{}}
+\cs{lz}\texttt{\{y\}\{x\}} & $\lz{y}{x}$ &
+  \cs{lzn}\texttt{\{2\}\{y\}\{x\}} \ $\lzn{2}{y}{x}$\\[1ex]
+\cs{lzo}\texttt{\{x\}} & $\lzo{x}$ &
+  \cs{lzon}\texttt{\{2\}\{x\}} \ $\lzon{2}{x}$\\[1ex]
+\cs{lzoo}\texttt{\{x\}\{f\}} & $\lzoo{x}{f}$ &
+  \cs{lzoa}\texttt{\{y\}\{x\}\{a\}} \ $\lzoa{y}{x}{a}$\\
+\end{tabular}
+\end{center}
+
+Primed shorthands \cs{fp} \cs{fpp} \cs{Fp} \cs{Fpp} \cs{yp} \cs{gp}
+($\fp$, $\fpp$, $\Fp$, $\Fpp$, $\yp$, $\gp$) carry a hair of
+\cs{primeskip} so the prime clears the letter.
+
+\subsection*{Limits, series, statements}
+
+\begin{center}
+\begin{tabular}{@{}l l@{}}
+\cs{inflim} / \cs{inflim}\texttt{[x]} & $\inflim x_n$, \ $\inflim[x] f(x)$
+  (optional argument = the variable)\\[1ex]
+\cs{infser} / \cs{infser}\texttt{[0]} & $\infser \frac{1}{n^2}$ (optional
+  argument = the lower index)\\[1ex]
+\cs{deriv}\texttt{\{x\^{}2\}\{2x\}} & $\deriv{x^2}{2x}$\\[1ex]
+\cs{myint}\texttt{\{2x\}\{x\^{}2\}} & $\myint{2x}{x^2}$\\
+\end{tabular}
+\end{center}
+
+\subsection*{Delimiters, operators, misc}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+\cs{abs}, \cs{norm} & paired delimiters: $\abs{x}$, $\norm{v}$; starred
+  forms auto-scale (\cs{abs*}\texttt{\{...\}}), and an optional
+  \texttt{[\char`\\big]} picks a size.\\
+\cs{sech}, \cs{csch} & proper operators (upright, spaced): $\sech x$,
+  $\csch x$.\\
+\cs{ds} & \cs{displaystyle} shorthand.\\
+\cs{mathN} & $\mathN$.\\
+\cs{lsim} & $\lsim p$ (tilde as logical negation).\\
+\cs{hreq} & $\hreq$ (equals by l'H\^opital).\\
+\cs{thet} & $\thet$.\\
+\cs{dx}, \cs{dy}, \cs{ddz} & $\dx$, $\dy$, $\ddz$.\\
+\cs{zerooverzero} & the quoted indeterminate form
+  $\zerooverzero$.\\
+\end{tabular}
+\end{center}
+
+(\cs{oldstylenums} and \cs{liningnums} look like notation but live in
+Typefaces, with the rest of the figure policy.)

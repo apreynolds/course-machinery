@@ -1,0 +1,75 @@
+% The course-machinery manual. Compiled WITH the machinery it documents: the
+% class and packages below are the shipped ones, loaded exactly as a course
+% document would load them -- so if the manual builds, the toolkit works.
+\documentclass{CourseDocument}
+
+% CourseDocument itself loads Typefaces[osf], Titling, Hyperlinks and
+% InstructorNotes. The manual adds the rest of the toolkit so it can DEMONSTRATE
+% it, in the same order LectureNotes.cls loads it (the canonical order; see the
+% load-order contract in Part 3).
+\usepackage{Exercises}
+\usepackage{ProblemMeta}
+\usepackage{Workspace}
+\usepackage{MathStuff}
+\usepackage{CourseBoxes}
+
+% Manual-local example machinery (source-plus-rendered blocks). Not shipped.
+\usepackage{manual-style}
+
+% Force every content layer ON: the point of the manual is to SHOW solutions,
+% hints and instructor notes. In a real course document these are off and
+% injected per-view by build-pdfs; see "How to read this manual".
+\solutionstrue
+\hintstrue
+
+% Solid mode: boxes at natural height, so rendered examples stack normally.
+% The default overlay mode (zero-height boxes painting into reserved
+% \workspace) is demonstrated -- and explained -- in its own chapter.
+\solidboxes
+
+\title{The Course Machinery}
+\subtitle{Guide and reference for \texttt{.course-machinery}\\[1ex]
+  \normalfont\normalsize\itshape three document classes, the exercise system,
+  and the build scripts}
+
+\begin{document}
+
+% The canonical CourseDocument opening (documented in CourseDocument.cls:
+% \maketitle runs on the plain page style, the TOC gets its own, and the
+% running head starts after) -- the same idiom a syllabus uses.
+\maketitle
+\pagestyle{toc}
+\tableofcontents
+\newpage
+\pagestyle{myfancy}
+
+\input{ch0-howto}
+
+\part{Workflows}
+\input{ch1-quickstart}
+\input{ch2-problem-files}
+\input{ch3-lectures}
+\input{ch4-assessments}
+\input{ch5-prose-documents}
+\input{ch6-build-and-find}
+\input{ch7-overlay-contract}
+
+\part{Reference}\label{part:reference}
+\input{ref-assessment}
+\input{ref-lecturenotes}
+\input{ref-coursedocument}
+\input{ref-exercises}
+\input{ref-problemmeta}
+\input{ref-courseboxes}
+\input{ref-instructornotes}
+\input{ref-workspace}
+\input{ref-mathstuff}
+\input{ref-typefaces}
+\input{ref-titling-hyperlinks}
+\input{ref-scripts}
+\input{ref-knobs}
+
+\part{Architecture and Extending}\label{part:architecture}
+\input{ch-architecture}
+
+\end{document}

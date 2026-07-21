@@ -1,0 +1,71 @@
+\section{CourseBoxes.sty}\label{sec:ref-courseboxes}
+
+Theorem-like boxes in two families, both built on amsthm heads inside
+tcolorbox frames:
+
+\begin{itemize}
+  \item \textbf{Text results} -- things that live in the course text and
+    carry the number the text gives them. The number is \emph{declared}
+    (typed at the call site), not counted, so the machinery is
+    numbering-scheme-agnostic; \cs{label}/\cs{ref} record the typed number.
+  \item \textbf{Asides} -- the instructor's pedagogical interjections.
+    Unnumbered, and deliberately not \cs{label}-able: a stray label prints
+    \texttt{[unlabelled aside]} -- loud -- rather than silently grabbing
+    the section number.
+\end{itemize}
+
+Load-order contract: amsthm must already be loaded, which Typefaces'
+newtxmath owns -- so CourseBoxes comes \emph{after} Typefaces (enforced by
+a \cs{PackageError}); hyperref (for the boxes' link anchors) arrives via
+Hyperlinks in time for body use. Section~\ref{sec:load-order} has the whole
+ordering story.
+
+\subsection*{Shipped vocabulary}
+
+Universal text results (every textbook has them):
+\env{theorem}, \env{proposition}, \env{lemma}, \env{corollary} (italic
+body); \env{definition}, \env{example}, \env{remark} (upright body). Call
+site: \texttt{\char`\\begin\{theorem\}\{2.1.3\}[Power Rule]}.
+
+Shared asides (the author's voice, consistent course to course):
+\env{caution} (red, warning glyph), \env{takeaway} (blue),
+\env{yourturn} (blue, pen glyph), \env{prepwork} (blue, book glyph), and
+\env{tip}\texttt{[surviving$\vert$thriving]} (orange; the optional tier
+appends ``for the \emph{surviving/thriving}'' to the head).
+
+Text-\emph{specific} vocabulary (Key Idea, Axiom, \dots) deliberately does
+not ship here -- it is declared per course in \file{course-vocab.tex} with
+the factories below (section~\ref{sec:extending}).
+
+\subsection*{The factories}
+
+\begin{center}
+\begin{tabular}{@{}l p{0.5\linewidth}@{}}
+\cs{NewTextResult}\texttt{[head]\{env\}\{Name\}\{box\}} & declare a
+  numbered text result; call site
+  \texttt{\char`\\begin\{env\}\{num\}[name]}. Default head \env{cbdefn}
+  (upright); pass \env{cbthm} for italic.\\
+\cs{NewAside}\texttt{[head]\{env\}\{Name\}\{box\}} & declare an unnumbered
+  aside. Default head \env{cbaside} (black sans).\\
+\end{tabular}
+\end{center}
+
+\subsection*{Restyling knobs}
+
+Named once, referenced everywhere -- each is a one-line edit:
+
+\begin{center}
+\begin{tabular}{@{}l p{0.55\linewidth}@{}}
+tcolorbox styles & \env{cb/textresult} (quiet grey L-rule),
+  \env{cb/note} (blue box), \env{cb/caution} (red), \env{cb/tip}
+  (orange).\\
+amsthm head styles & \env{cbthm}, \env{cbdefn}, \env{cbaside},
+  \env{cbnote}, \env{cbnotecolon} (colon punctuation), \env{cbcaution},
+  \env{cbtip}. Head punctuation is the style's sixth argument.\\
+colours & \env{ThmColor} (grey), \env{NoteColor} (royal blue),
+  \env{CautionColor} (red), \env{TipColor} / \env{TipTextColor}
+  (orange; the darker text value keeps WCAG contrast). Provisional
+  pending a colour-blind-safe palette pass; the head glyphs
+  (fontawesome, monochrome) are the colour-independent channel.\\
+\end{tabular}
+\end{center}

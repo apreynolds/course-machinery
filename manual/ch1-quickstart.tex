@@ -1,0 +1,85 @@
+\section{Quickstart: anatomy of a course repo}\label{sec:quickstart}
+
+A course lives in one repository, organised by topic, with this machinery in
+a hidden subdirectory. The demo course (\file{math101-demo}) is the
+reference layout:
+
+\begin{manexsource}
+math101-demo/
+  .course-machinery/   the toolkit (classes, packages, scripts)
+  .latexmkrc           puts the machinery on TEXINPUTS
+  .CLOUDDIR            optional PDF mirror destination
+  course-vocab.tex     per-course vocabulary
+  differentiation/     a topic
+    problems/          problem bank: one problem per file
+    lectures/          LectureNotes masters (+ .latexmkrc)
+    facts/             preamble-less snippets to \import
+    images/
+  curve-sketching/     ... more topics, same shape ...
+  _assessment/         Assessment masters (+ .latexmkrc)
+  _syllabus/           CourseDocument masters (+ .latexmkrc)
+\end{manexsource}
+
+Three document classes cover every document a course produces -- when you
+sit down to write, the only decision is which one:
+
+\begin{itemize}
+  \item \file{Assessment} -- anything graded or handed in: tests, finals,
+    quizzes, homework (\texttt{[noid]}), worksheets. Clear and standard;
+    nothing fancy. Section~\ref{sec:assessments}.
+  \item \file{LectureNotes} -- lecture handouts, with a projector view for
+    the room. Big type, board space, imported examples.
+    Section~\ref{sec:lectures}.
+  \item \file{CourseDocument} -- prose documents: syllabus, TA info,
+    policies. Coloured headings, TOC, reading measure.
+    Section~\ref{sec:prose-documents}.
+\end{itemize}
+
+Underneath them, shared packages supply the content machinery -- the same
+problem environments, boxes, whitespace commands and fonts everywhere, so
+one problem file moves freely between a test and a lecture. You rarely load
+any of them yourself; the class does (Part~\ref{part:reference} documents
+each).
+
+\subsection{The wiring}
+
+Documents name their class plainly -- \cs{documentclass}\texttt
+{\{LectureNotes\}} -- and never spell out where it lives. The
+\file{.latexmkrc} in each \file{.tex}-holding directory makes that work: it
+walks up to the repo root and puts \file{.course-machinery//} on
+\env{TEXINPUTS} for that build. The copies are identical; creating a new
+topic folder means copying one file in.
+
+Cross-file inclusion uses the \file{import} package's relative paths:
+a lecture pulls \file{../problems/find-derivative.tex}, the midterm pulls
+\file{../differentiation/problems/}\allowbreak\file{find-derivative.tex} --
+the \emph{same} file, and any images that file loads resolve against the
+\emph{file's own} directory, so one source serves every consumer.
+
+The one course-wide content file is \file{course-vocab.tex} at the repo
+root: the vocabulary this course's textbook uses (its named result boxes,
+the noun lectures call an example). Masters \cs{input} it in the preamble
+by relative path; section~\ref{sec:extending} explains what belongs there
+and why it is guarded.
+
+\subsection{The five-minute loop}
+
+Day to day, the toolkit is a three-step loop:
+
+\begin{enumerate}
+  \item \textbf{Write or find problems.} One file per problem in a topic's
+    \file{problems/}, tagged; \texttt{find-problems -{}-topic ...} to
+    rummage (sections \ref{sec:problem-files}, \ref{sec:build-and-find}).
+  \item \textbf{Assemble a document.} A master imports problems (with
+    points, on a test; as examples, in a lecture) and declares its views
+    in the \texttt{\%! views:} comment.
+  \item \textbf{Build.} \texttt{build-pdfs} in the document's directory
+    compiles everything there -- student PDF plus each declared view,
+    routed to the synced mirror if one is configured
+    (section~\ref{sec:build-and-find}).
+\end{enumerate}
+
+The rest of Part~1 walks these in order; Part~\ref{part:reference} is the
+per-file reference; Part~\ref{part:architecture} explains the architecture
+-- the load-order contract, the view/layer model, and how to extend the
+vocabulary -- for the day you want to change the machinery itself.
