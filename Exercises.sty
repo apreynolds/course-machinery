@@ -125,6 +125,13 @@
 % the per-import override layered on top, so both frameworks coexist.
 \newcommand{\CurrentProblemHint}{inherit}
 
+% Whether the file just imported actually CONTAINS a hint environment -- set by
+% \begin{hint} whether or not the hint displays, reset per import. Read after
+% the \import to catch [hint] forced on a hint-less file: you explicitly asked
+% for a hint to show in every build and nothing would appear, in build variants
+% you may never proof -- so that silence earns a warning (see \importproblem).
+\newif\ifEx@hintseen
+
 % Literal display number for the current problem, set by \importproblem's
 % `number' key. Empty (the default) means the CONTEXT decides: on a test the
 % `problem' counter numbers it; in lecture notes it prints unnumbered. A
@@ -302,6 +309,11 @@
 % marker (e.g. a lecture, ungraded). The trailing reset restores every default for
 % whatever follows -- a safety net for a file that sets no problem to consume them.
 %
+% Nonsensical-but-compilable combinations WARN (never error): checkin with a
+% points spec, points={...} together with pointseach, [hint] on a file carrying
+% no hint environment, and (in the env itself) a problemchoice member with its
+% own points=. See the "Consistency warnings" block above \importproblem.
+%
 % New per-import axes slot in here as one more key (a future notes-to-marker note,
 % per-part points, ...), which is why the interface moved to keyval.
 % A COMMA in the value marks a case-2 positional list (points={1,1,2}); anything
@@ -351,6 +363,8 @@
   \gdef\CurrentProblemPoints{}%
   \gdef\CurrentProblemCounts{1}%
   \gdef\CurrentProblemHint{inherit}%
+  \global\Ex@hintseenfalse
+
   \gdef\CurrentProblemNumber{}%
   \gdef\CurrentProblemDesc{}%
   \global\CurrentProblemPrinttrue
@@ -377,6 +391,25 @@
         \IfInteger{\bonus@core}{\bonus@scalar{#1}}{\setkeys{eximport}{#1}}}%
        {\setkeys{eximport}{#1}}}%
 }
+% ---- Consistency warnings (warnings, NOT errors) ---------------------------
+% The guarded combinations all COMPILE and even render plausibly -- the danger
+% is that the page silently stops saying what the source says (points counted
+% but never shown, a spec quietly ignored, a requested hint that cannot appear).
+% Anything that would corrupt the bookkeeping outright is an error elsewhere;
+% these are the one-notch-down cases. Deliberately NOT warned: presentation keys
+% a class ignores by design (points= under LectureNotes, number=/desc= under
+% Test) -- that cross-context tolerance is the point of the extrinsic model.
+%
+% checkin + a points spec: check-in mode suppresses the problem heading (the box
+% header is the label) -- which is exactly where a class prints the number and
+% the marks. So the points can never display, yet counted points still enter the
+% total: the cover's total stops matching the visible marks.
+\newcommand{\Ex@warn@checkinpoints}{%
+  \PackageWarning{Exercises}%
+    {checkin suppresses the problem heading, so its points can\MessageBreak
+     never display -- but counted points still enter the total.\MessageBreak
+     Drop the points spec, or the checkin key}}
+
 % The import is wrapped in the check-in box only when `checkin' is set -- the box
 % (\CheckinBox@begin/@end) is defined in the MULTIPLE CHOICE section. Splitting
 % the box's begin/end across \import is fine: \import introduces no group that
@@ -385,9 +418,31 @@
   \importproblem@reset
   \importproblem@opts{#1}%
   \ifCurrentProblemPrint
+    % Consistency warnings (see the block above). Points spec = a scalar OR
+    % either case-2 mode; conflicting case-2 specs = list AND broadcast at once
+    % (the positional list wins in \ExPart, so pointseach would be ignored).
+    \ifcheckinmode
+      \ifdefempty{\CurrentProblemPoints}
+        {\ifPartsListMode\Ex@warn@checkinpoints\else
+           \ifPartsEachMode\Ex@warn@checkinpoints\fi\fi}
+        {\Ex@warn@checkinpoints}%
+    \fi
+    \ifPartsListMode\ifPartsEachMode
+      \PackageWarning{Exercises}%
+        {both points={...} and pointseach given; the positional\MessageBreak
+         list wins and pointseach is ignored}%
+    \fi\fi
     \ifcheckinmode\CheckinBox@begin\fi
     \import{#2}{#3}%
     \ifcheckinmode\CheckinBox@end\fi
+    % [hint] promised this problem's hint in EVERY build -- if the file carries
+    % no hint environment at all, that promise is silently broken; say so.
+    \ifdefstring{\CurrentProblemHint}{on}{%
+      \ifEx@hintseen\else
+        \PackageWarning{Exercises}%
+          {hint forced on, but `#3' contains no hint\MessageBreak
+           environment -- no hint will show in any build}%
+      \fi}{}%
   \fi
   \importproblem@reset
 }
@@ -522,6 +577,16 @@
     % mark (members carry no points= of their own), and do NOT add to the total --
     % the group adds select*value ONCE at \end{problemchoice}. Count the member for
     % the select<=M guard.
+    %
+    % A member that DOES carry its own points= is flagged: the group's shared
+    % value is the one source, so the member's own would either be silently
+    % clobbered (group value set) or shown-but-never-counted (group value
+    % empty) -- both quiet divergences between the page and the total.
+    \ifdefempty{\CurrentProblemPoints}{}{%
+      \PackageWarning{Exercises}%
+        {problemchoice member carries its own
+         points=\CurrentProblemPoints, which is never\MessageBreak
+         counted -- declare one shared points= on the group instead}}%
     \ifdefempty{\pchoice@val}{}{\def\CurrentProblemPoints{\pchoice@val}}%
     \stepcounter{pchoicemembers}%
   \else
@@ -1005,6 +1070,9 @@
 % states to one boolean the emit-or-drop below reads.
 \newif\ifshowhint
 \NewEnviron{hint}{%
+  % Record that the imported file HAS a hint, shown or not -- \importproblem
+  % reads this to warn when [hint] is forced on a hint-less file.
+  \global\Ex@hintseentrue
   \showhintfalse
   \ifdefstring{\CurrentProblemHint}{on}{\showhinttrue}{%
     \ifdefstring{\CurrentProblemHint}{off}{}{\ifhints\showhinttrue\fi}%
