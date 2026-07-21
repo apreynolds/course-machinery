@@ -30,8 +30,17 @@
 
 \RequirePackage[T1]{fontenc}
 
-\let\CheckCommand\providecommand % silences a microtype warning: https://tex.stackexchange.com/q/511711
+% Silence a spurious microtype \CheckCommand warning ("\showhyphens has
+% changed") by disarming the check, then restoring \CheckCommand -- a bare \let
+% would leave it disabled for the whole document. The restore must be an
+% \AtBeginDocument hook, NOT a line after the load: microtype runs its checks
+% from its own begin-document hook (registered during its load, so it fires
+% before this one, which is registered after).
+% https://tex.stackexchange.com/q/511711
+\let\Typefaces@CheckCommand\CheckCommand
+\let\CheckCommand\providecommand
 \RequirePackage[tracking=true]{microtype}
+\AtBeginDocument{\let\CheckCommand\Typefaces@CheckCommand}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TYPEFACE SELECTIONS
