@@ -138,14 +138,16 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PARAGRAPHS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% skip=1em, deliberately airier than parskip's default (.5\baselineskip plus 2pt)
-% -- 10x3 chose this for lectures alone. Reads as a pedagogical call (room to
-% annotate, legible at a distance), not a typographic one; it is also the trade
-% against the display-math argument, since parskip weakens the
-% continuation-vs-new-paragraph cue after a display. Keep knowingly.
+% skip=1em, deliberately airier than parskip's default (.5\baselineskip plus
+% 2pt), and font-size-relative -- the air scales with the type (14pt handout,
+% 17pt projector). A pedagogical call (room to annotate, legible at a
+% distance), not a typographic one; it is also the trade against the
+% display-math argument, since parskip weakens the continuation-vs-new-paragraph
+% cue after a display. Keep knowingly.
 %
-% Loaded BEFORE titlesec, as 10x3 did. See CourseDocument.cls / NOTE.md
-% "Paragraphs" on the silent-patch hazard.
+% Loaded BEFORE titlesec. See CourseDocument.cls on parskip's silent-patch
+% hazard (grep the log for "Couldn't patch"; gotchas in
+% manual/ch-architecture.tex).
 \RequirePackage[skip=1em]{parskip}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -159,7 +161,9 @@
 \setcounter{tocdepth}{3}
 
 % titlesec calls \<name>break before each such title (titlesec.sty:435-437), so
-% this really does \clearpage before every subsection. Deliberate in 10x3.
+% this really does \clearpage before every subsection. It looks inert because
+% titlesec never mentions the name -- the hook is built dynamically via
+% \csname#6break\endcsname. Deliberate, not dead code.
 \newcommand{\subsectionbreak}{\clearpage}
 
 \titleformat{\section}[block]
@@ -167,13 +171,9 @@
 
 \titleformat{\subsection}[block]
   {\sffamily\bfseries\large}{\thesubsection}{0.7em}{}[]
-% 10x3 had `{\thesection-\thesubsection asdd}' here -- a stray typo, dormant only
-% because secnumdepth=1 leaves subsections unnumbered, so titlesec never
-% typesets the label. Dropped.
 
 \titleformat{\subsubsection}[block]
   {\sffamily\bfseries\itshape}{\thesubsubsection}{1em}{}[]
-% 10x3 had `{\thesection}' here -- the wrong counter, dormant for the same reason.
 
 %USAGE: \titlespacing*{command}{left}{before-sep}{after-sep}[right-sep]
 \titlespacing*{\section}{0em}{2em}{1em}[0em]

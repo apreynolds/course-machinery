@@ -2,16 +2,16 @@
 \ProvidesPackage{Titling}[2026/07/15 Shared title block for course documents]
 
 % \subtitle + \maketitle, shared by LectureNotes.cls and CourseDocument.cls.
-% The two 10x3 originals were structurally identical -- title / subtitle /
-% "Updated <date>" -- and differed only in colour, a timestamp, and an
-% instructor marker. Those three are hooks below; the structure is here, once.
+% The structure -- title / subtitle / "Updated <date>" -- lives here, once;
+% everything the two classes want done differently (colour, a timestamp, an
+% instructor marker) is a hook below, defaulting to plain.
 %
 % Assessment.cls deliberately does NOT load this. An assessment opens with
 % \AssessmentTitle -- a NAME/ID box on an empty pagestyle -- which is a
 % different artefact, not a styled title.
 
-% Both originals loaded datetime2 identically, and it is \@date's formatter,
-% so it belongs with the title block rather than in either class.
+% datetime2 is \@date's formatter, so it belongs with the title block rather
+% than in either class.
 \RequirePackage[en-GB]{datetime2}
 \DTMlangsetup[en-GB]{ord=raise,monthyearsep={,\space}}
 

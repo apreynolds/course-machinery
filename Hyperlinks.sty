@@ -28,8 +28,6 @@
 % amsthm...), so anything loaded AFTER it can silently undo those patches. It
 % must therefore load after every package the DOCUMENT loads, not merely after
 % this class -- which is what \AtEndPreamble gives and \AtEndOfClass does not.
-% (10x3 had it both ways: its LectureNotes used \AtEndPreamble and was right; its
-% CourseDocument used \AtEndOfClass and was wrong.)
 \AtEndPreamble{%
   \RequirePackage{hyperref}%
   \hypersetup{%

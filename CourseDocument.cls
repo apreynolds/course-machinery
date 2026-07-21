@@ -33,9 +33,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GEOMETRY
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% The measure rule is the DEFAULT here. 10x3 hid it behind a `nicemargins'
-% option that only its two most polished documents passed; without it you get
-% article's stock 1in margins, i.e. ~90 characters a line, well past readable.
+% The measure rule is the DEFAULT here -- there is no option to opt out.
+% Without it you get article's stock 1in margins, i.e. ~90 characters a line,
+% well past readable.
 %
 % legalpaper first: \paperwidth must be settled before the marginparwidth
 % \dimexpr below reads it.
@@ -56,12 +56,11 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % COLOURS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 10x3 wrote `Black!20!OliveGreen' inline in four places (title, three headings,
-% hyperref linkcolor), so the identity colour could not be changed in one place.
-% Named once here instead. Moved OFF green (was OliveGreen): green now means
-% "solutions / not for students" (SolutionColor in Exercises.sty), so a
-% student-facing course document must not read as green. Mahogany is the rich
-% brownish-red replacement.
+% The identity colour is named ONCE here and derived everywhere it appears
+% (title, headings, hyperref linkcolor), so it can be changed in one place.
+% NOT green: green means "solutions / not for students" (SolutionColor in
+% Exercises.sty), so a student-facing course document must not read as green.
+% Mahogany is the rich brownish-red choice.
 \RequirePackage{xcolor}
 \colorlet{CourseIdentity}{Mahogany}
 \colorlet{HeadingColor}{Black!20!CourseIdentity}
@@ -73,8 +72,7 @@
 % No \TitleMarker override: the instructor-copy signal is the page-edge frame
 % (InstructorNotes.sty), not a title stamp.
 
-% Hyperlinks hooks: internal links pick up the identity colour, as 10x3 had it
-% (it wrote Black!20!OliveGreen inline here too -- same four-places problem).
+% Hyperlinks hooks: internal links pick up the identity colour.
 \renewcommand{\LinkColor}{HeadingColor}
 \renewcommand{\UrlColor}{Black!20!RoyalBlue}
 
@@ -84,10 +82,12 @@
 % Blank line between paragraphs instead of an indent -- one paragraph-boundary
 % signal, not two. Default skip (.5\baselineskip plus 2pt).
 %
-% Loaded BEFORE titlesec, as 10x3 did. parskip patches LaTeX's \@startsection at
-% load time and titlesec's own machinery at \AtBeginDocument, so it compensates
-% for the \parskip that would otherwise double up after every heading. Those
-% patches fail SILENTLY (a \typeout, not a warning) -- see NOTE.md "Paragraphs".
+% Loaded BEFORE titlesec. parskip patches LaTeX's \@startsection at load time
+% and titlesec's own machinery at \AtBeginDocument, so it compensates for the
+% \parskip that would otherwise double up after every heading. Those patches
+% fail SILENTLY (a \typeout, not a warning): after any titlesec or amsthm
+% upgrade, grep the log for "Couldn't patch" -- see the gotchas in
+% manual/ch-architecture.tex.
 \RequirePackage{parskip}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -110,14 +110,14 @@
 
 \titleformat{\subsubsection}[block]
   {\sffamily\bfseries\itshape\color{HeadingColor}}{\thesubsubsection}{0.5em}{}
-\titlespacing*{\subsubsection} % 10x3 said \subsection here -- copy-paste bug, so
-  {0pt}{4.5ex plus 1ex minus .2ex}{2ex plus .2ex} % subsubsec spacing never applied
+\titlespacing*{\subsubsection}
+  {0pt}{4.5ex plus 1ex minus .2ex}{2ex plus .2ex}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HEADERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Two named styles, neither activated -- deliberate, matching 10x3. \maketitle
-% runs before the document picks a style, so the title page stays on `plain';
+% Two named styles, neither activated -- deliberate. \maketitle runs
+% before the document picks a style, so the title page stays on `plain';
 % defaulting to `myfancy' here would put a running head on it. Documents do:
 %   \maketitle  \pagestyle{toc}  \tableofcontents  \newpage  \pagestyle{myfancy}
 \RequirePackage{fancyhdr}

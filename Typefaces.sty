@@ -3,11 +3,6 @@
 
 % The Libertinus stack. Every course class loads this and nothing else
 % font-related, so the typefaces are chosen once, here.
-%
-% Assembled from two sources that each had half the answer:
-%   5create/latex/fonts/1-libertinus.tex  -- osf body text, sans \course, mathalpha
-%   math10x3 custom-cls-sty/CourseDocument.cls -- sans pinned to lining
-% Neither combined them; the combination is what's below.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OPTIONS
@@ -78,8 +73,8 @@
 ]{newtxmath}
 
 % Fancier math alphabets: \mathcal, \mathscr, \mathfrak, \mathbb.
-% `mathalpha' is the current name for what used to be `mathalfa' -- same package,
-% renamed by its author; the old 10x3 classes load it under the legacy name.
+% `mathalpha' is the current name for what used to be `mathalfa' -- the same
+% package, renamed by its author; older documents load it under the legacy name.
 % stixtwoplain/stixtwofancy keep \mathcal and \mathscr visually distinct.
 \RequirePackage[
   scr=stixtwofancy, scrscaled=1.02,

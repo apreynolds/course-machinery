@@ -3,8 +3,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % WHAT THIS IS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% The roll-your-own exercise system -- the homegrown answer to NOTE.md item 4,
-% built instead of resurrecting xsim. It provides:
+% The roll-your-own exercise system, built instead of adopting xsim (the
+% why-not is recorded in manual/ch-architecture.tex). It provides:
 %
 %   \begin{problem} ... \end{problem}     numbered, cross-referenceable
 %   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
@@ -24,9 +24,8 @@
 %
 % plus the independent \ifsolutions / \ifhints toggles that drive those two
 % environments. Deliberately small: counters, a few environments, conditionals,
-% one import wrapper -- all LaTeX primitives, none of xsim's expensive machinery.
-% See NOTE.md item 4 for
-% why that boundary is safe.
+% one import wrapper -- all LaTeX primitives, none of xsim's expensive machinery
+% (manual/ch-architecture.tex records why that boundary is safe).
 %
 % SELF-CONTAINED ON PURPOSE. This is the ESSENTIAL package -- problem sets with
 % optionally-printed solutions, the thing the course cannot be taught without.
@@ -36,9 +35,9 @@
 % problem file that still contains a \ProblemMeta{...} block compile even when
 % ProblemMeta is absent -- the block is silently swallowed.
 %
-% VOCABULARY NOTE: the package is "Exercises" (NOTE.md's name for the system),
-% but the author-facing environment is \begin{problem} -- the word the content
-% already uses and the one Patrick is accustomed to. The mismatch is intentional.
+% VOCABULARY NOTE: the package is named "Exercises", but the author-facing
+% environment is \begin{problem} -- the word course content already uses.
+% The mismatch is intentional.
 
 \RequirePackage{environ}       % \NewEnviron: capture a body to conditionally emit
 \RequirePackage{etoolbox}      % \ifdefempty, \ifdefstring
@@ -81,7 +80,7 @@
 % This lived in Assessment.cls as scaffolding. Moved here so it is SHARED: a problem
 % file that carries its own \begin{solution} (or \begin{hint}) can now be
 % \import-ed into a LECTURE (LectureNotes) as well as a test, which it could not
-% when only Assessment.cls knew the machinery. That was NOTE.md item 4's open gap.
+% when only Assessment.cls knew the machinery.
 \newif\ifsolutions
 \ifdefined\ShowSolutions \solutionstrue \fi
 \newif\ifhints
@@ -951,7 +950,7 @@
 % SOLUTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ForestGreen is a dvipsnames colour. Green reads as "answer" and stays clear of
-% the OliveGreen course identity used for headings. Named once here so it can be
+% the course-identity colour used for headings. Named once here so it can be
 % retuned in one place.
 \colorlet{SolutionColor}{ForestGreen}
 
@@ -961,9 +960,8 @@
 %
 %   ex/answerbox={COLOUR}       the box itself -- light fill, thin frame, sharp
 %                               corners, leftskip-aware width. NO tab.
-%   ex/answertab={COLOUR}{WORD} the small white-on-colour tab hung over the top-
-%                               left border (the SolutionBox look from the old
-%                               custom-cls-sty).
+%   ex/answertab={COLOUR}{WORD} the small white-on-colour tab hung over the
+%                               top-left border.
 %
 % Composed into ex/solution (box + tab) and ex/solutionplain (box only, for
 % \begin{solution}[notitle]). Splitting the tab out is what makes it suppressible:
@@ -1352,8 +1350,8 @@
 % (e.g. phrases) and the other tall (e.g. graphs), the short column floats to the
 % vertical middle of the tall one, giving a symmetric connecting-line gap instead
 % of a lopsided bottom wedge. Degrades gracefully with unequal counts -- no row
-% pairing is assumed. (If even spacing within the columns is later wanted, that is
-% the heavier measure-both-then-distribute job; see NOTE-PROBLEMS.md item 4.)
+% pairing is assumed. (If even spacing within the columns is later wanted, that
+% is the heavier measure-both-then-distribute job -- parked, not built.)
 \newcounter{matchleft}
 \newcounter{matchright}
 \newlength{\match@colwidth}
