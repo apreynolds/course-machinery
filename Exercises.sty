@@ -78,10 +78,10 @@
 % answer key -- different audiences, so a hints build is not a solutions build.
 % List both views to get both (separate) PDFs; nothing here couples them.
 %
-% This lived in Test.cls as scaffolding. Moved here so it is SHARED: a problem
+% This lived in Assessment.cls as scaffolding. Moved here so it is SHARED: a problem
 % file that carries its own \begin{solution} (or \begin{hint}) can now be
 % \import-ed into a LECTURE (LectureNotes) as well as a test, which it could not
-% when only Test.cls knew the machinery. That was NOTE.md item 4's open gap.
+% when only Assessment.cls knew the machinery. That was NOTE.md item 4's open gap.
 \newif\ifsolutions
 \ifdefined\ShowSolutions \solutionstrue \fi
 \newif\ifhints
@@ -139,13 +139,13 @@
 % "2.1.8" -- printed verbatim next to the label word and used as the \label
 % target. It steps NO counter, so an imported textbook number never competes
 % with a numbering scheme of your own. Only a class that shows it (LectureNotes)
-% reads this; Test.cls ignores it (an exam owns its own numbering).
+% reads this; Assessment.cls ignores it (an exam owns its own numbering).
 \newcommand{\CurrentProblemNumber}{}
 
 % Free-text parenthetical shown after the heading, set by \importproblem's
 % `desc' key -- e.g. "Example (similar to 2.1.8)". Empty (default) prints
 % nothing. Like `number', pure presentation: the notes heading appends it in
-% parentheses; Test.cls ignores it (an exam question is not annotated).
+% parentheses; Assessment.cls ignores it (an exam question is not annotated).
 \newcommand{\CurrentProblemDesc}{}
 
 % Whether the current import prints at all. \importproblem's `noprint' flag
@@ -178,7 +178,7 @@
   \quad\textnormal{\normalfont(#1\ \ifnum#1=1 point\else points\fi)}}
 
 % How a BONUS marker (points=2*) renders. Class-overridable, the twin of
-% \ProblemPointsFormat; default is the inline mark with a ", bonus" note. Test.cls
+% \ProblemPointsFormat; default is the inline mark with a ", bonus" note. Assessment.cls
 % overrides it with a stacked right-margin block ("(N pts)" + rule + "bonus"). The
 % value is still shown (a bonus IS worth N if earned); it is only kept OUT of the
 % total, and announced.
@@ -398,7 +398,7 @@
 % Anything that would corrupt the bookkeeping outright is an error elsewhere;
 % these are the one-notch-down cases. Deliberately NOT warned: presentation keys
 % a class ignores by design (points= under LectureNotes, number=/desc= under
-% Test) -- that cross-context tolerance is the point of the extrinsic model.
+% Assessment) -- that cross-context tolerance is the point of the extrinsic model.
 %
 % checkin + a points spec: check-in mode suppresses the problem heading (the box
 % header is the label) -- which is exactly where a class prints the number and
@@ -517,7 +517,7 @@
 %   \ProblemNumberText    the FORMATTED number, "Problem N" / "Q N" / "Q N" (tight).
 %                         One macro so the standalone heading and the group stem
 %                         can never disagree; a class overrides it if the separator
-%                         differs (Test wants "QN", no space).
+%                         differs (Assessment wants "QN", no space).
 %   \ProblemHeadingFormat typesets a TOP-LEVEL problem's whole heading. It runs
 %                         AFTER the counter is stepped and (for a counted problem)
 %                         the points are already in the total, so it is pure
@@ -526,7 +526,7 @@
 %                         the count. Default: run-in "Problem N." + inline points.
 %   \ProblemGroupHeadingFormat{STEM}  the same, for a \problemgroup's numbered stem.
 %
-%   Test.cls overrides these to "Q N" over a points \fbox hung in the left margin;
+%   Assessment.cls overrides these to "Q N" over a points \fbox hung in the left margin;
 %   LectureNotes.cls to a run-in "Example." (+ optional literal number / desc).
 \newcommand{\ProblemLabelWord}{Problem}
 \newcommand{\ProblemNumberText}{\ProblemLabelWord\ \theproblem}
@@ -700,7 +700,7 @@
 % the extrinsic rule holds. Each part letters "(a)(b)(c)" by reusing the
 % `subproblem' counter -- so a \ref to a part reads "7(a)", exactly like a case-1
 % part -- and drops its marks through the shared \ProblemPointsFormat hook (inline
-% by default, right-margin under Test.cls). With NO points spec the parts still
+% by default, right-margin under Assessment.cls). With NO points spec the parts still
 % letter, just unmarked (a valid ungraded / notes use).
 %
 % The item command is \qpart, NOT \part. A dedicated name (rather than locally
@@ -884,7 +884,7 @@
 % The instruction sentence -- CLASS-OVERRIDABLE presentation (same idiom as
 % \ProblemHeadingFormat). #1 = select (as given); #2 = first member number,
 % #3 = last member number, both \ref values (hence hyperlinks, and auto-updating).
-% Restyle the wording in one place (here, or override in Test.cls/course-vocab.tex).
+% Restyle the wording in one place (here, or override in Assessment.cls/course-vocab.tex).
 \newcommand{\ProblemChoiceInstruction}[3]{%
   \noindent\textbf{Answer any \pchoice@numword{#1} of Questions~#2--#3.}}
 
@@ -1005,7 +1005,7 @@
   ex/solutionplain/.style={ex/answerbox=SolutionColor, top=6pt},
 }
 
-% Zero-height overlay routing. Workspace.sty (loaded by Test/LectureNotes) defines
+% Zero-height overlay routing. Workspace.sty (loaded by Assessment/LectureNotes) defines
 % \WSZeroHeight, which in the default OVERLAY mode emits a box at zero height so it
 % paints down into the reserved \workspace instead of shifting the layout; under
 % \solidboxes it emits normally. Both the solution and hint environments route their

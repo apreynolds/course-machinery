@@ -15,7 +15,7 @@
 \PassOptionsToPackage{dvipsnames}{xcolor}
 \ProcessOptions\relax
 
-% Same shape as Test.cls's \ShowSolutions: build-pdfs' view loop injects
+% Same shape as Assessment.cls's \ShowSolutions: build-pdfs' view loop injects
 % \def\ProjectorView{} before \documentclass is read (its `projector' view), so
 % the view needs no class option at the call site.
 \ifdefined\ProjectorView \Projectortrue \fi
@@ -38,7 +38,7 @@
 \RequirePackage{ProblemMeta}
 
 % Explicit handwriting whitespace: \workspace[lines|halfpage|fullpage] / \workspace*.
-% Shared with Test -- both need copious writing room (student answers, board work).
+% Shared with Assessment -- both need copious writing room (student answers, board work).
 \RequirePackage{Workspace}
 
 % No [osf] -- figures here are information; keep them lining.
@@ -80,9 +80,9 @@
 % The noun is a per-COURSE choice -- texts variously say Example / Exercise /
 % Problem. A course overrides it by redefining \NotesProblemLabelWord (its safe
 % home is course-vocab.tex). We route \ProblemLabelWord through that macro rather
-% than setting the word directly, so a course-vocab file shared with a TEST
-% document can retune the notes noun without disturbing Test.cls's fixed "Q"
-% (Test sets \ProblemLabelWord literally and never reads \NotesProblemLabelWord).
+% than setting the word directly, so a course-vocab file shared with an ASSESSMENT
+% document can retune the notes noun without disturbing Assessment.cls's fixed "Q"
+% (Assessment sets \ProblemLabelWord literally and never reads \NotesProblemLabelWord).
 \providecommand{\NotesProblemLabelWord}{Example}
 \renewcommand{\ProblemLabelWord}{\NotesProblemLabelWord}
 

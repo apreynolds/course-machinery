@@ -48,7 +48,7 @@
 # View PDFs follow the same OUTDIR / BOTH handling as the default build.
 #
 # NB the class reads these as \ifdefined, so the same source builds both ways
-# with no option at the call site -- see LectureNotes.cls / Test.cls.
+# with no option at the call site -- see LectureNotes.cls / Assessment.cls.
 #
 # Auxiliary files (.aux/.log/etc.) go to a per-directory folder under
 # ~/.cache/latexmk/ so they clutter neither the repo nor the output directory.

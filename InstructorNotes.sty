@@ -11,8 +11,8 @@
 %%%
 %%% Why a shared .sty (loaded by LectureNotes + CourseDocument, not a class macro):
 %%% both lectures and course documents carry instructor-only content -- notes-to-self,
-%%% co-teacher asides -- and both want the instructor-copy page frame below. (Test.cls,
-%%% an assessment, has neither yet.)
+%%% co-teacher asides -- and both want the instructor-copy page frame below.
+%%% (Assessment.cls has neither yet.)
 %%%
 %%% VIEW MODEL: a "view" is a bundle of content layers. This package owns the
 %%% \ShowInstructorNotes layer. The build's `instructor' view injects the bundle
@@ -75,7 +75,7 @@
 %%% centred on the box height via the overlay (which adds no height), so a very
 %%% SHORT box with a LONG word can spill -- moot in practice. Bar 6mm; node xshift
 %%% is half that.
-% Zero-height overlay routing. Workspace.sty (loaded by Test/LectureNotes) defines
+% Zero-height overlay routing. Workspace.sty (loaded by Assessment/LectureNotes) defines
 % \WSZeroHeight -- in the default OVERLAY mode it emits the box at zero height so it
 % paints down into the reserved \workspace instead of shifting the layout; under
 % \solidboxes it emits normally. InstructorNotes stays self-contained: this

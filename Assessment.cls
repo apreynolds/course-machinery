@@ -1,4 +1,4 @@
-\ProvidesClass{Test}[2026/07/17]
+\ProvidesClass{Assessment}[2026/07/20]
 
 % Forward \documentclass[...] options to article, as the sibling classes do; a
 % stray option (12pt, twoside, ...) would otherwise be collected and then SILENTLY
