@@ -1006,7 +1006,7 @@
 % Zero-height overlay routing. Workspace.sty (loaded by Assessment/LectureNotes) defines
 % \WSZeroHeight, which in the default OVERLAY mode emits a box at zero height so it
 % paints down into the reserved \workspace instead of shifting the layout; under
-% \solidboxes it emits normally. Both the solution and hint environments route their
+% \collapseworkspace it emits normally. Both the solution and hint environments route their
 % box through it. Exercises stays SELF-CONTAINED: if Workspace is absent (e.g. under
 % CourseDocument), this \AtBeginDocument fallback makes \WSZeroHeight a pass-through,
 % so the boxes just render at normal height. \providecommand at begin-document, so
@@ -1055,7 +1055,7 @@
 %
 % NOT zero-height (unlike the solution overlay): a hint is student-facing help shown
 % in the hints build and should push content down NORMALLY, so it does not route
-% through \WSZeroHeight and is unaffected by \solidboxes.
+% through \WSZeroHeight and is unaffected by \collapseworkspace.
 %
 % \HintLabel is the single styling knob -- the fully-formatted run-in label. The
 % body that follows is italicised by the environment. TWEAK the label look here

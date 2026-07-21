@@ -27,9 +27,9 @@
 % InstructorBox) render as ZERO-HEIGHT OVERLAYS into this reserved room (see the
 % OVERLAY vs SOLID MODE section below) -- so a solutions/instructor copy is a
 % pixel-perfect overlay of the student copy. The ONE exception is SOLID MODE
-% (\solidboxes, opt-in and document-wide): there those boxes render at full height
+% (\collapseworkspace, opt-in and document-wide): there those boxes render at full height
 % and \workspace collapses to nothing, giving a compact answer key. So \workspace
-% DOES collapse -- but only under \solidboxes, never silently per-build.
+% DOES collapse -- but only under \collapseworkspace, never silently per-build.
 %
 % NO CARRY-OVER (by choice): a \workspace is plain vertical space. If it is larger
 % than the room left on the page, the overflow is simply dropped and the following
@@ -54,10 +54,10 @@
 %             ZERO HEIGHT, painting DOWN into the \workspace reserved below them, so
 %             they never shift the layout: the solutions/instructor copy is a
 %             pixel-perfect overlay of the student copy.
-%   \solidboxes   SOLID -- those boxes render at NORMAL height and the reserved
+%   \collapseworkspace   SOLID -- those boxes render at NORMAL height and the reserved
 %             room (\workspace, and \FreshPage's breaks / blank pages) collapses to
 %             nothing: a compact answer key. Set once in the preamble.
-%   \overlayboxes -- back to the default (for completeness / local re-enable).
+%   \preserveworkspace -- back to the default (for completeness / local re-enable).
 %
 % \ifWorkspaceOverlay is the flag both THIS package (the \workspace collapse below)
 % and the box packages (Exercises' solution/hint, InstructorNotes' InstructorBox)
@@ -67,8 +67,8 @@
 % normally and nothing here is required.
 \newif\ifWorkspaceOverlay
 \WorkspaceOverlaytrue
-\newcommand{\solidboxes}{\WorkspaceOverlayfalse}
-\newcommand{\overlayboxes}{\WorkspaceOverlaytrue}
+\newcommand{\collapseworkspace}{\WorkspaceOverlayfalse}
+\newcommand{\preserveworkspace}{\WorkspaceOverlaytrue}
 
 % \WSZeroHeight{<a complete \begin{tcolorbox}...\end{tcolorbox}>} -- in OVERLAY mode
 % emit that box at ZERO height and depth so it paints DOWNWARD over the \workspace
@@ -128,7 +128,7 @@
 % \textheight is read at USE time (in the body), so geometry has long since set it;
 % loading this package before geometry is therefore fine.
 % In OVERLAY mode (default) this reserves the space as documented. In SOLID mode
-% (\solidboxes) the whole body collapses to just \par -- the boxes now carry their
+% (\collapseworkspace) the whole body collapses to just \par -- the boxes now carry their
 % own height, so the reserved handwriting room is exactly what we drop.
 \NewDocumentCommand{\workspace}{s O{8}}{%
   \par
@@ -156,7 +156,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \FreshPage -- COLLAPSIBLE PAGE BREAKS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% One command, three forms -- ALL of which VANISH under \solidboxes (page breaks and
+% One command, three forms -- ALL of which VANISH under \collapseworkspace (page breaks and
 % extra-work pages are layout for the spacing copy, not the compact answer key):
 %
 %   \FreshPage             a collapsible \newpage: break to a fresh page your content

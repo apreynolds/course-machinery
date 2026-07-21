@@ -63,7 +63,7 @@ locally. The solution box adds no height of its own; it simply paints into
 the four workspace lines that follow, exactly where a student would write:
 
 \begin{manexample}
-\overlayboxes
+\preserveworkspace
 \begin{problem}
   Differentiate $h(x) = x^{5}$.
 \end{problem}
@@ -92,18 +92,18 @@ Sometimes the spaced layout is wrong: an answer-key handout to post online,
 or lecture notes (this manual runs in solid mode too). One preamble switch:
 
 \begin{manexsource}
-\solidboxes    % boxes at natural height; workspace and
-               % \FreshPage collapse to nothing
-\overlayboxes  % back to the default overlay mode
+\collapseworkspace  % boxes at natural height; workspace and
+                    % \FreshPage collapse to nothing
+\preserveworkspace  % back to the default overlay mode
 \end{manexsource}
 
-Under \cs{solidboxes} the boxes carry their own height and \emph{all} the
+Under \cs{collapseworkspace} the boxes carry their own height and \emph{all} the
 reserved room -- every \cs{workspace}, every \cs{FreshPage} break and blank
 page -- collapses to nothing: the same source becomes a compact document
 with answers inline. The collapse happens only under this explicit,
 document-wide switch, never silently per-build; within one mode, every view
 of a document lays out identically.
 
-The demo midterm keeps \cs{overlayboxes} written out in its preamble even
-though it is the default -- a one-line smoke test that the switch pair
-round-trips, and a visible declaration of which mode the document is in.
+A document may keep \cs{preserveworkspace} written out in its preamble even
+though it is the default -- a visible declaration of which mode the document
+is in, and a smoke test that the switch pair round-trips.

@@ -4,12 +4,12 @@ A lecture is a \file{LectureNotes} document. The class comes in two sizes from
 one source: the default 14\,pt \emph{handout} (printed or posted for students),
 and a 17\,pt \emph{projector} copy for the room, built automatically as a view
 (section~\ref{sec:build-and-find}). A typical master, from the demo repo's
-\file{differentiation/lectures/1.1-IntroToDerivatives.tex}:
+\file{derivatives/lectures/1.1-IntroToDerivatives.tex}:
 
 \begin{manexsource}
 %! views: projector, instructor
 \documentclass{LectureNotes}
-\solidboxes
+\collapseworkspace
 
 % Per-course text-result vocabulary (e.g. APEX's "Key Idea").
 \input{../../course-vocab}
@@ -22,7 +22,7 @@ and a 17\,pt \emph{projector} copy for the room, built automatically as a view
 
 Three preamble notes. The \texttt{\%! views:} comment declares which extra PDFs
 the build script produces (here a projector copy and an instructor copy). The
-\cs{solidboxes} switch selects natural-height boxes -- the right mode when the
+\cs{collapseworkspace} switch selects natural-height boxes -- the right mode when the
 notes carry no reserved whitespace; see section~\ref{sec:overlay} for the
 whole story. And \file{course-vocab.tex} is \cs{input} \emph{in the preamble}
 (its box declarations must run before the document starts), via a relative
