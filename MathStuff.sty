@@ -25,6 +25,14 @@
 %%% newtxmath supplies the symbols.
 %%% ===========================================================================
 
+% Enforce the CONTRACT above loudly: without newtxmath (i.e. without Typefaces)
+% the definitions below would fail one by one with cryptic errors instead.
+\@ifpackageloaded{newtxmath}{}{%
+  \PackageError{MathStuff}
+    {newtxmath is not loaded -- MathStuff must come AFTER Typefaces}
+    {Load Typefaces (which sets up amsmath + newtxmath in the required
+     order) before MathStuff, as the course classes do.}}
+
 \RequirePackage{mathtools}   % \DeclarePairedDelimiter; amsmath already in place
 
 %%% --- Display shorthand ------------------------------------------------------
