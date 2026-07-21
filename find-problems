@@ -168,10 +168,14 @@ for f in "${files[@]}"; do
 
   [[ -z $dump ]] && continue          # no block -> not part of the bank
 
-  csv_matches "$(field "$dump" topics)"     "$topic"      || continue
-  csv_matches "$(field "$dump" tags)"       "$tag"        || continue
-  csv_matches "$(field "$dump" difficulty)" "$difficulty" || continue
-  csv_matches "$(field "$dump" source)"     "$source"     || continue
+  # --vocab really does ignore the filters (as its help text promises): the
+  # vocabulary must cover the whole bank, so every tagged file counts.
+  if [[ $mode != vocab ]]; then
+    csv_matches "$(field "$dump" topics)"     "$topic"      || continue
+    csv_matches "$(field "$dump" tags)"       "$tag"        || continue
+    csv_matches "$(field "$dump" difficulty)" "$difficulty" || continue
+    csv_matches "$(field "$dump" source)"     "$source"     || continue
+  fi
 
   matches+=("$f")
   meta_of["$f"]=$dump
