@@ -26,8 +26,8 @@
 
 % Instructor-only notes layer, shared with LectureNotes. AFTER Typefaces: this is
 % where tcolorbox now legitimately enters this class (below the font block, per the
-% "Fonts" load order). Gives \maketitle's \TitleMarker an \InstructorInline to hang
-% the "Instructor Copy" flag on (override below).
+% "Fonts" load order). The instructor-copy signal is its page-edge frame -- no
+% \TitleMarker override needed (see the Titling hooks below).
 \RequirePackage{InstructorNotes}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
