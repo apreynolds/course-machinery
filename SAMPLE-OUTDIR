@@ -7,9 +7,10 @@
 # Format:
 #   - One line is a destination directory path; a leading ~ is expanded. PDFs
 #     are written there instead of next to the .tex source.
-#   - Optionally add a line reading BOTH (or COPY) to build locally AND copy the
-#     PDFs to that directory, keeping both. Without it the build goes straight
-#     to the directory, with no local copy.
+#   - Optionally add a line reading BOTH to build locally AND copy the PDFs to
+#     that directory, keeping both. Without it the build goes straight to the
+#     directory, with no local copy. (COPY, the songsheets synonym, is NOT
+#     recognised here -- build-pdfs deliberately doesn't wire it yet.)
 #   - Blank lines and #-comment lines (like these) are ignored, and the path and
 #     keyword(s) may appear in any order.
 #   - If the path is missing or is not a directory, build-pdfs warns and falls
