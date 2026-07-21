@@ -30,6 +30,15 @@
 %%%     are only ever used in the body.
 %%% ===========================================================================
 
+% Enforce the CONTRACT above loudly: amsthm arrives via newtxmath's [amsthm]
+% option (i.e. via Typefaces); loading this package first would otherwise fail
+% at the first \newtheoremstyle with a cryptic error.
+\@ifpackageloaded{amsthm}{}{%
+  \PackageError{CourseBoxes}
+    {amsthm is not loaded -- CourseBoxes must come AFTER Typefaces}
+    {Load Typefaces (whose newtxmath pulls amsthm in at the right moment)
+     before CourseBoxes, as the course classes do.}}
+
 \RequirePackage[most]{tcolorbox}     % \tcolorboxenvironment, enhanced, breakable
 \RequirePackage{fontawesome5}        % topic glyphs + expressive faces (pdflatex-safe,
                                      % monochrome, inherit surrounding colour). NOT
