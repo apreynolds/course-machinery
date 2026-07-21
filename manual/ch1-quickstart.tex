@@ -49,11 +49,11 @@ walks up to the repo root and puts \file{.course-machinery//} on
 \env{TEXINPUTS} for that build. The copies are identical; creating a new
 topic folder means copying one file in.
 
-Cross-file inclusion uses the \file{import} package's relative paths:
-a lecture pulls \file{../problems/power-rule-basic.tex}, the quiz pulls
-\file{../derivatives/problems/}\allowbreak\file{power-rule-basic.tex} --
-the \emph{same} file, and any images that file loads resolve against the
-\emph{file's own} directory, so one source serves every consumer.
+Cross-file inclusion uses the \file{import} package's relative paths, so one
+source serves every consumer. A lecture and the quiz pull the \emph{same}
+\file{power-rule-basic.tex} by the path each needs -- \file{../problems/}
+beside it, \file{../derivatives/problems/} from the repo root -- and any
+images that file loads resolve against the \emph{file's own} directory.
 
 The one course-wide content file is \file{course-vocab.tex} at the repo
 root: the vocabulary this course's textbook uses (its named result boxes,

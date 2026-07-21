@@ -86,6 +86,11 @@
 % are genuinely gappy, not merely eased.
 \setlength{\emergencystretch}{1.5em}
 \hbadness=3000
+% The same easing on the overfull side: an unbreakable typewriter name (a long
+% file path in this narrow measure) can poke a fraction of a point past the
+% margin -- invisible at well under a point -- so ignore sub-point overfulls and
+% let the log flag only genuine ones.
+\hfuzz=1pt
 
 % Reference tables. Y is a description column that takes exactly the measure
 % left over by the name column(s) (tabularx) and sets RAGGED RIGHT --
