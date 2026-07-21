@@ -422,8 +422,9 @@
 % "Problem N.". The flag below, set locally true by the group, is what the problem
 % environment branches on; the same atomic file renders either way, so nothing in
 % the library changes. The counter resets whenever `problem' steps (so each group,
-% and each top-level problem, starts its letters at (a)); \p@subproblem makes a
-% \ref to a part read "N(a)".
+% and each top-level problem, starts its letters at (a)); \thesubproblem carries
+% the parent number so a \ref to a part reads "N(a)" (NOT via \p@subproblem --
+% see the note at \thesubproblem below for why that route breaks).
 \newif\ifinproblemgroup
 % Choose-N-of-M grouping (see the PROBLEM CHOICE section). When active, a member's
 % points are NOT added to the exam total (the group adds select*points once), the
@@ -1100,11 +1101,23 @@
 \newcommand{\CheckinBox@begin}{\begin{tcolorbox}[ex@checkin]\CheckinBox@header}
 \newcommand{\CheckinBox@end}{\end{tcolorbox}}
 
-% How the key is boxed in a solutions build: a tight green frame + light fill
-% (matching the quarry's \Answer{} box), via \fcolorbox so no tcolorbox is needed.
-% SolutionColor is defined in the SOLUTION section above. NB \fcolorbox is an
-% \mbox, so a *very* long correct option will not line-break inside the box --
-% fine for typical MC options, which are short; restyle here if that ever bites.
+% The shared "this is the answer" cue: a tight SolutionColor frame + light fill
+% around the content, via \fcolorbox so no tcolorbox is needed. ONE macro (plus
+% its two dimension knobs) serves every inline answer cue -- the boxed correct
+% MC option below AND the matching env's "->[C]" annotation (\MatchKeyFormat) --
+% so the two can never drift apart. SolutionColor is defined in the SOLUTION
+% section above. NB \fcolorbox is an \mbox: content will not line-break inside
+% (fine for the short things boxed here). Retune the knobs to restyle both cues.
+\newcommand{\SolutionCueRule}{0.2mm}
+\newcommand{\SolutionCueSep}{2pt}
+\newcommand{\SolutionCueBox}[1]{%
+  \begingroup
+    \setlength{\fboxrule}{\SolutionCueRule}\setlength{\fboxsep}{\SolutionCueSep}%
+    \fcolorbox{SolutionColor}{SolutionColor!8}{#1}%
+  \endgroup}
+
+% How the key is boxed in a solutions build: the shared cue above, forced down
+% to the bare option's metrics.
 %
 % ZERO-FOOTPRINT (the overlay contract): the box must occupy EXACTLY the same
 % height/depth/width as the bare option text, so a choices list lays out identically
@@ -1120,17 +1133,16 @@
 %   \kern-(rule+sep) slide the frame left so the TEXT stays x-aligned with the other
 %                choices (frame overflows into the "(A)" gap on the left).
 % Works uniformly for all three layouts and \graphchoice, since the output is simply
-% "a box with the bare content's metrics". \fboxsep is kept modest so the overflow
-% into neighbours stays subtle. Retune \fboxsep / \fboxrule here.
+% "a box with the bare content's metrics". \SolutionCueSep is kept modest so the
+% overflow into neighbours stays subtle. Retune the \SolutionCue* knobs above.
 \newsavebox{\cc@inner}
 \newcommand{\CorrectChoiceFormat}[1]{%
   \begingroup
-    \setlength{\fboxrule}{0.2mm}\setlength{\fboxsep}{2pt}%
     \sbox\cc@inner{#1}%
     \makebox[\wd\cc@inner][l]{%
-      \kern-\dimexpr\fboxrule+\fboxsep\relax
+      \kern-\dimexpr\SolutionCueRule+\SolutionCueSep\relax
       \raisebox{\z@}[\ht\cc@inner][\dp\cc@inner]{%
-        \fcolorbox{SolutionColor}{SolutionColor!8}{\usebox\cc@inner}%
+        \SolutionCueBox{\usebox\cc@inner}%
       }%
     }%
   \endgroup
@@ -1279,15 +1291,12 @@
 \newlength{\match@colwidth}
 \newcommand{\MatchColWidth}{0.38\linewidth}
 \newcommand{\MatchItemSep}{2ex}
-% The match annotation is encased in the SAME green frame + light fill as every
-% other solution cue (\CorrectChoiceFormat, the solution box) -- so "-> [C]" reads as
-% "this is the answer" consistently. The target is bracketed to mirror the right
-% column's own [A][B] labels. \fboxrule/\fboxsep match \CorrectChoiceFormat.
+% The match annotation is encased in the shared \SolutionCueBox (the same green
+% frame + light fill as a boxed correct MC option) -- so "-> [C]" reads as
+% "this is the answer" consistently, by construction. The target is bracketed to
+% mirror the right column's own [A][B] labels.
 \newcommand{\MatchKeyFormat}[1]{%
-  \;\begingroup
-    \setlength{\fboxrule}{0.2mm}\setlength{\fboxsep}{2pt}%
-    \fcolorbox{SolutionColor}{SolutionColor!8}{\bfseries\color{SolutionColor}$\to$[#1]}%
-  \endgroup}
+  \;\SolutionCueBox{\bfseries\color{SolutionColor}$\to$[#1]}}
 
 % The two columns use DISTINCT enumeration systems, both in SQUARE brackets (round
 % brackets are taken by (parts)/(points), and Crowdmark bubbles are rectangular):
