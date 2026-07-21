@@ -25,6 +25,14 @@
 %%% tcolorbox); loading tcolorbox[most] a second time is a safe no-op.
 %%% ===========================================================================
 
+% Enforce the CONTRACT above loudly: tcolorbox drags amsmath in, so it must not
+% be this package that first loads it -- newtxmath (via Typefaces) owns that order.
+\@ifpackageloaded{newtxmath}{}{%
+  \PackageError{InstructorNotes}
+    {newtxmath is not loaded -- InstructorNotes must come AFTER Typefaces}
+    {Load Typefaces (which sets up amsmath + newtxmath in the required
+     order) before InstructorNotes, as the course classes do.}}
+
 \RequirePackage[most]{tcolorbox}   % the note boxes
 \RequirePackage{environ}           % \NewEnviron: drop a block's body when off
 \RequirePackage{marginnote}        % \marginnote: margin placement without floating
