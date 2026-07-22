@@ -31,8 +31,8 @@ aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
 
 \begin{manexsource}
 find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
-              [--source PAT] [--untagged] [--vocab] [--import]
-              [DIR ...]
+              [--source PAT] [--untagged] [--vocab]
+              [--import [--with LIST] [--from DIR]] [DIR ...]
 \end{manexsource}
 
 \begin{center}
@@ -44,6 +44,11 @@ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
   ignored).\\
 \texttt{-{}-untagged} & files with no \cs{ProblemMeta} block -- the
   backlog.\\
-\texttt{-{}-import} & matches as paste-ready \cs{import} lines.\\
+\texttt{-{}-import} & matches as paste-ready \cs{importproblem} lines.\\
+\texttt{-{}-with LIST} & (with \texttt{-{}-import}) inject metadata keys as
+  options; \env{LIST} is a comma subset of \env{number,desc}, added where a
+  file has them. \env{points} stays manual.\\
+\texttt{-{}-from DIR} & (with \texttt{-{}-import}) make each line's directory
+  argument relative to \env{DIR}, the importing document's folder.\\
 \end{tabularx}
 \end{center}

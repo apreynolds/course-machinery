@@ -131,8 +131,13 @@ Three modes round it out:
     before inventing a type.
   \item \texttt{-{}-untagged} inverts: files with \emph{no} metadata block
     at all -- the tagging backlog.
-  \item \texttt{-{}-import} prints the matches as \cs{import} lines ready
-    to paste into a document.
+  \item \texttt{-{}-import} prints the matches as paste-ready
+    \cs{importproblem} lines. Two opt-in modifiers refine the output:
+    \texttt{-{}-with LIST} injects a comma subset of \env{number,desc} as
+    options where a file carries them (\env{points} stays manual -- it is
+    extrinsic), and \texttt{-{}-from DIR} rewrites each line's directory
+    argument relative to \env{DIR}, the importing document's folder, so the
+    pasted line needs no \texttt{../} hand-fixing.
 \end{itemize}
 
 The parser is textual and deliberately simple, which is where the
