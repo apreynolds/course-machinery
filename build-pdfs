@@ -345,7 +345,10 @@ build_file() {
       compile_view "$jobname" "$base" "$varaux" "$suffix" "$inject" "$movedir" || exit
       echo "    + $jobname$suffix.pdf ($name)"
       if [[ $mode == BOTH ]]; then cp -- "$jobname$suffix.pdf" "$outdir/" || exit; fi
-      [[ -n $label ]] && ship_label "$pdfdir" "$jobname$suffix.pdf" "$label"
+      # An `if' (not `&&') so a label-less view leaves exit status 0 -- this is
+      # the loop's (and so the subshell's) last statement, and a trailing false
+      # here would make build_file wrongly report the whole file FAILED.
+      if [[ -n $label ]]; then ship_label "$pdfdir" "$jobname$suffix.pdf" "$label"; fi
     done
   )
 }
