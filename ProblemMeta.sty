@@ -13,9 +13,11 @@
 %
 %   \ProblemMeta{
 %     topics     = {differentiation, power-rule},
-%     tags       = {polynomial, routine},
+%     type       = {polynomial, routine},
 %     difficulty = {basic},
-%     source     = {Stewart 3.1},
+%     source     = {stewart-8e},
+%     number     = {3.1.2},
+%     desc       = {},
 %   }
 %
 % Keep ONE KEY PER LINE, values braced. The companion script (find-problems)
@@ -41,9 +43,10 @@
 % is read off disk by find-problems, never from these. Add handlers here again if
 % a future display layer needs the values stored.
 \define@key{ProblemMeta}{topics}    {}
-\define@key{ProblemMeta}{tags}      {}
+\define@key{ProblemMeta}{type}      {}
 \define@key{ProblemMeta}{difficulty}{}
 \define@key{ProblemMeta}{source}    {}
-\define@key{ProblemMeta}{id}        {}
+\define@key{ProblemMeta}{number}    {}
+\define@key{ProblemMeta}{desc}      {}
 
 \newcommand{\ProblemMeta}[1]{\setkeys{ProblemMeta}{#1}\ignorespaces}

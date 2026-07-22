@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # find-problems — search the problem bank by its \ProblemMeta metadata
-# Usage: find-problems [--topic PAT] [--tag PAT] [--difficulty PAT]
+# Usage: find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
 #                      [--source PAT] [--untagged] [--vocab] [--import]
 #                      [DIR ...]
 #
@@ -10,7 +10,7 @@
 #
 # Filters (all optional, combined with AND):
 #   --topic PAT       match a topic
-#   --tag PAT         match a tag
+#   --type PAT        match a type (problem form / character)
 #   --difficulty PAT  match the difficulty
 #   --source PAT      match the source
 #
@@ -22,10 +22,10 @@
 # Other modes:
 #   --untagged  invert: list .tex files with NO \ProblemMeta block at all, i.e.
 #               the backlog of problems still to be tagged.
-#   --vocab     ignore filters and instead print the tag/topic vocabulary in
+#   --vocab     ignore filters and instead print the type/topic vocabulary in
 #               use, with counts. This is the antidote to a bank where half the
 #               problems say `integration' and half say `integrals' -- read it
-#               before inventing a new tag.
+#               before inventing a new type.
 #   --import    print matches as \import lines ready to paste into a document,
 #               instead of the default listing.
 #
@@ -47,7 +47,7 @@ usage() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ARGUMENTS
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-topic="" tag="" difficulty="" source=""
+topic="" type_="" difficulty="" source=""
 mode="list"          # list | vocab | import | untagged
 dirs=()
 
@@ -55,7 +55,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     -h | --help)   usage; exit 0 ;;
     --topic)       topic=${2:?--topic needs a pattern};      shift 2 ;;
-    --tag)         tag=${2:?--tag needs a pattern};          shift 2 ;;
+    --type)        type_=${2:?--type needs a pattern};       shift 2 ;;
     --difficulty)  difficulty=${2:?--difficulty needs a pattern}; shift 2 ;;
     --source)      source=${2:?--source needs a pattern};    shift 2 ;;
     --vocab)       mode="vocab";    shift ;;
@@ -172,7 +172,7 @@ for f in "${files[@]}"; do
   # vocabulary must cover the whole bank, so every tagged file counts.
   if [[ $mode != vocab ]]; then
     csv_matches "$(field "$dump" topics)"     "$topic"      || continue
-    csv_matches "$(field "$dump" tags)"       "$tag"        || continue
+    csv_matches "$(field "$dump" type)"       "$type_"      || continue
     csv_matches "$(field "$dump" difficulty)" "$difficulty" || continue
     csv_matches "$(field "$dump" source)"     "$source"     || continue
   fi
@@ -188,7 +188,7 @@ case $mode in
   vocab)
     # Counts across every block found, per key. Filters are ignored: the point
     # is to see the whole vocabulary before adding to it.
-    for key in topics tags difficulty; do
+    for key in topics type difficulty; do
       echo "$key:"
       for f in "${matches[@]}"; do
         field "${meta_of[$f]}" "$key" | tr ',' '\n'
