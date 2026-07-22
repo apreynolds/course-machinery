@@ -122,7 +122,7 @@ expression matched case-insensitively against each comma-separated item, so
 file does not set never matches -- \texttt{-{}-difficulty basic} will not
 sweep in untagged files.
 
-Three modes round it out:
+Four modes round it out:
 
 \begin{itemize}
   \item \texttt{-{}-vocab} ignores the filters and prints the type and topic
@@ -138,8 +138,27 @@ Three modes round it out:
     extrinsic), and \texttt{-{}-from DIR} rewrites each line's directory
     argument relative to \env{DIR}, the importing document's folder, so the
     pasted line needs no \texttt{../} hand-fixing.
+  \item \texttt{-{}-tsv} prints one tab-separated row per match (path, then the
+    metadata) -- the machine-readable feed behind the picker below. An operand
+    may now be a single \file{.tex} file, not just a directory, so a picker can
+    ask \texttt{-{}-import} about exactly the files it selected.
 \end{itemize}
 
 The parser is textual and deliberately simple, which is where the
 one-key-per-line discipline of section~\ref{sec:problem-files} comes from:
 a reflowed block still compiles, but this script no longer sees it.
+
+\subsection{Picking problems interactively}
+
+\file{pick-problems} threads those two machine modes through
+\href{https://github.com/junegunn/fzf}{fzf}: it feeds \texttt{-{}-tsv} into the
+picker (fuzzy-search the metadata, \file{bat}-preview the \file{.tex},
+multi-select with Tab), then pipes the chosen files back through
+\texttt{-{}-import} so the accepted set comes out as \cs{importproblem} lines on
+standard output. Its \texttt{-{}-from} and any \file{find-problems} filters pass
+straight through, e.g.\ \texttt{pick-problems -{}-from \_assessment -{}-type
+multiple-choice derivatives/}. The Vim command \texttt{:ImportProblem}
+(\texttt{<Space>ip}) is the same pipeline, inserting the lines at the cursor
+with \texttt{-{}-from} pinned to the buffer's own directory -- so picking a
+problem while writing an assessment drops in a ready line, needing only its
+\env{points}.

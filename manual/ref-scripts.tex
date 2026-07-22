@@ -31,8 +31,8 @@ aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
 
 \begin{manexsource}
 find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
-              [--source PAT] [--untagged] [--vocab]
-              [--import [--with LIST] [--from DIR]] [DIR ...]
+              [--source PAT] [--untagged] [--vocab] [--tsv]
+              [--import [--with LIST] [--from DIR]] [PATH ...]
 \end{manexsource}
 
 \begin{center}
@@ -50,5 +50,28 @@ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
   file has them. \env{points} stays manual.\\
 \texttt{-{}-from DIR} & (with \texttt{-{}-import}) make each line's directory
   argument relative to \env{DIR}, the importing document's folder.\\
+\texttt{-{}-tsv} & one tab-separated row per match
+  (path, desc, topics, type, difficulty, source, number) -- the machine feed
+  for \file{pick-problems}. Respects the filters.\\
 \end{tabularx}
 \end{center}
+
+A \env{PATH} operand may be a directory (walked recursively) or a single
+\file{.tex} file, so a picker can ask \texttt{-{}-import} about exactly the
+files it selected.
+
+\subsection*{pick-problems}
+
+\begin{manexsource}
+pick-problems [--from DIR] [FILTER ...] [PATH ...]
+\end{manexsource}
+
+An fzf front-end to \file{find-problems}: it feeds \texttt{-{}-tsv} into fzf
+(multi-select, metadata shown, the \file{.tex} previewed with \file{bat}), then
+turns the chosen problems into paste-ready \cs{importproblem} lines via
+\texttt{-{}-import}, printed to standard output. \texttt{-{}-from} is forwarded
+to the emitter; every other argument is forwarded to the \texttt{-{}-tsv} feed,
+so \file{find-problems}' filters pre-narrow what the picker offers. The Vim
+command \texttt{:ImportProblem} (\texttt{<Space>ip}, in
+\file{after/ftplugin/tex.vim}) is the same pipeline wired to insert at the
+cursor, with \texttt{-{}-from} set to the editing buffer's own directory.
