@@ -104,7 +104,7 @@ label at a private staging folder and copy across by hand at release time --
 \subsection{\texorpdfstring{\texttt{find-problems}}{find-problems}}
 
 \begin{manexsource}
-$ find-problems [--topic PAT] [--tag PAT] [--difficulty PAT]
+$ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
                 [--source PAT] [--untagged] [--vocab] [--import]
                 [DIR ...]
 \end{manexsource}
@@ -125,10 +125,10 @@ sweep in untagged files.
 Three modes round it out:
 
 \begin{itemize}
-  \item \texttt{-{}-vocab} ignores the filters and prints the tag and topic
+  \item \texttt{-{}-vocab} ignores the filters and prints the type and topic
     vocabulary in use, with counts -- the antidote to a bank where half the
     problems say \emph{integration} and half say \emph{integrals}. Read it
-    before inventing a tag.
+    before inventing a type.
   \item \texttt{-{}-untagged} inverts: files with \emph{no} metadata block
     at all -- the tagging backlog.
   \item \texttt{-{}-import} prints the matches as \cs{import} lines ready

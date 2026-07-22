@@ -30,17 +30,17 @@ aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
 \subsection*{find-problems}
 
 \begin{manexsource}
-find-problems [--topic PAT] [--tag PAT] [--difficulty PAT]
+find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
               [--source PAT] [--untagged] [--vocab] [--import]
               [DIR ...]
 \end{manexsource}
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
-\texttt{-{}-topic}, \texttt{-{}-tag}, \texttt{-{}-difficulty},
+\texttt{-{}-topic}, \texttt{-{}-type}, \texttt{-{}-difficulty},
   \texttt{-{}-source} & AND-combined filters; PAT is a case-insensitive
   ERE matched per comma-separated item.\\
-\texttt{-{}-vocab} & print the tag/topic vocabulary with counts (filters
+\texttt{-{}-vocab} & print the type/topic vocabulary with counts (filters
   ignored).\\
 \texttt{-{}-untagged} & files with no \cs{ProblemMeta} block -- the
   backlog.\\

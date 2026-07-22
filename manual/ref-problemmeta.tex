@@ -6,13 +6,19 @@ of the exercise system (Exercises works without it). One command:
 \begin{manexsource}
 \ProblemMeta{
   topics     = {differentiation, power-rule},
-  tags       = {polynomial, routine},
+  type       = {polynomial, routine},
   difficulty = {basic},
-  source     = {Stewart 3.1 \#7},
+  source     = {stewart-8e},
+  number     = {3.1.2},
+  desc       = {},
 }
 \end{manexsource}
 
-Keys: \env{topics}, \env{tags}, \env{difficulty}, \env{source}, \env{id}.
+Keys: \env{topics}, \env{type}, \env{difficulty}, \env{source},
+\env{number}, \env{desc}. \env{topics} lists every subject the problem
+touches (and echoes its folder); \env{type} is its form or character;
+\env{source}/\env{number} are a clean provenance origin and its locator;
+\env{desc} is an optional short content label, sparse by design.
 On the LaTeX side the block is \emph{validated but discarded}: a mistyped
 key errors at compile time; nothing is typeset. The real reader is
 \file{find-problems}, which parses the block textually off disk -- hence
@@ -22,9 +28,9 @@ written \texttt{\char`\\\#}) explained in section~\ref{sec:problemmeta}.
 Design notes worth keeping in mind:
 
 \begin{itemize}
-  \item \textbf{Intrinsic only.} Topics, tags, difficulty and source belong
-    to a problem forever. Points do not -- they are extrinsic, set at the
-    import site, and deliberately not a key here.
+  \item \textbf{Intrinsic only.} Topics, type, difficulty, source and
+    number belong to a problem forever. Points do not -- they are
+    extrinsic, set at the import site, and deliberately not a key here.
   \item \textbf{Keys reset per block}, so a file that omits \env{source}
     never inherits the previous import's value when several problems land
     in one document.

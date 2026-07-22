@@ -11,9 +11,9 @@ the import site decides how it appears. Two rules follow from that:
     (``Q''\,/\,``Example''), no number, and no point value. The consuming class
     supplies the label and number style; the import site supplies the points.
   \item \textbf{A problem file carries what is intrinsically its own}: the
-    statement, its hint and solution, and its metadata (topics, tags,
-    difficulty, source). Those belong to the problem forever, wherever it is
-    used.
+    statement, its hint and solution, and its metadata (topics, type,
+    difficulty, source, number). Those belong to the problem forever, wherever
+    it is used.
 \end{itemize}
 
 This intrinsic/extrinsic split is load-bearing. Points are \emph{extrinsic} --
@@ -28,7 +28,7 @@ A complete file, exactly as it sits in the bank:
 \begin{manexample}
 \ProblemMeta{
   topics     = {differentiation, power-rule},
-  tags       = {polynomial, routine},
+  type       = {polynomial, routine},
   difficulty = {basic},
   source     = {own},
 }
@@ -73,10 +73,10 @@ That design puts one discipline on the author -- the block is parsed
     \texttt{Stewart 3.1 \#7}).
 \end{itemize}
 
-The recognised keys are \env{topics}, \env{tags}, \env{difficulty},
-\env{source}, and \env{id}. On the LaTeX side they are validated but discarded
--- a mistyped key (\env{topic} for \env{topics}) errors at compile time, so
-typos cannot silently un-index a problem. Before inventing a new tag, run
+The recognised keys are \env{topics}, \env{type}, \env{difficulty},
+\env{source}, \env{number}, and \env{desc}. On the LaTeX side they are validated
+but discarded -- a mistyped key (\env{topic} for \env{topics}) errors at compile
+time, so typos cannot silently un-index a problem. Before inventing a new type, run
 \texttt{find-problems -{}-vocab} to see the vocabulary already in use, and reuse
 it.
 
@@ -238,7 +238,7 @@ The payoff for the metadata discipline -- from anywhere in the course repo:
 
 \begin{manexsource}
 $ find-problems --topic chain-rule --difficulty basic
-$ find-problems --vocab      # the tag vocabulary in use, with counts
+$ find-problems --vocab      # the type/topic vocabulary in use, with counts
 $ find-problems --untagged   # the tagging backlog
 $ find-problems --import     # print matches as paste-ready \import lines
 \end{manexsource}
