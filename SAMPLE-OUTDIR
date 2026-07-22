@@ -1,26 +1,37 @@
-# SAMPLE-OUTDIR — template for build-pdfs output redirection
+# SAMPLE-OUTDIR — template for the build-pdfs output mirror
 #
-# To use: rename (or copy) this file to OUTDIR or .OUTDIR inside a 
-# directory. build-pdfs then redirects the PDFs it builds in that
-# directory according to the contents below.
+# To use: copy this file to .OUTDIR at the repo top level (or in any directory
+# whose subtree you want mirrored elsewhere -- the nearest .OUTDIR above a build
+# directory wins). build-pdfs then mirrors every PDF it builds under that
+# directory into the base named below, preserving the path relative to the
+# .OUTDIR's own directory: a source in REPO/integrals/lectures ships to
+# BASE/integrals/lectures. Missing mirror sub-directories are created; the base
+# itself must already exist (else build-pdfs warns and builds locally).
 #
 # Format:
-#   - One line is a destination directory path; a leading ~ is expanded. PDFs
-#     are written there instead of next to the .tex source.
+#   - One bare line is the mirror base directory; a leading ~ is expanded.
 #   - Optionally add a line reading BOTH to build locally AND copy the PDFs to
-#     that directory, keeping both. Without it the build goes straight to the
-#     directory, with no local copy. (COPY, the songsheets synonym, is NOT
-#     recognised here -- build-pdfs deliberately doesn't wire it yet.)
-#   - Blank lines and #-comment lines (like these) are ignored, and the path and
-#     keyword(s) may appear in any order.
-#   - If the path is missing or is not a directory, build-pdfs warns and falls
-#     back to the usual local output.
+#     the mirror, keeping both. Without it the build goes straight to the mirror,
+#     with no local copy. (COPY, the songsheets synonym, is NOT recognised here
+#     -- build-pdfs deliberately doesn't wire it yet.)
+#   - `LABEL: path' lines name extra flat destinations (see below).
+#   - Blank lines and #-comment lines (like these) are ignored; the base path and
+#     the BOTH keyword may appear in any order.
 #
-# OUTDIR / .OUTDIR are meant to be git-ignored, so each machine or checkout can
-# point somewhere different (keep SAMPLE-OUTDIR tracked as the reference).
+# Named destinations for selected views:
+#   A `%! views: ...' magic comment in a source may tag a view with a colon and a
+#   label -- e.g. `%! views: solutions, instructor:TA-dir' -- to drop THAT view's
+#   PDF, flat, into the directory the matching `LABEL: path' line names here, IN
+#   ADDITION to the mirror. The labelled directory must already exist; a missing
+#   label or directory warns and skips only that extra copy. `default:LABEL' does
+#   the same for the base (student) PDF. This keeps machine-specific paths out of
+#   the git-tracked source: the source names a label, this file maps it to a path.
 #
-# Edit the path below and uncomment it (drop the leading "# ") to activate;
-# uncomment BOTH as well if you also want a local copy kept.
+# .OUTDIR is meant to be git-ignored, so each machine or checkout can point
+# somewhere different (keep SAMPLE-OUTDIR tracked as the reference).
+#
+# Edit and uncomment the lines you want (drop the leading "# ").
 
+# ~/Documents/2teach/course-COPY
 # BOTH
-# ~/Dropbox/TEMP
+# TA-dir: ~/shared/calc-ta
