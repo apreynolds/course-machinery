@@ -278,11 +278,18 @@ csv_matches() {
 # WALK
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # -print0 / read -d '' so paths with spaces survive. Aux and build output never
-# live beside the sources here, but .git might, so prune it.
+# live beside the sources here, but two directories hold .tex that are NOT bank
+# entries and must be pruned: .git (obvious), and .course-machinery -- the
+# tooling submodule, whose manual/ documents \ProblemMeta / \FactMeta by SHOWING
+# example blocks, which would otherwise be scraped as phantom problems/facts.
+# Real banks live in course-content dirs (problems/, facts/), never in there. An
+# explicit operand INSIDE .course-machinery still works (the prune only fires on
+# a directory of that name met while descending).
 files=()
 while IFS= read -r -d '' f; do
   files+=("$f")
-done < <(find "${paths[@]}" -name .git -prune -o -type f -name '*.tex' -print0 | sort -z)
+done < <(find "${paths[@]}" \( -name .git -o -name .course-machinery \) -prune \
+           -o -type f -name '*.tex' -print0 | sort -z)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # FAST PATH: --tsv
