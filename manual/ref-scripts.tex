@@ -16,12 +16,12 @@ views & \texttt{\%!\ views: solutions, hints, projector, instructor} in
   the leading comment block; each produces \file{FILE-VIEW.pdf} by
   injecting its layer definition(s). Unknown views warn and skip. A
   \texttt{:LABEL} suffix also drops that view, flat, into the named
-  \file{.OUTDIR} destination (\env{default} = the base PDF).\\
-output & nearest ancestor \file{.OUTDIR} (bare base path $+$ optional
+  \file{.MIRRORDIR} destination (\env{default} = the base PDF).\\
+output & nearest ancestor \file{.MIRRORDIR} (bare base path $+$ optional
   \texttt{BOTH}) tree-mirrors the repo under the base $\to$ else local.
   Base must exist; missing $\to$ warn and fall back to local.
   \texttt{LABEL: path} lines name flat per-view destinations (must exist).
-  \file{SAMPLE-OUTDIR} is the template.\\
+  \file{SAMPLE-MIRRORDIR} is the template.\\
 aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
   key}$\rangle$-$\langle$\emph{job}$\rangle$.\\
 \end{tabularx}

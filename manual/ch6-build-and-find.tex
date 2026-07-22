@@ -56,7 +56,7 @@ identical page breaks (section~\ref{sec:overlay}).
 
 \subsubsection{Where the PDFs go}
 
-The output mirror is one \file{.OUTDIR} file, found by walking up from the
+The output mirror is one \file{.MIRRORDIR} file, found by walking up from the
 build directory to the nearest ancestor that holds one (the repo top level,
 the way \file{.latexmkrc} finds the machinery). Its first bare line names a
 base directory (leading \texttt{\~{}} expanded) that \emph{mirrors the repo
@@ -67,19 +67,19 @@ warns and builds locally rather than scattering a stray tree. By default the
 PDF goes \emph{straight there}, with no local copy; add a line reading
 \texttt{BOTH} to build locally \emph{and} copy. Blank and \texttt{\#}-comment
 lines are ignored; the base path and the \texttt{BOTH} keyword may come in
-either order. A nearer \file{.OUTDIR} in a subdirectory wins, letting a
-subtree mirror somewhere else. With no \file{.OUTDIR} above it at all, the PDF
+either order. A nearer \file{.MIRRORDIR} in a subdirectory wins, letting a
+subtree mirror somewhere else. With no \file{.MIRRORDIR} above it at all, the PDF
 lands next to its source.
 
-\file{SAMPLE-OUTDIR}, shipped with the machinery, is the commented template --
-copy it to \file{.OUTDIR} and uncomment. \file{.OUTDIR} is meant to be
+\file{SAMPLE-MIRRORDIR}, shipped with the machinery, is the commented template --
+copy it to \file{.MIRRORDIR} and uncomment. \file{.MIRRORDIR} is meant to be
 git-ignored: each machine points its own way.
 
 \paragraph{Routing a view to a named folder.}
 Sometimes one view of a document belongs somewhere else too -- the instructor
 copy of a test in a folder shared with TAs, say, while the rest of the build
 still mirrors to your private cloud. Add \texttt{LABEL: path} lines to
-\file{.OUTDIR} and tag the view with a matching \texttt{:LABEL} suffix in the
+\file{.MIRRORDIR} and tag the view with a matching \texttt{:LABEL} suffix in the
 magic comment:
 
 \begin{manexsource}
@@ -91,7 +91,7 @@ magic comment:
 goes only to the mirror. The labelled directory must already exist (a missing
 label or directory warns and skips just that extra copy -- the build still
 succeeds and still mirrors). Because the source names only a \emph{label} and
-the git-ignored \file{.OUTDIR} maps it to a path, no machine-specific path ever
+the git-ignored \file{.MIRRORDIR} maps it to a path, no machine-specific path ever
 enters a tracked source. The pseudo-view \env{default} names the base (student)
 PDF itself, so \texttt{default:LABEL} routes it the same way; a bare
 \env{default} is a harmless no-op.

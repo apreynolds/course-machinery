@@ -5,8 +5,8 @@
 # With no arguments, compiles every *.tex file in the current directory.
 # Each source FILE.tex produces FILE.pdf.
 #
-# Output mirror via a top-level .OUTDIR file: build-pdfs looks upward from the
-# build directory for a .OUTDIR (at the repo top level, found the way .latexmkrc
+# Output mirror via a top-level .MIRRORDIR file: build-pdfs looks upward from the
+# build directory for a .MIRRORDIR (at the repo top level, found the way .latexmkrc
 # finds .course-machinery). Its first bare line names a base directory (a leading
 # ~ is expanded) that mirrors the repo tree, so a source built in
 # REPO/integrals/lectures ships to BASE/integrals/lectures. The mirror sub-
@@ -15,18 +15,18 @@
 # scattering a stray tree. By default the build goes straight to the mirror (no
 # local copy); add a line reading BOTH to build locally AND copy the PDF to the
 # mirror, keeping both. Blank and #-comment lines are ignored; the path and the
-# BOTH keyword may appear in either order. A nearer .OUTDIR (in a subdirectory)
+# BOTH keyword may appear in either order. A nearer .MIRRORDIR (in a subdirectory)
 # wins, letting a subtree mirror elsewhere. (COPY, a songsheets synonym for
 # BOTH, is intentionally not recognised here yet.)
 #
 # Named destinations for selected views: besides the bare mirror-base line, a
-# .OUTDIR may carry `LABEL: path' lines (e.g. `TA-dir: ~/shared/calc-ta'). A view
+# .MIRRORDIR may carry `LABEL: path' lines (e.g. `TA-dir: ~/shared/calc-ta'). A view
 # in the magic comment below may name one with a colon suffix — `instructor:TA-dir'
 # — which drops that view's PDF, flat, into the labelled directory IN ADDITION to
 # the mirror. The labelled directory must already exist; a missing label or
 # directory warns and skips that one extra copy without failing the build. This
 # keeps machine-specific paths out of the (git-tracked) source: the source names a
-# label, the git-ignored .OUTDIR maps it to a path.
+# label, the git-ignored .MIRRORDIR maps it to a path.
 #
 # Views via a magic comment: a `%! views: ...' line in the leading comment block
 # of a source (before \documentclass) requests extra PDFs. Four views are wired:
@@ -81,12 +81,12 @@ case "${1:-}" in
     ;;
 esac
 
-# Parse a .OUTDIR file for its mirror base: blank and #-comment lines are ignored,
+# Parse a .MIRRORDIR file for its mirror base: blank and #-comment lines are ignored,
 # an optional BOTH keyword and the bare base path may appear in either order, and
 # `LABEL: path' named-destination lines are skipped here (resolve_label reads
 # those). Echoes two lines — the mode (MOVE or BOTH) then the base path (a leading
 # ~ expanded) — or warns and echoes nothing if the file names no base at all.
-# VALIDATING the base is the caller's job (read_outdir requires it to exist; it
+# VALIDATING the base is the caller's job (read_mirrordir requires it to exist; it
 # creates the mirror sub-directory itself). (COPY, a songsheets synonym for BOTH,
 # is intentionally not recognised here yet.)
 parse_dest_file() {
@@ -114,62 +114,62 @@ parse_dest_file() {
   printf '%s\n%s\n' "$mode" "${path/#\~/$HOME}"
 }
 
-# Echo the path of the .OUTDIR governing the cwd: the nearest ancestor holding a
-# .OUTDIR (the repo top level, the way .latexmkrc finds .course-machinery), or
-# also its own root when found. Echoes two lines — the .OUTDIR file path then the
-# directory that holds it — or nothing when no .OUTDIR exists above. Shared by the
-# mirror resolver and the label resolver so both agree on which .OUTDIR is in force.
-find_outdir_file() {
+# Echo the path of the .MIRRORDIR governing the cwd: the nearest ancestor holding a
+# .MIRRORDIR (the repo top level, the way .latexmkrc finds .course-machinery), or
+# also its own root when found. Echoes two lines — the .MIRRORDIR file path then the
+# directory that holds it — or nothing when no .MIRRORDIR exists above. Shared by the
+# mirror resolver and the label resolver so both agree on which .MIRRORDIR is in force.
+find_mirrordir_file() {
   local root=$PWD
-  while [[ $root != / && ! -f $root/.OUTDIR ]]; do
+  while [[ $root != / && ! -f $root/.MIRRORDIR ]]; do
     root=$(dirname -- "$root")
   done
-  [[ -f $root/.OUTDIR ]] || return 0
-  printf '%s\n%s\n' "$root/.OUTDIR" "$root"
+  [[ -f $root/.MIRRORDIR ]] || return 0
+  printf '%s\n%s\n' "$root/.MIRRORDIR" "$root"
 }
 
-# Resolve the mirror directory from the governing top-level .OUTDIR file. Reads a
+# Resolve the mirror directory from the governing top-level .MIRRORDIR file. Reads a
 # base directory from it (first bare non-comment line; a leading ~ expands; an
 # optional BOTH line keeps a local copy too). The PDF ships to the base with the
-# cwd's path relative to the .OUTDIR's own directory appended, so
+# cwd's path relative to the .MIRRORDIR's own directory appended, so
 # REPO/integrals/lectures mirrors to BASE/integrals/lectures. That mirror sub-
 # directory is created if missing, but the base itself must exist — if it doesn't,
 # warn and build locally rather than materialising a stray tree. Echoes two lines
 # (mode, dest) on success, or nothing when the caller should build locally.
-read_outdir() {
+read_mirrordir() {
   local finfo f root info base mode rel dest
-  finfo=$(find_outdir_file)
-  [[ -n $finfo ]] || return 0          # no .OUTDIR anywhere above -> build locally
+  finfo=$(find_mirrordir_file)
+  [[ -n $finfo ]] || return 0          # no .MIRRORDIR anywhere above -> build locally
   { read -r f; read -r root; } <<<"$finfo"
 
   info=$(parse_dest_file "$f")
   [[ -n $info ]] || return 0
   { read -r mode; read -r base; } <<<"$info"
   if [[ ! -d $base ]]; then
-    echo "build-pdfs: .OUTDIR base '$base' is not a directory, building locally" >&2
+    echo "build-pdfs: .MIRRORDIR base '$base' is not a directory, building locally" >&2
     return 0
   fi
 
-  # Mirror the cwd's path relative to the .OUTDIR's directory under the base.
+  # Mirror the cwd's path relative to the .MIRRORDIR's directory under the base.
   rel=${PWD#"$root"}; rel=${rel#/}
   dest=$base${rel:+/$rel}
   if ! mkdir -p -- "$dest"; then
-    echo "build-pdfs: could not create .OUTDIR path '$dest', building locally" >&2
+    echo "build-pdfs: could not create .MIRRORDIR path '$dest', building locally" >&2
     return 0
   fi
   printf '%s\n%s\n' "$mode" "$dest"
 }
 
-# Resolve a named view destination from the governing .OUTDIR: find the first
+# Resolve a named view destination from the governing .MIRRORDIR: find the first
 # `LABEL: path' line whose label matches $1, expand a leading ~, and require the
 # path to be an existing directory. Echoes the directory on success, or warns and
-# echoes nothing (no .OUTDIR, no such label, or the path is missing / not a
+# echoes nothing (no .MIRRORDIR, no such label, or the path is missing / not a
 # directory) so the caller skips that one flat copy without failing the build.
 resolve_label() {
   local label=$1 finfo f root line trimmed path
-  finfo=$(find_outdir_file)
+  finfo=$(find_mirrordir_file)
   if [[ -z $finfo ]]; then
-    echo "build-pdfs: view label '$label' needs a .OUTDIR, skipping extra copy" >&2
+    echo "build-pdfs: view label '$label' needs a .MIRRORDIR, skipping extra copy" >&2
     return 0
   fi
   { read -r f; read -r root; } <<<"$finfo"
@@ -196,7 +196,7 @@ resolve_label() {
   printf '%s\n' "$path"
 }
 
-# Drop one built PDF, flat, into the .OUTDIR destination named by a view label.
+# Drop one built PDF, flat, into the .MIRRORDIR destination named by a view label.
 # Additive: this is an extra copy on top of the mirror, never a replacement. A
 # label that does not resolve (resolve_label already warned) is skipped, and a
 # failed copy warns but does not abort the build.
@@ -286,21 +286,21 @@ build_file() {
     auxdir="$HOME/.cache/latexmk/$auxkey-$jobname"
     mkdir -p "$auxdir" || exit
 
-    # Output mirror: a governing top-level .OUTDIR mirrors the PDF to its base
-    # tree (see header). read_outdir echoes two lines (mode, dest) or nothing.
+    # Output mirror: a governing top-level .MIRRORDIR mirrors the PDF to its base
+    # tree (see header). read_mirrordir echoes two lines (mode, dest) or nothing.
     # MOVE (default): -outdir writes the PDF straight to the mirror. BOTH: build
     # locally (out-dir defaults to cwd), then copy the PDF to the mirror. movedir
     # carries the -outdir path for the MOVE case only, so BOTH keeps its local
     # build.
     mode=""; outdir=""; movedir=""
-    outinfo=$(read_outdir)
+    outinfo=$(read_mirrordir)
     if [[ -n $outinfo ]]; then
       { read -r mode; read -r outdir; } <<<"$outinfo"
       if [[ $mode == BOTH ]]; then
-        echo "    -> outdir: $outdir (local copy kept)"
+        echo "    -> mirror: $outdir (local copy kept)"
       else
         movedir="$outdir"
-        echo "    -> outdir: $outdir"
+        echo "    -> mirror: $outdir"
       fi
     fi
 
@@ -312,7 +312,7 @@ build_file() {
 
     # Where the built PDFs actually live, for the flat `:LABEL' copies below: the
     # mirror dir in MOVE mode, else the local build dir (BOTH keeps a local copy;
-    # no .OUTDIR builds locally).
+    # no .MIRRORDIR builds locally).
     pdfdir="."; [[ -n $movedir ]] && pdfdir="$movedir"
 
     # Extra views requested via `%! views: ...' in the source's leading comment.
@@ -321,7 +321,7 @@ build_file() {
     # one-line arm. Each view gets its own aux dir (so it never clobbers the main
     # build's log) and follows the same MOVE/BOTH output handling as the default
     # build above. A `view:LABEL' token additionally drops a flat copy into the
-    # named .OUTDIR destination; `default:LABEL' does the same for the base PDF.
+    # named .MIRRORDIR destination; `default:LABEL' does the same for the base PDF.
     for view in $(read_views "$base"); do
       name=$view; label=""
       if [[ $view == *:* ]]; then name=${view%%:*}; label=${view#*:}; fi

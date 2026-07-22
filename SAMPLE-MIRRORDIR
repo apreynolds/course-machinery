@@ -1,10 +1,10 @@
-# SAMPLE-OUTDIR — template for the build-pdfs output mirror
+# SAMPLE-MIRRORDIR — template for the build-pdfs output mirror
 #
-# To use: copy this file to .OUTDIR at the repo top level (or in any directory
-# whose subtree you want mirrored elsewhere -- the nearest .OUTDIR above a build
+# To use: copy this file to .MIRRORDIR at the repo top level (or in any directory
+# whose subtree you want mirrored elsewhere -- the nearest .MIRRORDIR above a build
 # directory wins). build-pdfs then mirrors every PDF it builds under that
 # directory into the base named below, preserving the path relative to the
-# .OUTDIR's own directory: a source in REPO/integrals/lectures ships to
+# .MIRRORDIR's own directory: a source in REPO/integrals/lectures ships to
 # BASE/integrals/lectures. Missing mirror sub-directories are created; the base
 # itself must already exist (else build-pdfs warns and builds locally).
 #
@@ -27,8 +27,8 @@
 #   the same for the base (student) PDF. This keeps machine-specific paths out of
 #   the git-tracked source: the source names a label, this file maps it to a path.
 #
-# .OUTDIR is meant to be git-ignored, so each machine or checkout can point
-# somewhere different (keep SAMPLE-OUTDIR tracked as the reference).
+# .MIRRORDIR is meant to be git-ignored, so each machine or checkout can point
+# somewhere different (keep SAMPLE-MIRRORDIR tracked as the reference).
 #
 # Edit and uncomment the lines you want (drop the leading "# ").
 
