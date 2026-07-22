@@ -1,0 +1,47 @@
+\section{FactMeta.sty}\label{sec:ref-factmeta}
+
+Greppable \emph{fact} metadata -- ProblemMeta's little sibling, and like it
+\emph{store-only} and nice-to-have. A fact is a bare snippet (a definition, a
+formula) with no structure of its own; FactMeta lets you find one by what it
+says without running \LaTeX. One command:
+
+\begin{manexsource}
+\FactMeta{
+  source = {apex},
+  number = {2.1},
+  topics = {differentiation, power-rule},
+  desc   = {},
+}
+\end{manexsource}
+
+Keys: \env{source}, \env{number}, \env{topics}, \env{desc} -- a strict subset of
+ProblemMeta's. A fact has \emph{no} \env{type} or \env{difficulty} (those
+describe a \emph{problem}'s form and challenge), and nothing extrinsic like
+points. \env{topics} lists every subject the fact touches (and echoes its
+folder); \env{source}/\env{number} are a provenance origin and its locator;
+\env{desc} is an optional short label. On the \LaTeX{} side the block is
+\emph{validated but discarded}: a mistyped key errors at compile time, nothing is
+typeset. The real reader is \file{find-facts}, which parses the block textually
+off disk -- hence the same two disciplines (one key per line with braced values,
+and \texttt{\#} written \texttt{\char`\\\#}) as ProblemMeta.
+
+Design notes worth keeping in mind:
+
+\begin{itemize}
+  \item \textbf{Intrinsic only.} Source, number and topics belong to a fact
+    forever. Anything set at the import site is not a key here.
+  \item \textbf{Keys reset per block}, so a file that omits \env{number} never
+    inherits a previous import's value when several facts land in one document.
+  \item \textbf{Removable.} If tagging is abandoned, delete the package:
+    Exercises' \cs{AtBeginDocument} stub swallows leftover \cs{FactMeta} blocks
+    and every document still builds.
+  \item \textbf{Import wrapper.} A picked fact is inserted as
+    \cs{importfact}\texttt{[number, desc]\{DIR\}\{FILE\}} (defined in
+    \file{Exercises.sty}, beside \cs{importproblem}). By default it renders the
+    fact bare; the injected \env{number}/\env{desc} are captured into
+    \cs{CurrentFactNumber}/\cs{CurrentFactDesc} but shown only if a document
+    opts in by redefining the \cs{ShowFactMeta} hook -- e.g.\ a formula sheet
+    that wants ``Power Rule\ldots{} \S2.1'' beside each fact. This mirrors the
+    ProblemMeta margin display that once existed: metadata captured and
+    available, display opt-in.
+\end{itemize}

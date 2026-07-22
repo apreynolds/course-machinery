@@ -75,3 +75,21 @@ so \file{find-problems}' filters pre-narrow what the picker offers. The Vim
 command \texttt{:ImportProblem} (\texttt{<Space>ip}, in
 \file{after/ftplugin/tex.vim}) is the same pipeline wired to insert at the
 cursor, with \texttt{-{}-from} set to the editing buffer's own directory.
+
+\subsection*{find-facts and pick-facts (the fact-bank twins)}
+
+The fact bank (section~\ref{sec:ref-factmeta}) is searched and imported by the
+same machinery, one rung smaller. \file{find-facts} and \file{pick-facts} behave
+exactly like their problem counterparts above but read \cs{FactMeta} blocks and
+emit \cs{importfact} lines, over the fact schema: the filters are
+\texttt{-{}-topic} and \texttt{-{}-source} only (a fact has no type or
+difficulty), and \texttt{-{}-tsv} columns are
+(path, desc, topics, source, number). The Vim command \texttt{:ImportFact}
+(\texttt{<Space>if}) mirrors \texttt{:ImportProblem}.
+
+Under the hood all four commands are thin shims over one shared engine,
+\file{find-meta} (\file{find-problems}/\file{find-facts}) and \file{pick-meta}
+(\file{pick-problems}/\file{pick-facts}): a \texttt{-{}-kind} selects the block
+macro, the emitted wrapper and the key schema; the reading, matching and
+emitting are written once. Run any shim with \texttt{-{}-help} for its concrete
+flags.

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# find-facts — search the fact bank by its \FactMeta metadata.
+# A thin shim over find-meta (the shared engine); `--help' lists the concrete
+# fact filters (--topic/--source -- facts carry no type/difficulty). See
+# find-meta and FactMeta.sty.
+exec "$(dirname -- "$0")/find-meta" --kind fact --as find-facts "$@"

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# pick-facts — fzf picker over the fact bank; emits \importfact lines.
+# A thin shim over pick-meta (the shared picker). Forwards find-facts' filters
+# and PATH operands; `--from DIR' makes emitted paths relative to DIR. See
+# pick-meta and find-facts.
+exec "$(dirname -- "$0")/pick-meta" --kind fact --as pick-facts "$@"

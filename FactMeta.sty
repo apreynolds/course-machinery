@@ -1,0 +1,52 @@
+\ProvidesPackage{FactMeta}[2026/07/22 Greppable fact metadata (store only)]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% WHY THIS EXISTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The fact bank is one fact per file (a bare snippet with no structure of its
+% own), pulled into lectures and formula sheets with \import. So "which facts do
+% I have about the chain rule?" has to be answerable WITHOUT running LaTeX --
+% nothing has \input those files yet when you are deciding what to put on a
+% formula sheet. That rules out any scheme where the metadata exists only once
+% TeX has read it.
+%
+% Hence the metadata is a literal block that a script reads straight off disk:
+%
+%   \FactMeta{
+%     source = {apex},
+%     number = {2.1},
+%     topics = {differentiation, power-rule},
+%     desc   = {},
+%   }
+%
+% This is ProblemMeta's little sibling -- same store-only design, same textual
+% parser (find-meta, via the find-facts shim), same disciplines -- but a smaller
+% schema: a fact has no type or difficulty (those describe a *problem*'s form and
+% challenge), and nothing extrinsic like points. The keys are source, number,
+% topics, desc.
+%
+% Keep ONE KEY PER LINE, values braced. find-facts parses the block textually,
+% line by line; reflowing it onto a single line still compiles fine but makes the
+% fact invisible to the script. That is the one way to get the two readers out of
+% step, so it is worth the discipline.
+%
+% The LaTeX side is STORE-ONLY: \FactMeta accepts the block (so the file compiles
+% and a mistyped key is caught) but typesets nothing. To display provenance at an
+% import site, that is \importfact's job (see Exercises.sty) via its opt-in
+% \ShowFactMeta hook -- not this package.
+%
+% NB `#' is special to LaTeX, so a source like `Stewart 3.1 #7' must be written
+% `Stewart 3.1 \#7'. find-facts knows this and reports it back without the
+% backslash.
+
+\RequirePackage{keyval}
+
+% The keys are ACCEPTED but their values are discarded -- validation only, so a
+% mistyped key (`topic' for `topics') errors at compile time. The metadata itself
+% is read off disk by find-facts, never from these.
+\define@key{FactMeta}{source}{}
+\define@key{FactMeta}{number}{}
+\define@key{FactMeta}{topics}{}
+\define@key{FactMeta}{desc}  {}
+
+\newcommand{\FactMeta}[1]{\setkeys{FactMeta}{#1}\ignorespaces}

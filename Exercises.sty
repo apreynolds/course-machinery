@@ -20,6 +20,8 @@
 %   \importproblem[points=5, ...]{DIR}{FILE}  \import a problem; keyval options:
 %                                             points= / nocount / hint / nohint
 %                                             ([5] alone is shorthand for points=5)
+%   \importfact[number=, desc=]{DIR}{FILE} \import a bare fact; provenance only,
+%                                             shown via the opt-in \ShowFactMeta
 %   \printtotalpoints                      the summed points of the assessment
 %
 % plus the independent \ifsolutions / \ifhints toggles that drive those two
@@ -65,6 +67,10 @@
 % does nothing; problem files are only read in the body, so the stub is in place
 % in time either way.
 \AtBeginDocument{\providecommand{\ProblemMeta}[1]{}}
+% Likewise for \FactMeta: a fact file carrying a metadata block compiles even
+% when FactMeta.sty is absent (the block is silently swallowed). \importfact
+% below is separate machinery -- this stub only guards the store-only block.
+\AtBeginDocument{\providecommand{\FactMeta}[1]{}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SOLUTIONS / HINTS TOGGLES
@@ -451,6 +457,45 @@
 % usual one, e.g. \importcheckin[desc={from APEX}]{...}{...}.
 \NewDocumentCommand{\importcheckin}{O{} m m}{%
   \ifblank{#1}{\importproblem[checkin]{#2}{#3}}{\importproblem[checkin, #1]{#2}{#3}}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FACT IMPORT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \importfact[number={2.1}, desc={from APEX}]{DIR}{FILE} -- the fact-bank
+% counterpart to \importproblem. A "fact" is a bare snippet (a definition, a
+% formula) with no structure of its own, so -- unlike \importproblem -- there is
+% NO points/checkin/hint/print bookkeeping: the wrapper just \imports the file.
+% Its optional keys carry provenance (number and desc, the same intrinsic pair
+% find-facts injects) into \CurrentFact... registers, and by default it renders
+% NOTHING extra -- an imported fact stays bare, as the fact files promise. A
+% document that DOES want the provenance shown -- a formula sheet listing "Power
+% Rule ... Sec 2.1" -- redefines the \ShowFactMeta hook to typeset from those
+% registers. This mirrors the old ProblemMeta margin display (removed
+% 2026-07-18): the metadata is captured and available, never silently dropped,
+% but display is opt-in.
+%
+% Kept here beside \importproblem because this package already owns the import
+% wrappers and everything \importfact needs (import, keyval) is already loaded --
+% no dependency on FactMeta.sty, so self-containment holds. If a lightweight
+% formula-sheet class ever wants \importfact WITHOUT the problem/solution
+% machinery, lift this block into a small Facts.sty and load that instead.
+\define@key{eximportfact}{number}{\gdef\CurrentFactNumber{#1}}
+\define@key{eximportfact}{desc}  {\gdef\CurrentFactDesc{#1}}
+\newcommand{\importfact@reset}{%
+  \gdef\CurrentFactNumber{}%
+  \gdef\CurrentFactDesc{}%
+}
+% The opt-in provenance hook: empty by default so an imported fact renders bare.
+% \renewcommand\ShowFactMeta{...} (e.g. in a formula-sheet preamble) to print
+% from \CurrentFactNumber / \CurrentFactDesc. Runs before the fact body.
+\newcommand{\ShowFactMeta}{}
+\NewDocumentCommand{\importfact}{O{} m m}{%
+  \importfact@reset
+  \setkeys{eximportfact}{#1}%
+  \ShowFactMeta
+  \import{#2}{#3}%
+  \importfact@reset
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

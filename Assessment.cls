@@ -66,8 +66,11 @@
 %                 part the course can't be taught without.
 %   ProblemMeta -- greppable topic/tag metadata. Nice-to-have; removable on its
 %                 own (Exercises no longer depends on it) without breaking builds.
+%   FactMeta   -- the same, for imported fact snippets. Also nice-to-have; the
+%                 \FactMeta stub in Exercises keeps facts compiling without it.
 \RequirePackage{Exercises}
 \RequirePackage{ProblemMeta}
+\RequirePackage{FactMeta}
 
 % Explicit handwriting whitespace: \workspace[lines|halfpage|fullpage] / \workspace*.
 % Shared with LectureNotes -- both need copious writing room, unlike CourseDocument.

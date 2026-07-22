@@ -1,0 +1,466 @@
+#!/usr/bin/env bash
+# find-meta — search a metadata bank (problems or facts) by its \<Kind>Meta block
+#
+# The shared engine behind find-problems and find-facts. A "kind" (chosen with
+# --kind) fixes three things: the block macro it reads (\ProblemMeta / \FactMeta),
+# the \import wrapper it emits (\importproblem / \importfact), and the key schema
+# (which filters exist, which columns --tsv prints). Everything else -- reading a
+# block off disk, matching, emitting -- is shared and lives here, in one place.
+#
+# This file is not meant to be called directly: invoke the per-kind shims
+# find-problems / find-facts, which each `exec' this with the right --kind. See
+# ProblemMeta.sty / FactMeta.sty for the block format this parses.
+#
+# Usage: find-meta --kind KIND [--as NAME] [FILTER ...] [--untagged] [--vocab]
+#                  [--tsv] [--import [--with LIST] [--from DIR]] [PATH ...]
+#
+# Run `find-problems --help' or `find-facts --help' for the concrete flags of a
+# kind (they differ: facts have no type/difficulty). The mechanics below are the
+# same for both.
+#
+# Filters are ANDed; PAT is an extended regular expression matched
+# case-insensitively against each comma-separated item in turn -- so `--topic
+# power' finds `power-rule', and `--topic '^power-rule$'' matches only that. A
+# filter for a key a file does not set never matches, so it will not report
+# untagged files.
+#
+# Other modes: --untagged (invert: files with NO block -- the tagging backlog),
+# --vocab (ignore filters, print the topic/type vocabulary with counts, the
+# antidote to `integration' vs `integrals'), --import (paste-ready \import<kind>
+# lines; --with LIST injects number,desc as options where present; --from DIR
+# rewrites the directory argument relative to the importing document's folder),
+# and --tsv (one tab-separated row per match, the machine feed for a picker).
+#
+# An operand may be a directory (walked recursively) or a single .tex file, so a
+# picker can ask --import about exactly the files it selected.
+#
+# The parser is textual and deliberately simple: it wants one key per line inside
+# the block, value braced, as the *Meta.sty headers ask for. A block reflowed
+# onto one line still compiles but will not be seen here.
+
+set -uo pipefail
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# KIND / SCHEMA
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# --kind and --as are needed before the main option loop (they pick the schema
+# and the program name used in messages), so pre-scan for them. The full argv is
+# left intact for the loop below, which simply skips these two.
+kind="" as=""
+_a=("$@")
+for ((_i = 0; _i < ${#_a[@]}; _i++)); do
+  case ${_a[_i]} in
+    --kind) kind=${_a[_i + 1]:-} ;;
+    --as)   as=${_a[_i + 1]:-} ;;
+  esac
+done
+prog=${as:-find-meta}
+
+# Everything that differs between a problem bank and a fact bank lives in exactly
+# this case. filter_specs are `flag:key' pairs -- each becomes a --flag PATTERN
+# filter on that metadata key (the flag is singular by habit: --topic -> topics).
+# tsv_cols / vocab_keys are metadata keys in report order. block/emit are the
+# LaTeX macros. number,desc are the only injectable --with keys, the same for
+# both kinds, so that stays hard-coded below.
+case $kind in
+  problem)
+    noun="problem"; block_macro="ProblemMeta"; emit_macro="importproblem"
+    filter_specs=(topic:topics type:type difficulty:difficulty source:source)
+    tsv_cols=(desc topics type difficulty source number)
+    vocab_keys=(topics type difficulty)
+    ;;
+  fact)
+    noun="fact"; block_macro="FactMeta"; emit_macro="importfact"
+    filter_specs=(topic:topics source:source)
+    tsv_cols=(desc topics source number)
+    vocab_keys=(topics)
+    ;;
+  '') echo "$prog: --kind is required (problem|fact)" >&2; exit 2 ;;
+  *)  echo "$prog: unknown --kind: $kind (want problem|fact)" >&2; exit 2 ;;
+esac
+
+# flag -> key map (for the option loop) and the filter store (key -> pattern,
+# only for keys actually asked about).
+declare -A flag_key=()
+for _spec in "${filter_specs[@]}"; do
+  flag_key[${_spec%%:*}]=${_spec#*:}
+done
+declare -A filt=()
+
+usage() {
+  # Help is generated from the active schema so each kind reports its own flags
+  # and columns accurately (find-problems and find-facts do not have the same
+  # filters). This replaces find-problems' sed-reprint-the-header trick, which
+  # cannot vary per kind.
+  local spec flag key cols c
+  echo "$prog — search the $noun bank by its \\$block_macro metadata"
+  echo
+  echo "Usage: $prog [FILTER ...] [--untagged] [--vocab] [--tsv]"
+  echo "       ${prog//?/ } [--import [--with LIST] [--from DIR]] [PATH ...]"
+  echo
+  echo "Reads the \\$block_macro{...} block out of every .tex file under each PATH"
+  echo "(default: the current directory, recursively) and reports the files that"
+  echo "match. With no filters, reports every file that has a block."
+  echo
+  echo "Filters (optional, AND-combined; PAT is a case-insensitive ERE matched"
+  echo "against each comma-separated item):"
+  for spec in "${filter_specs[@]}"; do
+    flag=${spec%%:*}; key=${spec#*:}
+    printf '  --%-14s match the %s\n' "$flag PAT" "$key"
+  done
+  echo
+  echo "Modes:"
+  echo "  --untagged  invert: list .tex files with NO \\$block_macro block."
+  echo "  --vocab     ignore filters; print the ${vocab_keys[*]} vocabulary with counts."
+  echo "  --import    print matches as paste-ready \\$emit_macro lines."
+  echo "    --with LIST   subset of {number, desc}: inject those as options where set."
+  echo "    --from DIR    rewrite each directory argument relative to DIR."
+  cols="path"; for c in "${tsv_cols[@]}"; do cols+="<TAB>$c"; done
+  echo "  --tsv       one row per match: $cols"
+}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ARGUMENTS
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+with_keys="" from_dir=""    # --import modifiers (validated below)
+mode="list"                 # list | vocab | import | untagged | tsv
+paths=()                    # search operands: directories and/or individual files
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h | --help)   usage; exit 0 ;;
+    --kind)        shift 2 ;;   # consumed in the pre-scan
+    --as)          shift 2 ;;   # ditto
+    --vocab)       mode="vocab";    shift ;;
+    --import)      mode="import";   shift ;;
+    --untagged)    mode="untagged"; shift ;;
+    --tsv)         mode="tsv";      shift ;;
+    --with)        with_keys=${2:?--with needs a comma-separated key list}; shift 2 ;;
+    --from)        from_dir=${2:?--from needs a directory};                 shift 2 ;;
+    --*)
+      f=${1#--}
+      if [[ -n ${flag_key[$f]:-} ]]; then
+        filt[${flag_key[$f]}]=${2:?--$f needs a pattern}; shift 2
+      else
+        echo "$prog: unknown option: $1" >&2
+        echo "Try '$prog --help'." >&2
+        exit 2
+      fi ;;
+    *)             paths+=("$1"); shift ;;
+  esac
+done
+
+# --with / --from only make sense as modifiers of --import; reject them anywhere
+# else so a silent no-op cannot hide a typo.
+if [[ -n $with_keys || -n $from_dir ]] && [[ $mode != import ]]; then
+  echo "$prog: --with/--from only apply with --import" >&2
+  exit 2
+fi
+
+# --with takes a comma-separated subset of the injectable keys -- and ONLY those
+# two: number and desc are the only metadata keys that map to \import<kind>
+# options, so the set is deliberately closed (no per-key flag creep). Collect the
+# request as a set for the emitter below.
+declare -A want=()
+if [[ -n $with_keys ]]; then
+  IFS=, read -ra _wk <<< "$with_keys"
+  for k in "${_wk[@]}"; do
+    k="${k//[[:space:]]/}"                 # tolerate `number, desc' and trailing commas
+    case $k in
+      number | desc) want[$k]=1 ;;
+      "") ;;
+      *) echo "$prog: --with accepts only number,desc (got: $k)" >&2; exit 2 ;;
+    esac
+  done
+fi
+
+if [[ -n $from_dir && ! -d $from_dir ]]; then
+  echo "$prog: --from: not a directory: $from_dir" >&2
+  exit 2
+fi
+
+[[ ${#paths[@]} -eq 0 ]] && paths=(".")
+
+# Operands may be directories (walked recursively) or individual .tex files --
+# the picker's accept action passes specific selected files. `find' handles a
+# mix of both; we only insist each operand exists.
+for p in "${paths[@]}"; do
+  if [[ ! -e $p ]]; then
+    echo "$prog: no such file or directory: $p" >&2
+    exit 2
+  fi
+done
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# READING A BLOCK
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Prints one "key<TAB>value" line per key found in the file's \<kind>Meta block,
+# or nothing at all if the file has no block. Everything downstream works off
+# this, so the parsing rules live in exactly one place. The block macro name is
+# the only kind-specific input; it travels via the environment (fm_macro), like
+# the tsv filter patterns, to keep it away from awk -v's backslash processing.
+read_meta() {
+  fm_macro="$block_macro" awk '
+    BEGIN { open_re = "\\\\" ENVIRON["fm_macro"] "[[:space:]]*[{]" }
+
+    # The block opens on the line carrying \<Kind>Meta{ ...
+    $0 ~ open_re { inblock = 1; next }
+
+    # ... and closes at the first line starting with a brace.
+    inblock && /^[[:space:]]*\}/ { inblock = 0; next }
+
+    inblock {
+      line = $0
+
+      # Strip trailing LaTeX comments, but not an escaped \% inside a value.
+      # Park the escaped ones under a byte that cannot occur in a .tex source,
+      # cut at the first surviving %, then put them back.
+      gsub(/\\%/, "\001", line)
+      sub(/%.*$/, "", line)
+      gsub(/\001/, "\\%", line)
+
+      # A key line looks like:  name = {value},
+      if (match(line, /^[[:space:]]*[A-Za-z]+[[:space:]]*=/)) {
+        key = line
+        sub(/[[:space:]]*=.*$/, "", key)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+
+        val = line
+        sub(/^[^=]*=[[:space:]]*/, "", val)   # drop up to and including the =
+        sub(/,[[:space:]]*$/, "", val)        # drop the trailing comma
+        gsub(/^\{|\}$/, "", val)              # drop the surrounding braces
+        gsub(/\\#/, "#", val)                 # \# is how you must write # in TeX
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+
+        printf "%s\t%s\n", key, val
+      }
+    }
+  ' "$1"
+}
+
+# Pull one key out of a block dump (as produced by read_meta).
+field() {
+  local dump=$1 key=$2
+  printf '%s\n' "$dump" | awk -F'\t' -v k="$key" '$1 == k { print $2; exit }'
+}
+
+# Print TARGET as a path relative to BASE (both absolutised first). Used by
+# --from to make emitted \import<kind> directory arguments relative to the
+# importing document. macOS's BSD realpath has no --relative-to, so lean on perl
+# -- already a hard dependency of this repo (every .latexmkrc uses it) -- and its
+# core File::Spec::abs2rel.
+relpath() {
+  perl -MFile::Spec -MCwd -e \
+    'print File::Spec->abs2rel(Cwd::abs_path($ARGV[0]), Cwd::abs_path($ARGV[1]))' \
+    "$1" "$2"
+}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# MATCHING
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Does any comma-separated item in $1 match the ERE in $2? An empty pattern
+# means "no filter asked for", which matches everything -- including files that
+# do not set the key at all.
+csv_matches() {
+  local list=$1 pattern=$2 item
+  [[ -z $pattern ]] && return 0
+  local IFS=,
+  for item in $list; do
+    item="${item#"${item%%[![:space:]]*}"}"     # trim leading whitespace
+    item="${item%"${item##*[![:space:]]}"}"     # trim trailing whitespace
+    [[ -z $item ]] && continue
+    if [[ ${item,,} =~ ${pattern,,} ]]; then return 0; fi
+  done
+  return 1
+}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# WALK
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# -print0 / read -d '' so paths with spaces survive. Aux and build output never
+# live beside the sources here, but .git might, so prune it.
+files=()
+while IFS= read -r -d '' f; do
+  files+=("$f")
+done < <(find "${paths[@]}" -name .git -prune -o -type f -name '*.tex' -print0 | sort -z)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# FAST PATH: --tsv
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# --tsv is the machine feed for an interactive picker, so it has to be quick. The
+# generic loop below spawns read_meta plus a field() per key for EVERY file --
+# hundreds to thousands of forks -- fine for a human listing but laggy as an fzf
+# source. So --tsv gets its own route: a SINGLE awk parses every file in one
+# pass, applies the filters itself, and prints the rows. It reuses read_meta's
+# exact parsing rules and csv_matches' exact semantics, so the output is
+# byte-identical to the generic path -- just ~100x faster. The schema travels via
+# the environment (fm_*, flt_*), not awk -v, so awk's backslash-escape processing
+# cannot mangle a pattern. Columns/filters are data-driven from the active kind.
+if [[ $mode == tsv ]]; then
+  [[ ${#files[@]} -eq 0 ]] && exit 0
+
+  cols_csv=$(IFS=,; printf '%s' "${tsv_cols[*]}")
+  active=(); for k in "${!filt[@]}"; do active+=("$k"); done
+  filt_csv=$(IFS=,; printf '%s' "${active[*]}")
+
+  env_pairs=(fm_macro="$block_macro" fm_cols="$cols_csv" fm_filters="$filt_csv")
+  for k in "${active[@]}"; do env_pairs+=("flt_$k=${filt[$k]}"); done
+
+  printf '%s\0' "${files[@]}" \
+    | env "${env_pairs[@]}" xargs -0 awk '
+      function csv_match(value, pattern,   n, arr, i, item) {
+        if (pattern == "") return 1
+        n = split(value, arr, ",")
+        for (i = 1; i <= n; i++) {
+          item = arr[i]
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", item)
+          if (item != "" && tolower(item) ~ tolower(pattern)) return 1
+        }
+        return 0
+      }
+      BEGIN {
+        open_re = "\\\\" ENVIRON["fm_macro"] "[[:space:]]*[{]"
+        ncol  = split(ENVIRON["fm_cols"], col, ",")
+        nfilt = (ENVIRON["fm_filters"] == "") ? 0 : split(ENVIRON["fm_filters"], fk, ",")
+      }
+      # New file: reset state. split("",v) empties the array portably.
+      FNR == 1 { path = FILENAME; inblock = 0; split("", v) }
+      $0 ~ open_re { inblock = 1; next }
+      # Block close: filter, then emit one row (path + the schema columns).
+      inblock && /^[[:space:]]*\}/ {
+        inblock = 0
+        ok = 1
+        for (i = 1; i <= nfilt; i++)
+          if (!csv_match(v[fk[i]], ENVIRON["flt_" fk[i]])) { ok = 0; break }
+        if (ok) {
+          out = path
+          for (j = 1; j <= ncol; j++) out = out "\t" v[col[j]]
+          print out
+        }
+        next
+      }
+      # Key line inside the block -- read_meta parsing rules, verbatim.
+      inblock {
+        line = $0
+        gsub(/\\%/, "\001", line); sub(/%.*$/, "", line); gsub(/\001/, "\\%", line)
+        if (match(line, /^[[:space:]]*[A-Za-z]+[[:space:]]*=/)) {
+          key = line; sub(/[[:space:]]*=.*$/, "", key); gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+          val = line; sub(/^[^=]*=[[:space:]]*/, "", val); sub(/,[[:space:]]*$/, "", val)
+          gsub(/^\{|\}$/, "", val); gsub(/\\#/, "#", val); gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+          v[key] = val
+        }
+      }
+    '
+  exit 0
+fi
+
+matches=()
+declare -A meta_of=()
+
+for f in "${files[@]}"; do
+  dump=$(read_meta "$f")
+
+  if [[ $mode == untagged ]]; then
+    [[ -z $dump ]] && matches+=("$f")
+    continue
+  fi
+
+  [[ -z $dump ]] && continue          # no block -> not part of the bank
+
+  # --vocab really does ignore the filters (as its help text promises): the
+  # vocabulary must cover the whole bank, so every tagged file counts.
+  if [[ $mode != vocab ]]; then
+    ok=1
+    for k in "${!filt[@]}"; do
+      csv_matches "$(field "$dump" "$k")" "${filt[$k]}" || { ok=0; break; }
+    done
+    [[ $ok == 1 ]] || continue
+  fi
+
+  matches+=("$f")
+  meta_of["$f"]=$dump
+done
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# REPORT
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+case $mode in
+  vocab)
+    # Counts across every block found, per key. Filters are ignored: the point
+    # is to see the whole vocabulary before adding to it.
+    for key in "${vocab_keys[@]}"; do
+      echo "$key:"
+      for f in "${matches[@]}"; do
+        field "${meta_of[$f]}" "$key" | tr ',' '\n'
+      done | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' \
+           | sort | uniq -c | sort -rn | sed 's/^/  /'
+      echo
+    done
+    ;;
+
+  import)
+    # \import<kind> is the wrapper a document actually wants (it reboxes the
+    # imported file and carries the metadata options); its signature is
+    # [opts]{dir/}{file}. The dir/file split is relative to the importing
+    # document. Without --from we cannot know that document, so paths come out
+    # relative to the search root and usually need a ../ or two (paste and
+    # adjust); --from does the ../ for you.
+    for f in "${matches[@]}"; do
+      file=$(basename "$f")
+      if [[ -n $from_dir ]]; then
+        dir=$(relpath "$(dirname "$f")" "$from_dir")
+      else
+        dir=$(dirname "$f")
+      fi
+
+      # Injected options, in a fixed canonical order regardless of --with order.
+      # A file that lacks a requested key is silently skipped for that key. Any
+      # `#' has to be re-escaped to `\#': read_meta un-escaped it on the way in
+      # (\# -> #), but `\%' it left intact, so % needs no re-escaping here.
+      opts=""
+      for key in number desc; do
+        [[ -n ${want[$key]:-} ]] || continue
+        v=$(field "${meta_of[$f]}" "$key")
+        [[ -n $v ]] || continue
+        v=${v//'#'/\\#}
+        opts+="${opts:+, }${key}={${v}}"
+      done
+
+      if [[ -n $opts ]]; then
+        printf '\\%s[%s]{%s/}{%s}\n' "$emit_macro" "$opts" "$dir" "$file"
+      else
+        printf '\\%s{%s/}{%s}\n' "$emit_macro" "$dir" "$file"
+      fi
+    done
+    ;;
+
+  tsv)
+    # Reference implementation of the --tsv columns (the fast path above short-
+    # circuits before here and is what actually runs; this mirrors it exactly so
+    # the two stay legible side by side). One tab-separated row per match: column
+    # 1 is the path -- hidden from the picker's display, but kept because it is
+    # what opens/previews the file and feeds back into --import.
+    for f in "${matches[@]}"; do
+      row=$f
+      for key in "${tsv_cols[@]}"; do
+        row+=$'\t'$(field "${meta_of[$f]}" "$key")
+      done
+      printf '%s\n' "$row"
+    done
+    ;;
+
+  untagged)
+    printf '%s\n' "${matches[@]}"
+    echo >&2
+    echo "${#matches[@]} file(s) with no \\$block_macro block." >&2
+    ;;
+
+  list)
+    for f in "${matches[@]}"; do
+      echo "$f"
+      printf '%s\n' "${meta_of[$f]}" | sed 's/^/    /; s/\t/: /'
+      echo
+    done
+    echo "${#matches[@]} match(es)." >&2
+    ;;
+esac

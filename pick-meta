@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# pick-meta — fzf picker over a metadata bank (problems or facts); emits
+# \import<kind> lines. The shared engine behind pick-problems and pick-facts.
+#
+# Usage: pick-meta --kind KIND [--as NAME] [--from DIR] [FILTER ...] [PATH ...]
+#
+# This file is not meant to be called directly: invoke the per-kind shims
+# pick-problems / pick-facts. An interactive front-end to find-meta: it feeds
+# `find-<kind> --tsv' into fzf (multi-select, metadata shown, the .tex
+# previewed), then turns the chosen entries into paste-ready \import<kind> lines
+# via `find-<kind> --import'. The import block is printed to stdout -- pipe it,
+# or paste it into a document.
+#
+#   --from DIR    make the emitted directory arguments relative to DIR (the
+#                 folder of the document you will paste into); handed straight to
+#                 find-<kind> --import. Without it, paths are relative to the
+#                 search root and usually need a ../ or two.
+#
+# Every other argument is forwarded verbatim to `find-<kind> --tsv', so all of
+# its filters and PATH operands work here too, to pre-narrow what is offered.
+
+set -uo pipefail
+
+# --kind / --as picked before the main loop (they select the engine and the name
+# in messages); pre-scan for them, leaving the rest for the forward-through loop.
+kind="" as=""
+_a=("$@")
+for ((_i = 0; _i < ${#_a[@]}; _i++)); do
+  case ${_a[_i]} in
+    --kind) kind=${_a[_i + 1]:-} ;;
+    --as)   as=${_a[_i + 1]:-} ;;
+  esac
+done
+prog=${as:-pick-meta}
+
+case $kind in
+  problem) noun="problem" ;;
+  fact)    noun="fact" ;;
+  '') echo "$prog: --kind is required (problem|fact)" >&2; exit 2 ;;
+  *)  echo "$prog: unknown --kind: $kind (want problem|fact)" >&2; exit 2 ;;
+esac
+
+# find-meta is our sibling in the same directory. Call it by path rather than
+# assume it is on PATH: it is not installed globally -- each course carries its
+# own copy in .course-machinery, and that is the one we want. We drive it with
+# --kind directly (the find-problems/find-facts shims do the same thing).
+here=$(cd -- "$(dirname -- "$0")" && pwd)
+fm="$here/find-meta"
+if [[ ! -x $fm ]]; then
+  echo "$prog: cannot find find-meta next to me ($fm)" >&2
+  exit 2
+fi
+engine=("$fm" --kind "$kind" --as "find-$noun")
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ARGUMENTS
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Pull out --from (which only --import understands) and --kind/--as (consumed
+# above); forward everything else -- find-meta's own filters and PATH operands --
+# to the --tsv feed.
+from=""
+feed_args=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h | --help) sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --kind)      shift 2 ;;
+    --as)        shift 2 ;;
+    --from)      from=${2:?--from needs a directory}; shift 2 ;;
+    *)           feed_args+=("$1"); shift ;;
+  esac
+done
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# PICK
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Column 1 (the path) is hidden from the display (--with-nth=2..) but is what the
+# preview reads ({1}) and what we hand back to --import; search covers the shown
+# metadata. fzf exits non-zero on cancel or no-match, so we do not `set -e' and
+# just treat an empty result as "nothing to do".
+selection=$(
+  "${engine[@]}" --tsv "${feed_args[@]}" \
+    | fzf --multi \
+          --delimiter='\t' --with-nth=2.. \
+          --preview='bat --color=always --language=tex --style=numbers {1}' \
+          --preview-window='right:60%' \
+          --prompt="$noun> "
+)
+[[ -z $selection ]] && exit 0
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# EMIT
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Recover the paths (column 1) and hand exactly those files to the one emitter,
+# so the \import<kind> construction, #-escaping and --from logic all live in
+# find-meta, never duplicated here.
+mapfile -t files < <(printf '%s\n' "$selection" | cut -f1)
+
+import_args=(--import --with number,desc)
+[[ -n $from ]] && import_args+=(--from "$from")
+
+"${engine[@]}" "${import_args[@]}" "${files[@]}"
