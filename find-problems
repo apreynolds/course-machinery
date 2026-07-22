@@ -216,6 +216,66 @@ while IFS= read -r -d '' f; do
   files+=("$f")
 done < <(find "${paths[@]}" -name .git -prune -o -type f -name '*.tex' -print0 | sort -z)
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# FAST PATH: --tsv
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# --tsv is the machine feed for an interactive picker, so it has to be quick. The
+# generic loop below spawns read_meta plus a field() per key for EVERY file --
+# one awk process each, hundreds to thousands of forks -- which is fine for a
+# human-read listing but makes a fzf source feel laggy. So --tsv gets its own
+# route: a SINGLE awk parses every file in one pass, applies the filters itself,
+# and prints the rows. It reuses read_meta's exact parsing rules and csv_matches'
+# exact semantics (case-insensitive ERE per comma-separated item), so the output
+# is byte-identical to what the generic path would produce -- just ~100x faster.
+# Filter patterns travel via the environment (fp_*), not awk -v, so awk's -v
+# backslash-escape processing cannot mangle a pattern. Columns match the tsv
+# report branch below.
+if [[ $mode == tsv ]]; then
+  [[ ${#files[@]} -eq 0 ]] && exit 0
+  printf '%s\0' "${files[@]}" \
+    | fp_topic="$topic" fp_type="$type_" fp_difficulty="$difficulty" fp_source="$source" \
+      xargs -0 awk '
+      function csv_match(value, pattern,   n, arr, i, item) {
+        if (pattern == "") return 1
+        n = split(value, arr, ",")
+        for (i = 1; i <= n; i++) {
+          item = arr[i]
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", item)
+          if (item != "" && tolower(item) ~ tolower(pattern)) return 1
+        }
+        return 0
+      }
+      BEGIN {
+        ft = ENVIRON["fp_topic"]; fy = ENVIRON["fp_type"]
+        fd = ENVIRON["fp_difficulty"]; fs = ENVIRON["fp_source"]
+      }
+      # New file: reset state. split("",v) empties the array portably.
+      FNR == 1 { path = FILENAME; inblock = 0; split("", v) }
+      /\\ProblemMeta[[:space:]]*\{/ { inblock = 1; next }
+      # Block close: filter, then emit one row. Same column order as the report.
+      inblock && /^[[:space:]]*\}/ {
+        inblock = 0
+        if (csv_match(v["topics"], ft) && csv_match(v["type"], fy) &&
+            csv_match(v["difficulty"], fd) && csv_match(v["source"], fs))
+          printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+                 path, v["desc"], v["topics"], v["type"], v["difficulty"], v["source"], v["number"]
+        next
+      }
+      # Key line inside the block -- read_meta parsing rules, verbatim.
+      inblock {
+        line = $0
+        gsub(/\\%/, "\001", line); sub(/%.*$/, "", line); gsub(/\001/, "\\%", line)
+        if (match(line, /^[[:space:]]*[A-Za-z]+[[:space:]]*=/)) {
+          key = line; sub(/[[:space:]]*=.*$/, "", key); gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+          val = line; sub(/^[^=]*=[[:space:]]*/, "", val); sub(/,[[:space:]]*$/, "", val)
+          gsub(/^\{|\}$/, "", val); gsub(/\\#/, "#", val); gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+          v[key] = val
+        }
+      }
+    '
+  exit 0
+fi
+
 matches=()
 declare -A meta_of=()
 
