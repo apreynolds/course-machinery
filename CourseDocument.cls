@@ -24,6 +24,11 @@
 \RequirePackage{Titling}
 \RequirePackage{Hyperlinks}
 
+% \textbookref -- links into the course text (a syllabus cites the book as much
+% as a lecture does). Mechanism only; the manifest is course data, in
+% .textbook/textbook.tex.
+\RequirePackage{TextRef}
+
 % Instructor-only notes layer, shared with LectureNotes. AFTER Typefaces: this is
 % where tcolorbox now legitimately enters this class (below the font block, per the
 % "Fonts" load order). The instructor-copy signal is its page-edge frame -- no

@@ -57,6 +57,11 @@
 \RequirePackage{Titling}
 \RequirePackage{Hyperlinks}
 
+% \textbookref -- links into the course text. Mechanism only: the base URL and
+% the section manifest are course data, declared in .textbook/textbook.tex.
+% Inert until that file is \input; unresolved references print as plain text.
+\RequirePackage{TextRef}
+
 % Theorem/definition boxes + pedagogical asides. AFTER Typefaces: it pulls in
 % tcolorbox (which would drag amsmath in) but amsthm/amsmath are already loaded by
 % newtxmath, so the load-order fixed in "Fonts" holds. Requires hyperref (for
@@ -80,10 +85,11 @@
 % lecture notes. Exercises.sty leaves the presentation to the class (see its
 % "class-overridable PRESENTATION" hooks); here we set the notes look.
 %
-% The noun is a per-COURSE choice -- texts variously say Example / Exercise /
-% Problem. A course overrides it by redefining \NotesProblemLabelWord (its safe
-% home is course-vocab.tex). We route \ProblemLabelWord through that macro rather
-% than setting the word directly, so a course-vocab file shared with an ASSESSMENT
+% The noun is a per-TEXT choice -- texts variously say Example / Exercise /
+% Problem, and the notes should echo whichever the students are reading. A course
+% overrides it by redefining \NotesProblemLabelWord (its home is the text layer,
+% .textbook/textbook.tex). We route \ProblemLabelWord through that macro rather
+% than setting the word directly, so a text layer shared with an ASSESSMENT
 % document can retune the notes noun without disturbing Assessment.cls's fixed "Q"
 % (Assessment sets \ProblemLabelWord literally and never reads \NotesProblemLabelWord).
 \providecommand{\NotesProblemLabelWord}{Example}

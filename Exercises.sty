@@ -541,7 +541,8 @@
 % places a part label appears -- the \ref text (\thesubproblem), the case-2 \qpart
 % run-in, and the case-1 \problemgroup run-in -- so the printed "(a)" and a \ref's
 % "N(a)" always agree. Set once, e.g. \renewcommand{\QPartLabelFormat}{\Alph} in
-% course-vocab.tex or a class.
+% a class or a master's preamble. (Not the course's text layer: a part letter is
+% your format, not something you would open the textbook to decide.)
 \newcommand{\QPartLabelFormat}{\alph}
 % \thesubproblem carries the parent number ("4(a)") so a \ref to a part reads
 % "4(a)" -- the same nesting trick as \theequation under a section. The prefix
@@ -928,7 +929,7 @@
 % The instruction sentence -- CLASS-OVERRIDABLE presentation (same idiom as
 % \ProblemHeadingFormat). #1 = select (as given); #2 = first member number,
 % #3 = last member number, both \ref values (hence hyperlinks, and auto-updating).
-% Restyle the wording in one place (here, or override in Assessment.cls/course-vocab.tex).
+% Restyle the wording in one place (here, or override in Assessment.cls).
 \newcommand{\ProblemChoiceInstruction}[3]{%
   \noindent\textbf{Answer any \pchoice@numword{#1} of Questions~#2--#3.}}
 

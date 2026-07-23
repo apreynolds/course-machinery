@@ -76,6 +76,13 @@
 % Shared with LectureNotes -- both need copious writing room, unlike CourseDocument.
 \RequirePackage{Workspace}
 
+% \textbookref, so the ONE .textbook/textbook.tex file is \input-safe from an
+% assessment master too (it calls \SetTextBase/\DeclareSection unguarded). This
+% class loads no hyperref -- correctly, a link on printed paper being a dead end
+% -- so references here degrade to their plain text, which is the whole point of
+% the mechanism. See TextRef.sty.
+\RequirePackage{TextRef}
+
 % No [osf] -- assessments must read clearly and standardly; figures stay lining.
 % Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
 \RequirePackage{Typefaces}

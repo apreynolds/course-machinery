@@ -1,7 +1,8 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{Hyperlinks}[2026/07/15 hyperref (loaded last) + back-to-top anchor]
+\ProvidesPackage{Hyperlinks}[2026/07/22 hyperref (loaded last) + back-to-top anchor + \string\demo]
 
-% hyperref for the course classes, plus the anchor a back-to-top link jumps to.
+% hyperref for the course classes, plus the anchor a back-to-top link jumps to,
+% plus \demo (links out to an interactive tool).
 %
 % Requires the loading class to have done, before \ProcessOptions:
 %     \PassOptionsToPackage{dvipsnames}{xcolor}
@@ -58,3 +59,44 @@
 \newcommand{\TopAnchorName}{CourseTop}
 \AtBeginDocument{\hypertarget{\TopAnchorName}{}}
 \newcommand{\BackToTopLink}[1]{\hyperlink{\TopAnchorName}{#1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \demo -- LINK OUT TO AN INTERACTIVE TOOL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   \demo{https://www.desmos.com/calculator/xxxxxxxx}
+%   \demo[geogebra]{https://example.org/some/opaque/url}
+%
+% THE PRINCIPLE: students do not care which tool it is -- only the author does.
+% A class that meets "LINK: DESMOS", "Desmos demo" and "LET'S EXPLORE WITH
+% DESMOS!" on three consecutive pages is reading three different things when it
+% is always the same thing: press here, a graph moves. So every demo gets ONE
+% student-facing label, and the tool's identity is author-only metadata.
+%
+% Hence the optional argument is ACCEPTED AND DISCARDED (the same store-only
+% idiom as ProblemMeta/FactMeta): it names the tool for a human reader of the
+% source, and for the eventual link-checker, which classifies a link by its URL
+% domain and needs the hint only when the domain is opaque. Nothing about it
+% reaches the page.
+%
+% The real payoff is enumerability. Every demo routed through one macro means
+% "curl all my interactive links and tell me which died over the summer" is a
+% grep away -- rot found on your schedule, not in front of a class. That is why
+% even a bare \href you were about to write should be a \demo.
+%
+% Lives here rather than in TextRef.sty deliberately: a demo link has nothing to
+% do with the textbook (it is your own Desmos page as often as not), and
+% Hyperlinks is loaded by both LectureNotes and CourseDocument, so \demo works
+% in a syllabus too. Assessment loads no hyperref -- correctly, since a link on
+% printed paper is a dead end -- and therefore has no \demo.
+
+% Knobs. The marker is \triangleright rather than the heavier \blacktriangleright
+% because the latter is an amssymb symbol and this package deliberately requires
+% no maths font (Assessment-adjacent classes may load neither).
+\providecommand{\DemoLabel}{interactive graph}
+\providecommand{\DemoMarker}{\ensuremath{\triangleright}}
+
+% The whole rendering in one hook, so a course can restyle it (bracket it, put
+% it on its own line, drop the marker) without touching the macro.
+\providecommand{\DemoFormat}[1]{\href{#1}{\DemoMarker\,\DemoLabel}}
+
+\NewDocumentCommand{\demo}{o m}{\DemoFormat{#2}}

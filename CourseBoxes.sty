@@ -17,9 +17,9 @@
 %%%     "[unlabelled aside]") rather than silently grabbing the section number.
 %%%
 %%% This file ships the FACTORY plus a UNIVERSAL default vocabulary. Text-specific
-%%% names (Key Idea, Axiom, ...) are declared per-course in a small course-vocab
-%%% file \input from the master's preamble -- NOT here (this is the shared
-%%% submodule; a single text's vocabulary is not shared).
+%%% names (Key Idea, Axiom, ...) are declared in the course's own TEXT LAYER
+%%% (.textbook/textbook.tex), \input from the master's preamble -- NOT here (this
+%%% is the shared submodule; a single text's vocabulary is not shared).
 %%%
 %%% CONTRACT (load order):
 %%%   - amsthm must ALREADY be loaded. In our classes newtxmath's [amsthm] option
@@ -61,7 +61,7 @@
                                            % text -- the frame/fill stay TipColor.
 
 %%% --- tcolorbox styles (named once; the extension point). --------------------
-%%% A course-vocab file references these by name, so restyling every Theorem in
+%%% A course's text layer references these by name, so restyling every Theorem in
 %%% the course is a one-line edit here.
 \tcbset{
   cb/textresult/.style={          % category A: thin grey L-rule, textbook-quiet
@@ -164,7 +164,7 @@
 
 %%% --- Universal default vocabulary -------------------------------------------
 %%% Present in every text; not course-specific, so it ships here. A course adds
-%%% only its text-specific extras in course-vocab (Key Idea, Axiom, ...).
+%%% only its text-specific extras in its text layer (Key Idea, Axiom, ...).
 \NewTextResult[cbthm]{theorem}    {Theorem}    {cb/textresult}
 \NewTextResult[cbthm]{proposition}{Proposition}{cb/textresult}
 \NewTextResult[cbthm]{lemma}      {Lemma}      {cb/textresult}
@@ -175,7 +175,7 @@
 
 %%% --- Shared pedagogical asides (MY voice, consistent course-to-course) -------
 %%% These are the instructor's interjections, not the text's, so they ship here
-%%% (shared) rather than in course-vocab. A fontawesome glyph in the head inherits
+%%% (shared) rather than in the text layer. A fontawesome glyph in the head inherits
 %%% the head colour and is the colour-independent cue -- kept on Caution / Your Turn
 %%% / Prepwork, dropped on Takeaway.
 %%%
