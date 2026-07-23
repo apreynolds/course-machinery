@@ -99,4 +99,25 @@
 % it on its own line, drop the marker) without touching the macro.
 \providecommand{\DemoFormat}[1]{\href{#1}{\DemoMarker\,\DemoLabel}}
 
-\NewDocumentCommand{\demo}{o m}{\DemoFormat{#2}}
+% SCHEME CHECK. A URL with no "://" is a RELATIVE URI: the viewer resolves it
+% against the document's own location -- a local file path -- so the link is
+% silently dead. `www.cbc.ca' pasted without its `https://' is the whole failure,
+% and it looks perfectly fine on the page, which is what makes it worth catching.
+% Same principle as TextRef's unresolved keys: degrade if you must, but say so.
+%
+% \Demo@scan is delimited-argument string surgery. The URL is always followed by
+% a spare "://" so the pattern is guaranteed to match; whatever lands in #2 tells
+% us whether the URL had a separator of its own:
+%   https://x  ->  "https://x://"  -> #1=https, #2=x://  (non-empty: has scheme)
+%   www.cbc.ca ->  "www.cbc.ca://" -> #1=the URL, #2=    (empty: no scheme)
+% When #2 comes back empty there was no separator, and #1 is then the whole URL
+% -- so the warning can name it without any bookkeeping.
+\def\Demo@scan#1://#2\Demo@nil{%
+  \ifstrempty{#2}%
+    {\PackageWarning{Hyperlinks}{\string\demo\space URL has no scheme and will
+       not be clickable: #1}}%
+    {}%
+}
+\newcommand{\Demo@check}[1]{\Demo@scan#1://\Demo@nil}
+
+\NewDocumentCommand{\demo}{o m}{\Demo@check{#2}\DemoFormat{#2}}

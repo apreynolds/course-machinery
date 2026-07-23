@@ -71,6 +71,21 @@ store-only idiom as ProblemMeta -- naming the tool for a human reading
 the source, and for the link-checker when the domain is too opaque to
 classify. Nothing about it reaches the page.
 
+\textbf{Write the whole URL, scheme and all.} A URL without
+\texttt{://} is a \emph{relative} one: the viewer resolves it against the
+document's own location -- a local file path -- and the link silently does
+nothing, while the page still looks perfectly right. Pasting
+\texttt{www.example.com} without its \texttt{https://} is the entire failure,
+so \cs{demo} checks and warns at build time rather than letting it through:
+
+\begin{manexsource}
+Package Hyperlinks Warning: \demo URL has no scheme and will
+(Hyperlinks)                not be clickable: www.cbc.ca on input line 29.
+\end{manexsource}
+
+Same principle as TextRef's unresolved keys (section~\ref{sec:ref-textref}):
+degrade if you must, but never silently.
+
 The real payoff is enumerability: with every interactive link routed
 through one macro, ``curl all my demos and tell me which died over the
 summer'' is a grep away. That is reason enough to write \cs{demo} rather
