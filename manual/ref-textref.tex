@@ -74,6 +74,36 @@ where the text is known and \file{Exercises.sty} merely re-emits it:
   {../facts/}{power-rule.tex}
 \end{manexsource}
 
+\subsection*{One text layer per master}
+
+A course may draw its chapters from more than one book -- an opening
+review chapter out of one text, the rest out of another. Mount one text
+layer per book. But \textbf{every master \cs{input}s exactly one of
+them}, and never two.
+
+That costs nothing, because it is how notes are written anyway: a lecture
+guides students through \emph{one} book. And the two things that would
+collide fail very differently, which is the reason to be deliberate
+rather than to find out:
+
+\begin{itemize}
+  \item \textbf{Vocabulary collides loudly.} \cs{NewTextResult}
+    (section~\ref{sec:ref-courseboxes}) ends in
+    \cs{NewDocumentEnvironment}, which \emph{errors} on a name already
+    taken. Two layers that both name a result stop the build. Annoying,
+    but it tells you.
+  \item \textbf{Links collide silently.} \cs{DeclareSection} is
+    last-declaration-wins, so a second layer's \texttt{1.1} quietly
+    replaces the first's. Both books have a \S1.1; they are different
+    sections. The document compiles, reads correctly, and links to the
+    wrong book.
+\end{itemize}
+
+Last-wins is not an oversight -- it is what lets a course-local
+declaration override one it inherits, which is worth more than an error
+on duplicates. So the discipline lives here, in the rule, rather than in
+a check.
+
 \subsection*{Why no URL registry}
 
 The eventual link-checker (harvest every external link, \texttt{curl}

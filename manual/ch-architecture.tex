@@ -205,6 +205,23 @@ insulation: should the section manifest ever become machine-generated
 hand-written vocabulary), \file{textbook.tex} becomes a two-line
 aggregator and no document notices.
 
+Promoting it also frees the \emph{name}. \file{.textbook/} is the neutral
+choice, and the right one while a course has a single book; a course that
+mounts a submodule may instead name the folder for the text it holds
+(\file{.apex/apex.tex}), so the tree says at a glance which book the
+course teaches out of and each master's \cs{input} line names the text it
+is citing. Nothing in the machinery reads the path -- masters \cs{input}
+it by relative path and that is the whole coupling -- so this is purely
+whether you want the name to carry the information.
+
+Naming earns its keep once a course needs \emph{two}: an opening review
+chapter drawn from one book, the rest from another. Mount one layer per
+book; two named folders sit side by side without ambiguity, and a
+transition year that runs both can do so without either shadowing the
+other. The constraint that comes with it is that a given master
+\cs{input}s exactly \emph{one} layer, which is worth reading before you
+try it (section~\ref{sec:ref-textref}).
+
 To restyle course-wide, prefer the named extension points -- the
 \env{cb/*} tcolorbox styles and \env{cb*} head styles
 (section~\ref{sec:ref-courseboxes}) -- over per-environment edits.
