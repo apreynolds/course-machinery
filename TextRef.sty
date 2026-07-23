@@ -1,0 +1,156 @@
+\ProvidesPackage{TextRef}[2026/07/22 Textbook section links -- mechanism only]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% WHY THIS EXISTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Lecture notes constantly point at the course text: "Table 5.2.3", "Key Idea
+% 5.2.1", "see 2.5.4". Hand-typing a deep link every time gives you a hundred
+% URLs scattered through the sources, each rotting on its own schedule.
+%
+% So this package supplies the MECHANISM and nothing else:
+%
+%   \SetTextBase{https://example.org/the-text/}     % where the text lives
+%   \DeclareSection{5.2}{sec_definite_integral.html} % section -> page
+%   ...in the body:  \textbookref{5.2}{Table 5.2.3}
+%
+% THE DATA LIVES OUTSIDE THIS FILE, in the course's own text layer
+% (.textbook/textbook.tex -- see the manual's architecture chapter). This file
+% must stay free of any particular textbook: no base URL, no section names, no
+% publisher. That is the same mechanism-in-machinery / data-in-the-course split
+% as the box factory in CourseBoxes.sty vs. the course's "Key Idea" declaration.
+%
+% THREE DESIGN DECISIONS worth knowing before you extend it:
+%
+% 1. KEYED ON THE SECTION, not the fine coordinate. Table 5.2.3, Key Idea 5.2.1
+%    and Example 5.2.6 all resolve to the top of section 5.2 and the student
+%    scrolls. Page URLs are the stable part of a web text; in-page anchors are
+%    exactly what rots. One manifest entry per section (~40 lines for a course)
+%    instead of one per referenced item (hundreds), and it survives a re-edition
+%    that renumbers items within a section.
+%
+% 2. GRACEFUL DEGRADATION IS THE POINT. \textbookref ALWAYS prints its label
+%    text. It hyperlinks that text only if the loaded manifest resolves the key
+%    AND hyperref is present. A missing manifest, a typo'd key, or a class that
+%    loads no hyperref (Assessment) demotes the reference to correct plain text
+%    -- never a broken link, never a compile error. Misses are logged instead
+%    (see MISS REPORTING), so silence never hides a rotted reference.
+%
+% 3. NO RUNTIME URL REGISTRY. The eventual link-checker harvests URLs by
+%    GREPPING the sources (\SetTextBase + \DeclareSection lines in one file,
+%    plus \demo calls in Hyperlinks.sty's format), not by reading something this
+%    package writes at compile time. Same discipline as ProblemMeta/FactMeta:
+%    the question "what links does this course have?" must be answerable without
+%    running LaTeX.
+%
+% LAYERING RULE (important). \textbookref is a TEXT-TIED citizen. Use it in
+% lecture bodies, in box titles at the call site, and in import-time desc=.
+% Never inside CourseBoxes.sty/Exercises.sty (that would couple text-agnostic
+% machinery to a manifest), and never inside a problems/ or facts/ file (those
+% are reused across courses and texts; a baked-in reference would point at the
+% wrong book). The reference belongs in the lecture AROUND the import:
+%   \importproblem[desc={\textbookref{2.5}{from the text, 2.5.4}}]{...}{...}
+% -- the call site is text-tied, and Exercises just re-emits desc= opaquely.
+
+\RequirePackage{etoolbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THE MANIFEST
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The base URL every slug hangs off. Empty by default, which is the honest state
+% for a course that has not declared a text: every reference then degrades to
+% plain text. Include the trailing slash -- entries are appended verbatim.
+\newcommand{\TextRefBase}{}
+\newcommand{\SetTextBase}[1]{\renewcommand{\TextRefBase}{#1}}
+
+% \DeclareSection{5.2}{sec_the_definite_integral.html}
+%
+% Stored as a macro per key rather than a list: lookup is then a single \ifcsdef
+% with no searching, and a redeclared section simply wins (last one read), which
+% is the useful behaviour when a course-local file overrides a shared one.
+% Global (\csgdef) so a declaration inside a group still sticks.
+\newcommand{\DeclareSection}[2]{\csgdef{TextRef@sec@#1}{#2}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LOOKUP (with one level of truncation)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Resolving {5.2} is a plain lookup. Resolving {5.2.3} is the ergonomic case:
+% you typed the full coordinate off the page, and it should still find section
+% 5.2. So on a miss we retry with the first two components.
+%
+% \TextRef@firsttwo is a delimited-argument macro -- classic TeX string surgery.
+% It is always called with TWO extra dots appended so the pattern is guaranteed
+% to match:
+%   "5.2.3.." -> #1=5, #2=2, #3=3.   -> yields 5.2
+%   "5.2.."   -> #1=5, #2=2, #3=(.)  -> yields 5.2   (same key; harmless retry)
+%   "5.."     -> #1=5, #2=(empty)    -> yields "5."  (misses; plain text)
+% One level only: textbook coordinates are chapter.section.item and no deeper.
+\def\TextRef@firsttwo#1.#2.#3\TextRef@nil{#1.#2}
+
+% Result of a lookup: the slug, or empty for "unresolved".
+\newcommand{\TextRef@slug}{}
+\newcommand{\TextRef@resolve}[1]{%
+  \ifcsdef{TextRef@sec@#1}%
+    {\letcs\TextRef@slug{TextRef@sec@#1}}%
+    {\edef\TextRef@key{\TextRef@firsttwo#1..\TextRef@nil}%
+     \ifcsdef{TextRef@sec@\TextRef@key}%
+       {\letcs\TextRef@slug{TextRef@sec@\TextRef@key}}%
+       {\renewcommand{\TextRef@slug}{}}}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MISS REPORTING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Degrading silently would let a whole rotted manifest pass unnoticed -- the
+% document still compiles and still reads correctly, which is exactly the
+% failure you want to be told about. So: one \PackageInfo per distinct key (the
+% .log is the record), and one end-of-run warning listing them, which is what
+% actually catches your eye in the terminal.
+%
+% Deduplicated by a per-key flag: a section cited twenty times must not produce
+% twenty log lines.
+\newcommand{\TextRef@misslist}{}
+\newcommand{\TextRef@miss}[1]{%
+  \ifcsdef{TextRef@missed@#1}{}{%
+    \csgdef{TextRef@missed@#1}{}%
+    \PackageInfo{TextRef}{No section declared for `#1'; printed as plain text}%
+    % Separator BEFORE each entry but the first: \PackageWarning appends its own
+    % full stop, so a trailing ", " would read as "5.2, ." in the terminal.
+    \ifdefempty{\TextRef@misslist}{\gappto\TextRef@misslist{#1}}%
+                                  {\gappto\TextRef@misslist{, #1}}%
+  }%
+}
+\AtEndDocument{%
+  \ifdefempty{\TextRef@misslist}{}{%
+    \PackageWarningNoLine{TextRef}{Textbook references printed WITHOUT links
+      (no matching \string\DeclareSection):\MessageBreak \TextRef@misslist}%
+  }%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \textbookref
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \textbookref{5.2}{Table 5.2.3}   -> "Table 5.2.3", linked to section 5.2
+% \textbookref*{5.2.3}{Table}      -> "Table 5.2.3", linked to section 5.2
+%
+% The starred form is the typing shortcut for the overwhelmingly common shape
+% "Word Number": it appends the key you already typed (unbreakable ~, since a
+% label must never split from its number). Use the plain form whenever the
+% printed text is not simply label-then-key ("the start of \S5.2", "the
+% definition of flux").
+\NewDocumentCommand{\textbookref}{s m m}{%
+  \IfBooleanTF{#1}{\def\TextRef@text{#3~#2}}{\def\TextRef@text{#3}}%
+  \TextRef@resolve{#2}%
+  \ifdefempty{\TextRef@slug}%
+    {\TextRef@miss{#2}\TextRef@text}%
+    {\ifdefined\href
+       % \href does catcode surgery on its first argument and will NOT expand
+       % macros there, so the URL is assembled by \edef first and handed over
+       % pre-tokenised. Consequence: a slug must be plain text -- write \% and
+       % \# in the manifest if a URL ever needs them.
+       \edef\TextRef@url{\TextRefBase\TextRef@slug}%
+       \expandafter\href\expandafter{\TextRef@url}{\TextRef@text}%
+     \else
+       % No hyperref (an Assessment master): the text is still right.
+       \TextRef@text
+     \fi}%
+}
