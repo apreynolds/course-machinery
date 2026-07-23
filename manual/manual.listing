@@ -1,0 +1,8 @@
+\ifdefined\NewTextResult
+  \NewTextResult[cbnote]{keyidea}{Key Idea}{cb/note}
+\fi
+% \renewcommand{\NotesProblemLabelWord}{Exercise}
+
+\SetTextBase{https://opentext.uleth.ca/apex-calculus/}
+\DeclareSection{2.1}{sec_derivative.html}
+\DeclareSection{2.2}{sec_common_der.html}

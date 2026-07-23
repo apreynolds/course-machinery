@@ -9,7 +9,8 @@ course-demo/
   .course-machinery/   the toolkit (classes, packages, scripts)
   .latexmkrc           puts the machinery on TEXINPUTS
   .MIRRORDIR           optional PDF mirror destination
-  course-vocab.tex     per-course vocabulary
+  .textbook/           the text layer: what the course's book
+    textbook.tex       names things, and where it lives online
   derivatives/         a topic (a course has several, same shape)
     problems/          problem bank: one problem per file
     lectures/          LectureNotes masters (+ .latexmkrc)
@@ -55,11 +56,13 @@ source serves every consumer. A lecture and the quiz pull the \emph{same}
 beside it, \file{../derivatives/problems/} from the repo root -- and any
 images that file loads resolve against the \emph{file's own} directory.
 
-The one course-wide content file is \file{course-vocab.tex} at the repo
-root: the vocabulary this course's textbook uses (its named result boxes,
-the noun lectures call an example). Masters \cs{input} it in the preamble
-by relative path; section~\ref{sec:extending} explains what belongs there
-and why it is guarded.
+The one course-wide content file is \file{.textbook/textbook.tex}, the
+\emph{text layer}: everything that depends on which book the course is
+taught from -- the named result boxes it uses (APEX's ``Key Idea''), the
+noun lectures call an example, and the section-to-URL map behind
+\cs{textbookref}. Masters \cs{input} it in the preamble by relative path.
+Section~\ref{sec:extending} explains the one-question test for what
+belongs there, why it is a folder, and why it is guarded.
 
 \subsection{The five-minute loop}
 

@@ -1,0 +1,85 @@
+\section{TextRef.sty}\label{sec:ref-textref}
+
+Links from the notes into the course textbook. The package holds the
+\emph{mechanism} only; the base URL and the section list are course data,
+declared in the course's text layer (\file{.textbook/textbook.tex},
+section~\ref{sec:extending}). Loaded by all three classes, and inert
+until that file is \cs{input}.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\cs{SetTextBase}\texttt{\{URL\}} & where the text lives; every slug is
+  appended to it verbatim, so include the trailing slash. Default: empty
+  (no text declared).\\
+\cs{DeclareSection}\texttt{\{5.2\}\{slug.html\}} & one manifest entry:
+  section number $\to$ its page. Last declaration wins.\\
+\cs{textbookref}\texttt{\{5.2\}\{Table 5.2.3\}} & prints
+  ``Table 5.2.3'', linked to \S5.2.\\
+\cs{textbookref*}\texttt{\{5.2.6\}\{Example\}} & starred: appends the key,
+  so this prints ``Example~5.2.6''.\\
+\end{tabularx}
+\end{center}
+
+\subsection*{Three decisions that shape it}
+
+\textbf{Keyed on the section, never finer.} Table 5.2.3, Key Idea 5.2.1
+and Example 5.2.6 all resolve to the top of \S5.2, and the student
+scrolls. Page URLs are the stable part of a web text; in-page anchors are
+exactly what rots. So the manifest is about forty lines for a course
+rather than several hundred, and it survives a re-edition that renumbers
+items \emph{within} a section. A full coordinate is accepted anyway --
+\cs{textbookref}\texttt{\{5.2.3\}} truncates to \texttt{5.2} on a miss --
+so you can type what you read off the page.
+
+\textbf{Graceful degradation is the point.} The label text always prints.
+It becomes a link only if the manifest resolves the key \emph{and}
+hyperref is loaded. A missing text layer, a typo'd key, or an Assessment
+master (which deliberately loads no hyperref -- a link on paper is a dead
+end) all demote the reference to correct plain text. Nothing breaks, and
+nothing is silently wrong.
+
+\textbf{Misses are reported.} Degrading silently would let a whole rotted
+manifest pass unnoticed, since the document still compiles and still
+reads correctly. So each unresolved key gets one \cs{PackageInfo} in the
+\file{.log} (deduplicated -- a section cited twenty times logs once), and
+the end of the run warns with the full list:
+
+\begin{manexsource}
+Package TextRef Warning: Textbook references printed WITHOUT links
+(no matching \DeclareSection):
+(TextRef)                9.9, 10.4.
+\end{manexsource}
+
+\subsection*{The layering rule}
+
+\cs{textbookref} is a \emph{text-tied} citizen, and the model only holds
+if it stays where the text is known:
+
+\begin{itemize}
+  \item \textbf{Yes:} lecture bodies, box titles at the call site, and
+    import-time \env{desc=}.
+  \item \textbf{No:} inside \file{CourseBoxes.sty} or
+    \file{Exercises.sty} -- that would couple text-agnostic machinery to
+    a particular manifest.
+  \item \textbf{No:} inside a \file{problems/} or \file{facts/} file.
+    Those are reused across courses and texts; a baked-in reference would
+    point at the wrong book the moment the file is borrowed.
+\end{itemize}
+
+The reference therefore goes in the lecture \emph{around} the import,
+where the text is known and \file{Exercises.sty} merely re-emits it:
+
+\begin{manexsource}
+\importfact[number={2.1}, desc={from \textbookref{2.1}{APEX 2.1}}]%
+  {../facts/}{power-rule.tex}
+\end{manexsource}
+
+\subsection*{Why no URL registry}
+
+The eventual link-checker (harvest every external link, \texttt{curl}
+them, report rot on your schedule rather than in front of a class) reads
+the \emph{sources}: one file of \cs{DeclareSection} lines, plus every
+\cs{demo} call (section~\ref{sec:ref-titling}). It does not read anything
+this package writes at compile time, and there is deliberately nothing to
+write. Same discipline as ProblemMeta and FactMeta: ``what does this
+course contain?'' must be answerable without running \LaTeX.

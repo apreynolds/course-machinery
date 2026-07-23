@@ -98,8 +98,8 @@ no restyle can corrupt it. The instances:
   \item \textbf{The label-word routing.} LectureNotes sets
     \cs{ProblemLabelWord} to read \emph{through}
     \cs{NotesProblemLabelWord}, while Assessment sets it literally to
-    ``Q'' -- so a \file{course-vocab.tex} shared by both can retune the
-    notes noun with no risk of renaming exam questions.
+    ``Q'' -- so a text layer shared by both can retune the notes noun
+    with no risk of renaming exam questions.
   \item \textbf{Titles and links.} The hooks \cs{TitleColor},
     \cs{TitleStamp}, \cs{LinkColor} and \cs{UrlColor} have plain defaults
     in the base packages and are coloured only by CourseDocument.
@@ -157,26 +157,53 @@ trick, sentinel-valued, is why a stray \cs{label} on an aside prints
 \texttt{[unlabelled aside]} instead of silently grabbing the section
 number.)
 
-\subsubsection*{course-vocab.tex}
+\subsubsection*{The text layer: .textbook/}
 
 The shared machinery draws a deliberate line: vocabulary every text has
 (theorem, definition, \dots) and the author's own asides ship in
-CourseBoxes; vocabulary \emph{specific to one text} (APEX's ``Key
-Idea'', a geometry text's ``Axiom'') is declared per course, in a small
-\file{course-vocab.tex} at the repo root:
+CourseBoxes; anything \emph{specific to one text} lives in the course's
+own \textbf{text layer}, \file{.textbook/textbook.tex}.
+
+\textbf{The membership test} is one question: \emph{would you look at the
+textbook to set this value?} ``Key Idea'' is what APEX calls its flagged
+results -- yes. The noun the notes use for a worked item, which should
+echo the book the students are reading -- yes. Where \S2.1 of the text
+lives on the web -- yes. Your identity colour, your hint wording, your
+layout knobs -- no: those are your voice, and they stay in the machinery.
+The text-driven set is small and bounded, which is what makes the split
+worth drawing:
 
 \begin{manexsource}
 \ifdefined\NewTextResult
   \NewTextResult[cbnote]{keyidea}{Key Idea}{cb/note}
 \fi
 % \renewcommand{\NotesProblemLabelWord}{Exercise}
+
+\SetTextBase{https://opentext.uleth.ca/apex-calculus/}
+\DeclareSection{2.1}{sec_derivative.html}
+\DeclareSection{2.2}{sec_common_der.html}
 \end{manexsource}
 
 Masters \cs{input} it in the preamble (\cs{newtheorem} must run before
-the document starts). The \cs{ifdefined} guard is what lets \emph{one}
-vocab file serve every master: an Assessment document loads no
-CourseBoxes, skips the factory calls, and still picks up non-box
-overrides like the notes noun.
+the document starts), by relative path:
+\file{\textbackslash input\{../../.textbook/textbook\}}. The
+\cs{ifdefined} guard is what lets \emph{one} file serve every master: an
+Assessment document loads no CourseBoxes, skips the factory calls, and
+still picks up non-box overrides like the notes noun. The manifest lines
+need no guard -- all three classes load TextRef
+(section~\ref{sec:ref-textref}).
+
+\textbf{Why a folder for one file.} The folder is the unit that travels.
+Teach three courses out of the same book and \file{.textbook/} is exactly
+what you would promote to a shared submodule (\file{.apex/}) mounted in
+all three: the text's vocabulary and link map then live \emph{once}, and
+a publisher moving domains is one edit for every course that uses it.
+Nothing depends on which it is -- plain folder today, submodule tomorrow,
+and no master changes either way. The single \cs{input} is the same
+insulation: should the section manifest ever become machine-generated
+(scraped from the book's contents, so a regeneration cannot clobber
+hand-written vocabulary), \file{textbook.tex} becomes a two-line
+aggregator and no document notices.
 
 To restyle course-wide, prefer the named extension points -- the
 \env{cb/*} tcolorbox styles and \env{cb*} head styles

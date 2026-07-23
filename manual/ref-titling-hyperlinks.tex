@@ -45,5 +45,39 @@ loads too, not merely after the class
   anchor (the projector footer's grey arrow).\\
 \cs{TopAnchorName} & the anchor's name (\texttt{CourseTop}), placed at
   the very top of the body.\\
+\cs{demo}\texttt{[tool]\{URL\}} & a link out to an interactive tool; see
+  below.\\
+\cs{DemoLabel}, \cs{DemoMarker} & the student-facing wording
+  (\texttt{interactive graph}) and its cue ($\triangleright$).\\
+\cs{DemoFormat}\texttt{\{URL\}} & the whole rendering, in one hook.\\
 \end{tabularx}
 \end{center}
+
+\subsection*{\texorpdfstring{\cs{demo}}{\textbackslash demo}}
+
+\emph{Students do not care which tool it is; only the author does.} A
+class that meets ``LINK: DESMOS'', ``Desmos demo'' and ``LET'S EXPLORE
+WITH DESMOS!'' on three consecutive pages is reading three different
+things when it is always the same thing: press here, a graph moves. So
+every demo prints \emph{one} uniform label:
+
+\begin{manexsource}
+\demo{https://www.desmos.com/calculator/xxxxxxxxxx}
+\demo[geogebra]{https://example.org/some/opaque/url}
+\end{manexsource}
+
+The optional argument is \emph{accepted and discarded} -- the same
+store-only idiom as ProblemMeta -- naming the tool for a human reading
+the source, and for the link-checker when the domain is too opaque to
+classify. Nothing about it reaches the page.
+
+The real payoff is enumerability: with every interactive link routed
+through one macro, ``curl all my demos and tell me which died over the
+summer'' is a grep away. That is reason enough to write \cs{demo} rather
+than the bare \cs{href} you were about to.
+
+It lives in Hyperlinks rather than TextRef (section~\ref{sec:ref-textref})
+deliberately: a demo has nothing to do with the textbook -- it is as often
+your own Desmos page -- and Hyperlinks is loaded by LectureNotes and
+CourseDocument alike, so a syllabus gets \cs{demo} too. Assessment loads
+no hyperref and therefore has none.
