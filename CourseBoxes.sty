@@ -18,8 +18,9 @@
 %%%
 %%% This file ships the FACTORY plus a UNIVERSAL default vocabulary. Text-specific
 %%% names (Key Idea, Axiom, ...) are declared in the course's own TEXT LAYER
-%%% (.textbook/textbook.tex), \input from the master's preamble -- NOT here (this
-%%% is the shared submodule; a single text's vocabulary is not shared).
+%%% (.textbook/textbook.tex, auto-loaded by name via TextRef; no master \input's
+%%% it) -- NOT here (this is the shared submodule; a single text's vocabulary is
+%%% not shared).
 %%%
 %%% CONTRACT (load order):
 %%%   - amsthm must ALREADY be loaded. In our classes newtxmath's [amsthm] option

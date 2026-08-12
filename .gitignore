@@ -1,0 +1,17 @@
+# https://git-scm.com/docs/gitignore
+#
+# LaTeX build output -- the manual/ compile drops all of these beside its
+# source. Listed here (not left to a user's global gitignore) so a fresh clone
+# building the manual stays clean for anyone.
+*.pdf
+*.log
+*.aux
+*.fls
+*.fdb_latexmk
+*.toc
+*.out
+
+# tcolorbox's `listings' scratch file (\jobname.listing, via manual-style.sty)
+*.listing
+
+*.swp

@@ -154,6 +154,13 @@
 % for whatever the default text is -- the empty name, unless \SetDefaultText has
 % said otherwise -- so a single-text course writes one line and never meets the
 % naming machinery at all.
+%
+% ORDER TRAP: the default-text name is read when \SetTextBase is CALLED, so in
+% the named-text idiom (\SetDefaultText + \SetTextBase together) \SetDefaultText
+% must come first -- the other way round binds the base to the EMPTY name and
+% every link=... then reports "no text selected". The single-text course cannot
+% hit this (it never calls \SetDefaultText); use \DeclareTextBase{name}{url},
+% which names its text explicitly, if the ordering feels fragile.
 \newcommand{\SetTextBase}[1]{\DeclareTextBase{\TextRef@defaulttext}{#1}}
 
 % Kept as the documented spelling for "the base currently in force". Nothing

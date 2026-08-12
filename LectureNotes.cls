@@ -266,5 +266,5 @@
 \pagestyle{fancy}
 
 % TEMPORARY, testing purposes only
-\usepackage[english]{babel}
-\usepackage[math]{blindtext}
+\RequirePackage[english]{babel}
+\RequirePackage[math]{blindtext}
