@@ -232,6 +232,45 @@ than a column-width image; \file{match-trig-derivatives.tex} matches text to
 text. There are deliberately no drawn answer arrows -- the inline key on the
 left item is the answer, and skipping arrows keeps the system TikZ-free.
 
+\subsection{The fact bank}\label{sec:fact-files}
+
+Facts follow the same pattern, one directory over: \emph{one fact per file},
+no preamble, sitting in a topic's \file{facts/} folder. A fact is a bare
+snippet -- a definition, a theorem statement, a formula -- on which the
+machinery deliberately imposes \emph{no} structure: no environment, no
+counter, no hint/solution layers. The surrounding document supplies all the
+context; the file is just the content plus its metadata:
+
+\begin{manexample}
+\FactMeta{
+  source = {apex},
+  number = {2.1},
+  topics = {differentiation, power-rule},
+  desc   = {},
+}
+\textbf{Power Rule.}\quad
+For any real constant $n$,
+\[ \frac{d}{dx}\,x^{n} = n\,x^{n-1}. \]
+\end{manexample}
+
+\cs{FactMeta} is \cs{ProblemMeta}'s little sibling: the same store-only
+design (the block typeset nothing above), the same textual reader
+(\file{find-facts}, section~\ref{sec:build-and-find}), and therefore the same
+two disciplines -- one key per line with braced values (a reflowed block
+still compiles but silently vanishes from the script's index), and
+\texttt{\#} written \texttt{\char`\\\#}. The schema is smaller: \env{source},
+\env{number}, \env{topics}, \env{desc}. A fact has no \env{type} or
+\env{difficulty} -- those describe a \emph{problem}'s form and challenge --
+and, as ever, nothing extrinsic.
+
+A lecture or formula sheet pulls a fact in with
+\cs{importfact}\texttt{[number=\dots, desc=\dots]\{DIR\}\{FILE\}}
+(section~\ref{sec:lectures}). By default the imported fact renders bare; a
+document that wants the provenance shown -- a formula sheet printing
+``\S2.1'' beside each rule, say -- opts in by redefining the
+\cs{ShowFactMeta} hook (section~\ref{sec:ref-factmeta}). The demo bank is
+\file{derivatives/facts/} in the course repo.
+
 \subsection{Finding problems in the bank}\label{sec:find-problems-taste}
 
 The payoff for the metadata discipline -- from anywhere in the course repo:
@@ -244,5 +283,5 @@ $ find-problems --import     # print matches as paste-ready \import lines
 \end{manexsource}
 
 Filters combine (AND), match case-insensitively as regular expressions, and
-never run LaTeX. The full command reference is in
-section~\ref{sec:build-and-find}.
+never run LaTeX. \file{find-facts} answers the same questions about the fact
+bank. The full command reference is in section~\ref{sec:build-and-find}.

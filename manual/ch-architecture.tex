@@ -22,27 +22,34 @@ it is shaped the way it is.
   \node[band] at (-0.6, 1.6) {features};
   \node[box] at (1.5, 2.0) {Exercises};
   \node[box] at (4.0, 2.0) {ProblemMeta};
-  \node[box] at (6.3, 2.0) {Workspace};
+  \node[box] at (6.2, 2.0) {FactMeta};
+  \node[box] at (8.3, 2.0) {Workspace};
   \node[box] at (2.2, 1.2) {CourseBoxes};
   \node[box] at (5.2, 1.2) {InstructorNotes};
   \node[box] at (7.8, 1.2) {MathStuff};
-  % Row 4: the base
+  % Row 4: the base (TextRef sits here: all three classes load it)
   \node[band] at (-0.6, 0.1) {base};
   \node[box] at (1.8, 0.1) {Typefaces};
   \node[box] at (4.0, 0.1) {Titling};
   \node[box] at (6.2, 0.1) {Hyperlinks};
+  \node[box] at (8.3, 0.1) {TextRef};
   % Alongside: the scripts
   \node[band] at (-0.6, -1.0) {scripts};
   \node[box] at (1.8, -1.0) {build-pdfs};
-  \node[box] at (4.5, -1.0) {find-problems};
+  \node[box] at (4.4, -1.0) {find-meta};
+  \node[box] at (6.6, -1.0) {pick-meta};
 \end{tikzpicture}
 \end{center}
 
 Classes pick from the features; every class stands on the base
 (Assessment skips Titling and CourseBoxes; CourseDocument skips the
-exercise stack). The scripts sit beside the LaTeX entirely:
-\file{build-pdfs} drives latexmk and injects layer flags;
-\file{find-problems} reads problem files off disk.
+exercise stack; TextRef -- and the text layer it auto-loads -- reaches all
+three). The scripts sit beside the LaTeX entirely: \file{build-pdfs} drives
+latexmk and injects layer flags; \file{find-meta} reads bank files off disk
+behind its per-kind shims \file{find-problems} / \file{find-facts}; and
+\file{pick-meta} threads those searches through fzf behind
+\file{pick-problems} / \file{pick-facts}
+(section~\ref{sec:build-and-find}).
 
 The honest description of the packages' relationship: \emph{not
 independent, but coupled through narrow, documented contracts}. Each
@@ -260,9 +267,9 @@ corner of the toolkit, worth a skim before debugging anything odd:
     internals at load time; after a titlesec/amsthm upgrade a failed
     patch prints only \texttt{Couldn't patch ...} in the log. Grep for
     it: \texttt{grep "Couldn't patch" *.log}.
-  \item \textbf{A reflowed \cs{ProblemMeta} block still compiles} -- and
-    silently vanishes from \file{find-problems}
-    (section~\ref{sec:problemmeta}).
+  \item \textbf{A reflowed \cs{ProblemMeta} or \cs{FactMeta} block still
+    compiles} -- and silently vanishes from \file{find-problems} /
+    \file{find-facts} (section~\ref{sec:problemmeta}).
   \item \textbf{\texttt{[5, hint]} errors} -- the lone-integer points
     shorthand works only alone; write \texttt{[points=5, hint]}.
   \item \textbf{Points are integers}; \texttt{points=2.5} errors at the

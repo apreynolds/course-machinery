@@ -1,9 +1,14 @@
-\section{Building and finding: the two scripts}\label{sec:build-and-find}
+\section{Building and finding: the scripts}\label{sec:build-and-find}
 
-Two executables ship with the machinery. \file{build-pdfs} compiles course
-documents (with their views, and with output routed where you want it);
-\file{find-problems} searches the problem bank. Both print their full
-reference with \texttt{-{}-help}.
+One executable builds; a small family searches. \file{build-pdfs} compiles
+course documents (with their views, and with output routed where you want
+it). The searchers are per-kind faces of one shared engine:
+\file{find-problems} searches the problem bank and \file{find-facts} the fact
+bank -- each a two-line shim that hands the right \texttt{-{}-kind} to
+\file{find-meta}, where all the real logic lives once -- and their
+interactive twins \file{pick-problems} / \file{pick-facts} (shims over
+\file{pick-meta} the same way) thread those searches through fzf. Every one
+of them prints its full reference with \texttt{-{}-help}.
 
 \subsection{\texorpdfstring{\texttt{build-pdfs}}{build-pdfs}}
 
@@ -101,21 +106,28 @@ you would rather TAs not see solutions until after the assessment, point the
 label at a private staging folder and copy across by hand at release time --
 \file{build-pdfs} deliberately knows nothing about dates.
 
-\subsection{\texorpdfstring{\texttt{find-problems}}{find-problems}}
+\subsection{\texorpdfstring{\texttt{find-problems} /
+  \texttt{find-facts}}{find-problems / find-facts}}
 
 \begin{manexsource}
 $ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
                 [--source PAT] [--untagged] [--vocab] [--import]
-                [DIR ...]
+                [--tsv] [PATH ...]
+$ find-facts    [--topic PAT] [--source PAT] [--untagged] [--vocab]
+                [--import] [--tsv] [PATH ...]
 \end{manexsource}
 
-Reads the \cs{ProblemMeta} block off every \file{.tex} file under each
-\env{DIR} (default: the current directory, recursively) and reports the
-matches -- without running LaTeX, which is the point
-(section~\ref{sec:problem-files}). With no filters, it lists every file
-that has a block.
+Reads the \cs{ProblemMeta} (resp.\ \cs{FactMeta}) block off every
+\file{.tex} file under each \env{PATH} (default: the current directory,
+recursively) and reports the matches -- without running LaTeX, which is the
+point (section~\ref{sec:problem-files}). With no filters, it lists every
+file that has a block. The kind fixes the block macro it reads, the
+\cs{importproblem}~/ \cs{importfact} lines it emits, and the filter set --
+facts carry no \env{type} or \env{difficulty}, so \file{find-facts} has two
+filters where \file{find-problems} has four. Everything below holds for
+both.
 
-The four filters combine with AND. \env{PAT} is an extended regular
+Filters combine with AND. \env{PAT} is an extended regular
 expression matched case-insensitively against each comma-separated item, so
 \texttt{-{}-topic power} finds \texttt{power-rule} and
 \texttt{-{}-topic '\^{}power-rule\$'} matches exactly. A filter on a key a
@@ -132,7 +144,8 @@ Four modes round it out:
   \item \texttt{-{}-untagged} inverts: files with \emph{no} metadata block
     at all -- the tagging backlog.
   \item \texttt{-{}-import} prints the matches as paste-ready
-    \cs{importproblem} lines. Two opt-in modifiers refine the output:
+    \cs{importproblem} (or \cs{importfact}) lines. Two opt-in modifiers
+    refine the output:
     \texttt{-{}-with LIST} injects a comma subset of \env{number,desc} as
     options where a file carries them (\env{points} stays manual -- it is
     extrinsic), and \texttt{-{}-from DIR} rewrites each line's directory
@@ -148,17 +161,20 @@ The parser is textual and deliberately simple, which is where the
 one-key-per-line discipline of section~\ref{sec:problem-files} comes from:
 a reflowed block still compiles, but this script no longer sees it.
 
-\subsection{Picking problems interactively}
+\subsection{Picking from a bank interactively}
 
-\file{pick-problems} threads those two machine modes through
+\file{pick-problems} (and \file{pick-facts}, identically) threads those two
+machine modes through
 \href{https://github.com/junegunn/fzf}{fzf}: it feeds \texttt{-{}-tsv} into the
 picker (fuzzy-search the metadata, \file{bat}-preview the \file{.tex},
 multi-select with Tab), then pipes the chosen files back through
-\texttt{-{}-import} so the accepted set comes out as \cs{importproblem} lines on
+\texttt{-{}-import} so the accepted set comes out as \cs{importproblem} (or
+\cs{importfact}) lines on
 standard output. Its \texttt{-{}-from} and any \file{find-problems} filters pass
 straight through, e.g.\ \texttt{pick-problems -{}-from \_assessment -{}-type
-multiple-choice derivatives/}. The Vim command \texttt{:ImportProblem}
-(\texttt{<Space>ip}) is the same pipeline, inserting the lines at the cursor
+multiple-choice derivatives/}. The Vim commands \texttt{:ImportProblem}
+(\texttt{<Space>ip}) and \texttt{:ImportFact} (\texttt{<Space>if}) are the same
+pipeline, inserting the lines at the cursor
 with \texttt{-{}-from} pinned to the buffer's own directory -- so picking a
 problem while writing an assessment drops in a ready line, needing only its
 \env{points}.

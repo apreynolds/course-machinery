@@ -124,7 +124,7 @@ the problem reads ``2.1.8'' too), and \texttt{desc=} adds a parenthetical
 note. Points keys are simply ignored in notes -- the same import line can
 move between a test and a lecture unchanged.
 
-Two more import forms round out the lecture repertoire:
+Three more import forms round out the lecture repertoire:
 
 \begin{itemize}
   \item \cs{importcheckin} (same arguments as \cs{importproblem}) wraps an
@@ -135,6 +135,13 @@ Two more import forms round out the lecture repertoire:
     shared stem; in notes the stem stays an unnumbered ``Example.''\ and the
     members letter themselves (a), (b) (see section~\ref{sec:assessments}
     for the graded version).
+  \item \cs{importfact} (same shape again: \texttt{[number, desc]} then
+    directory and file) drops in a snippet from the \emph{fact} bank
+    (section~\ref{sec:fact-files}) -- a definition or rule stated once in
+    \file{facts/} and quoted wherever a lecture or formula sheet wants it.
+    The fact renders bare unless the document opts in to showing its
+    provenance via the \cs{ShowFactMeta} hook
+    (section~\ref{sec:ref-factmeta}).
 \end{itemize}
 
 The ``Example'' noun itself is a per-\emph{text} choice (books say Example /

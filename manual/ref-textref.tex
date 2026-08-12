@@ -32,7 +32,9 @@ just the sections a course actually points at.
 \cs{SetDefaultText}\texttt{\{name\}} & the book assumed when a lecture
   does not say. Default: unnamed.\\
 \cs{SetTextBase}\texttt{\{URL\}} & shorthand for a course with one book:
-  the base for whichever text is the default.\\
+  the base for whichever text is the default. (Reads the default name
+  \emph{when called}, so if \cs{SetDefaultText} is used too, it must come
+  first; \cs{DeclareTextBase} sidesteps the ordering entirely.)\\
 \cs{booksection}\texttt{\{2.5\}\{Title\}} & this lecture's own
   coordinate: its title and its running head. No URL needed.\\
 \cs{booksection}\texttt{[link=page]\dots} & the same, linked:
@@ -249,3 +251,21 @@ compiling it, and feeding them all to \texttt{curl} to find what rotted
 over the summer is then a short script rather than a project. The rule
 pays for itself on readability alone, so it holds whether or not such a
 script is ever written.
+
+\subsection*{For package authors}
+
+Nothing in this package typesets. \cs{booksection} /
+\cs{lecturetitle} only \emph{record}, into public read-only accessors:
+\cs{BookSectionHead} (the assembled head --- number, separator, title,
+linked if a URL resolved and hyperref is present), and the raw pieces
+\cs{BookSectionNumber}, \cs{BookSectionTitle}, \cs{BookSectionText} and
+\cs{BookSectionSlug}. A class that wants the running head reads
+\cs{BookSectionHead} at shipout --- LectureNotes puts it in
+\cs{CourseRunningHead} (Titling) and keys its \cs{headrule} off its
+emptiness, so a lecture that declares nothing gets no head and no rule
+--- and a class that wants no head simply never reads it: the same
+mechanism/presentation split as everywhere else
+(section~\ref{sec:hooks}). \cs{BookSectionHead} is
+\cs{providecommand}-stubbed empty in Titling, so reading it never
+requires this package to be loaded. The one knob between the pieces is
+\cs{BookSectionSeparator} (section~\ref{sec:ref-knobs}).
