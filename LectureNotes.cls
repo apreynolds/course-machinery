@@ -128,16 +128,23 @@
 % textwidth follows the measure rule rather than a frozen length; see Typefaces.
 % At 14pt this gives ~6.31in (the inherited hardcode was 6.382in, derived for a
 % font we no longer use); at 17pt it re-derives on its own.
+% includehead, because the running head (see HEADERS) is real reserved space and
+% has to be budgeted rather than borrowed from the top margin: the projector
+% copy's 0.25in top is smaller than the head itself, so without this the head
+% would run off the top of the page. With it, `top' is measured to the top of the
+% head and the body begins below it.
 \RequirePackage{geometry}
 \geometry{letterpaper}
 \ifProjector
   % Room copy: no marginpar, top margin tightened to buy vertical space.
-  \geometry{top=0.25in, bottom=0.75in, textwidth=2.6\alphabet}
+  \geometry{top=0.25in, bottom=0.75in, textwidth=2.6\alphabet,
+            includehead, headheight=22pt, headsep=8pt}
 \else
   % Handout: left margin fixed, remainder falls to the right and carries the
   % marginpar column.
   \geometry{top=0.5in, bottom=0.75in, left=0.5in,
-            textwidth=2.6\alphabet, marginparwidth=1.3in}
+            textwidth=2.6\alphabet, marginparwidth=1.3in,
+            includehead, headheight=17pt, headsep=10pt}
 \fi
 
 % No \TitleMarker override: the instructor-copy signal is now the page-edge frame
@@ -215,13 +222,31 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HEADERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Lectures want no running head at all -- just a page number, and not even that
-% on the projector copy: it is scrolled on screen and never collated, so a page
-% number is noise. \fancyhf{} clears every field; each view puts back only what
-% it wants.
+% The head carries the lecture's \booksection coordinate -- "2.5: The Chain
+% Rule", linked to that section of the book (TextRef.sty). It is the document's
+% title as well as its running head, which is why it repeats on every page
+% instead of sitting once at the top: a lecture is read a page at a time, and on
+% the projector copy -- scrolled rather than paged -- persistent orientation is
+% worth more than anywhere else. (Page NUMBERS are a different matter and are
+% still dropped there: the copy is never collated, so a number is noise. That is
+% the distinction an earlier version of this comment missed when it concluded
+% lectures want no running head at all.)
+%
+% \fancyhf{} clears every field; each view puts back only what it wants.
 \RequirePackage{fancyhdr}
-\renewcommand{\headrulewidth}{0pt}
 \fancyhf{}
+\fancyhead[R]{\CourseRunningHead}
+
+% Rule under the head, but only when there IS a head -- a lecture that declares
+% no coordinate (neither \booksection nor \lecturetitle) should not get a rule
+% sitting over nothing. Redefining \headrule rather than \headrulewidth is what
+% makes that testable: \headrulewidth has to expand to a dimension, whereas
+% \headrule is executed at shipout, by which point the declaration has run.
+\renewcommand{\headrule}{%
+  \ifdefempty{\BookSectionHead}{}{%
+    \hrule\@height\CourseHeadRule\@width\headwidth
+    \vskip-\CourseHeadRule}%
+}
 
 \ifProjector
   % Back-to-top arrow, bottom right of every page. The projector copy is scrolled
