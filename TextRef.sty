@@ -51,13 +51,18 @@
 %    logged instead (see MISS REPORTING), so silence never hides a rotted
 %    reference.
 %
-% 3. NO RUNTIME URL REGISTRY. The eventual link-checker harvests URLs by
-%    GREPPING the sources (\booksection lines in the lectures, \DeclareTextBase
-%    and \DeclareSection in the course setup, plus \demo calls in Hyperlinks.sty's
-%    format), not by reading something this package writes at compile time. Same
-%    discipline as ProblemMeta/FactMeta: the question "what links does this course
-%    have?" must be answerable without running LaTeX. KEEP ONE DECLARATION PER
-%    LINE -- that is the whole contract the checker relies on.
+% 3. NO RUNTIME URL REGISTRY. This package writes nothing at compile time for
+%    anything else to read back. The sources ARE the record: \booksection lines
+%    in the lectures, \DeclareTextBase and \DeclareSection in the course's text
+%    layer, \demo calls in Hyperlinks.sty's format. Same discipline as
+%    ProblemMeta/FactMeta -- "what links does this course have?" must be
+%    answerable without running LaTeX.
+%
+%    KEEP ONE DECLARATION PER LINE. That is what makes the answer a grep: you
+%    can list, count or audit every link in a course without compiling it, and
+%    a tool that curls them all is then a short script rather than a project.
+%    The rule earns its keep on readability alone, so it holds whether or not
+%    such a script is ever written.
 %
 % LAYERING RULE (important). \textbookref is a TEXT-TIED citizen. Use it in
 % lecture bodies, in box titles at the call site, and in import-time desc=.

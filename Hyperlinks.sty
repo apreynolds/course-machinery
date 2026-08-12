@@ -73,15 +73,19 @@
 % student-facing label, and the tool's identity is author-only metadata.
 %
 % Hence the optional argument is ACCEPTED AND DISCARDED (the same store-only
-% idiom as ProblemMeta/FactMeta): it names the tool for a human reader of the
-% source, and for the eventual link-checker, which classifies a link by its URL
-% domain and needs the hint only when the domain is opaque. Nothing about it
-% reaches the page.
+% idiom as ProblemMeta/FactMeta): it names the tool for a human reading the
+% source, worth giving when the URL's domain does not already say. Nothing about
+% it reaches the page.
 %
-% The real payoff is enumerability. Every demo routed through one macro means
-% "curl all my interactive links and tell me which died over the summer" is a
-% grep away -- rot found on your schedule, not in front of a class. That is why
-% even a bare \href you were about to write should be a \demo.
+% WHY THIS RATHER THAN A BARE \href, even for a one-off link:
+%   - one student-facing label, so the notes do not invent new wording per page;
+%   - one place to restyle every such link (\DemoLabel/\DemoMarker/\DemoFormat)
+%     instead of hunting \href calls;
+%   - the scheme-less-URL check below, which catches a dead link that renders
+%     perfectly;
+%   - and they stay countable: one macro means every interactive link in a
+%     course can be listed, or fed to curl, with a grep -- rot found on your
+%     schedule rather than in front of a class.
 %
 % Lives here rather than in TextRef.sty deliberately: a demo link has nothing to
 % do with the textbook (it is your own Desmos page as often as not), and

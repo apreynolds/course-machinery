@@ -234,15 +234,18 @@ point.
 
 \subsection*{Why no URL registry}
 
-The eventual link-checker (harvest every external link, \texttt{curl}
-them, report rot on your schedule rather than in front of a class) reads
-the \emph{sources}. There are three places to look: the
-\cs{booksection} line in each lecture; the base and cross-reference
-lines in the course's text layer; and every \cs{demo} call
-(section~\ref{sec:ref-titling}). It does not read anything this package
-writes at compile time, and there is deliberately nothing to write. Same
-discipline as ProblemMeta and FactMeta: ``what does this course
-contain?'' must be answerable without running \LaTeX.
+This package writes nothing at compile time for anything else to read
+back, and deliberately so. The \emph{sources} are the record, in three
+places: the \cs{booksection} line in each lecture; the base and
+cross-reference lines in the course's text layer; and every \cs{demo}
+call (section~\ref{sec:ref-titling}). Same discipline as ProblemMeta and
+FactMeta --- ``what does this course contain?'' must be answerable
+without running \LaTeX.
 
 That is also the reason for one rule of style: \textbf{keep each
-declaration on one line}. It is the whole contract the checker relies on.
+declaration on one line}. It is what makes the answer a \texttt{grep} ---
+every link in a course can be listed, counted or audited without
+compiling it, and feeding them all to \texttt{curl} to find what rotted
+over the summer is then a short script rather than a project. The rule
+pays for itself on readability alone, so it holds whether or not such a
+script is ever written.
