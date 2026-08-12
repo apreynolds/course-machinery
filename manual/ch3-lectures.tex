@@ -11,24 +11,38 @@ and a 17\,pt \emph{projector} copy for the room, built automatically as a view
 \documentclass{LectureNotes}
 \collapseworkspace
 
-% The text layer: what this course's book names things, where it lives.
-\input{../../.textbook/textbook}
-
 \begin{document}
-\section*{Introduction to Derivatives}
+\booksection[link=sec_derivative.html]{2.1}{Introduction to Derivatives}
 ...
 \end{document}
 \end{manexsource}
 
-Three preamble notes. The \texttt{\%! views:} comment declares which extra PDFs
+Two preamble notes. The \texttt{\%! views:} comment declares which extra PDFs
 the build script produces (here a projector copy and an instructor copy). The
 \cs{collapseworkspace} switch selects natural-height boxes -- the right mode when the
 notes carry no reserved whitespace; see section~\ref{sec:overlay} for the
-whole story. And the text layer \file{.textbook/textbook.tex} is \cs{input}
-\emph{in the preamble} (its box declarations must run before the document
-starts), via a relative path from the repo root -- section~\ref{sec:extending}
-explains what belongs in that file, and section~\ref{sec:ref-textref} what its
-section map buys you.
+whole story.
+
+Note what is \emph{not} there: the course's text layer
+(\file{.textbook/textbook.tex}) is loaded for you, found by name rather than
+\cs{input} by path, so a lecture may sit at any depth in the tree and a new
+master cannot forget it. Section~\ref{sec:extending} explains what belongs in
+that file; section~\ref{sec:ref-textref} covers naming a second book with
+\cs{usetext} when a course draws on two.
+
+Then the first line of the document proper: \cs{booksection} says which
+section of the book this lecture \emph{is}. It supplies the title and sets the
+running head on every page --- so the lecture is tied to its text structurally,
+rather than by remembering to cite. Note there is no \cs{section*}: the head is
+the title, written once.
+
+The \texttt{link=} option is what makes that head clickable, and it is
+\emph{optional}. A course taught from a printed text, or from none, writes
+\cs{booksection}\texttt{\{2.5\}\{The Chain Rule\}} and gets the same head
+without a URL anywhere in the repo. A lecture with no counterpart in the book
+at all says \cs{lecturetitle}\texttt{\{\dots\}} instead.
+Section~\ref{sec:ref-textref} has the rest, including a course drawing on two
+books.
 
 \subsection{Text results: boxes with declared numbers}
 
@@ -130,8 +144,9 @@ and every lecture follows, without touching the fixed ``Q'' on assessments.
 
 \subsection{Linking out: the text, and interactive demos}
 
-Two macros carry the outside world into a lecture, and both exist so that a
-link is written \emph{once}, consistently, and can be checked later:
+The lecture's own section is already linked, by the \cs{booksection} in its
+head. Two further macros carry the outside world into the body, and both exist
+so that a link is written \emph{once}, consistently, and can be checked later:
 
 \begin{manexsource}
 re-read \textbookref{1.3}{\S1.3} in the text
@@ -139,13 +154,16 @@ re-read \textbookref{1.3}{\S1.3} in the text
 \demo{https://www.desmos.com/calculator/xxxxxxxxxx}
 \end{manexsource}
 
-\cs{textbookref} resolves through the section map in your text layer
-(\file{.textbook/textbook.tex}) and links to the section's page --- keyed on
-the section, not the finer coordinate, because page URLs are the stable part
-of a web text and in-page anchors are what rots. If the section is not
-declared, the label still prints, unlinked, and the build tells you at the
-end. Full details, including where \cs{textbookref} may and may not appear
-(never inside a shared \file{problems/} or \file{facts/} file), are in
+\cs{textbookref} is for pointing at \emph{another} section than the one this
+lecture covers --- most often a prerequisite you are sending students back to.
+Those resolve through a short list of \cs{DeclareSection} entries in your text
+layer (\file{.textbook/textbook.tex}), which therefore only needs the handful
+of sections a course actually cross-references. It is keyed on the section,
+not the finer coordinate, because page URLs are the stable part of a web text
+and in-page anchors are what rots. If the section is not declared, the label
+still prints, unlinked, and the build tells you at the end. Full details,
+including where \cs{textbookref} may and may not appear (never inside a shared
+\file{problems/} or \file{facts/} file), are in
 section~\ref{sec:ref-textref}.
 
 \cs{demo} links an interactive tool under one uniform student-facing label,

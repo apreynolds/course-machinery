@@ -52,7 +52,12 @@ travels with you. Everything else in this table is the second kind.
   wording and its cue.\\
 \cs{DemoFormat} & Hyperlinks & a demo link's whole rendering.\\
 \cs{TextRefBase} & TextRef & the textbook base URL -- set via
-  \cs{SetTextBase} in the \textbf{text} layer, not renewed here.\\[0.5ex]
+  \cs{DeclareTextBase} (or \cs{SetTextBase}) in the \textbf{text} layer,
+  not renewed here.\\
+\cs{BookSectionSeparator} & TextRef & between number and title in a
+  lecture's head (default ``\texttt{:\ }'').\\
+\cs{CourseHeadRule}, \cs{CourseRunningHead} & Titling & the running
+  head's rule width and its whole rendering.\\[0.5ex]
 \cs{InstructorFrameInset}, \cs{InstructorFrameRule} & InstructorNotes &
   the instructor page frame.\\[0.5ex]
 \env{CourseIdentity} (\cs{colorlet}) & CourseDocument & the course

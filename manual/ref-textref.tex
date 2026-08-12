@@ -1,17 +1,47 @@
 \section{TextRef.sty}\label{sec:ref-textref}
 
 Links from the notes into the course textbook. The package holds the
-\emph{mechanism} only; the base URL and the section list are course data,
-declared in the course's text layer (\file{.textbook/textbook.tex},
-section~\ref{sec:extending}). Loaded by all three classes, and inert
-until that file is \cs{input}.
+\emph{mechanism} only; which book, where it lives, and which section a
+given lecture covers are all course data. Loaded by all three classes,
+and inert until a course declares something.
+
+It works in two halves, and the first is the one that carries the weight.
+
+\textbf{Every lecture declares the section it is.} One line at the top of
+the file names the coordinate, and the class prints it as a running head
+(section~\ref{sec:ref-lecturenotes}). The tie between a lecture and its
+section is therefore \emph{structural} rather than something to remember
+to write.
+
+If the book is online, that head is also a link --- but the link is
+optional, and everything here works without one. A course taught from a
+printed text, or from no text at all, uses the same command and never
+types a URL.
+
+\textbf{Anything else is a cross-reference.} Pointing at some
+\emph{other} section --- usually a prerequisite --- is what
+\cs{textbookref} is for, and those resolve through a small manifest of
+just the sections a course actually points at.
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
-\cs{SetTextBase}\texttt{\{URL\}} & where the text lives; every slug is
-  appended to it verbatim, so include the trailing slash. Default: empty
-  (no text declared).\\
-\cs{DeclareSection}\texttt{\{5.2\}\{slug.html\}} & one manifest entry:
+\cs{usetext}\texttt{\{apex\}} & in a master's preamble: this document is
+  an \emph{apex} document. Loads \file{.textbook/apex.tex}.\\
+\cs{DeclareTextBase}\texttt{\{name\}\{URL\}} & where a book lives; every
+  page is appended to it verbatim, so include the trailing slash.\\
+\cs{SetDefaultText}\texttt{\{name\}} & the book assumed when a lecture
+  does not say. Default: unnamed.\\
+\cs{SetTextBase}\texttt{\{URL\}} & shorthand for a course with one book:
+  the base for whichever text is the default.\\
+\cs{booksection}\texttt{\{2.5\}\{Title\}} & this lecture's own
+  coordinate: its title and its running head. No URL needed.\\
+\cs{booksection}\texttt{[link=page]\dots} & the same, linked:
+  \texttt{link} is a page \emph{appended to the base}, not a full URL.\\
+\cs{booksection}\texttt{[text=name]\dots} & the same, naming a book other
+  than the default. Combines with \texttt{link}.\\
+\cs{lecturetitle}\texttt{\{Title\}} & for a lecture with no counterpart
+  in the book: title only, no coordinate, no link.\\
+\cs{DeclareSection}\texttt{\{5.2\}\{page\}} & one cross-reference entry:
   section number $\to$ its page. Last declaration wins.\\
 \cs{textbookref}\texttt{\{5.2\}\{Table 5.2.3\}} & prints
   ``Table 5.2.3'', linked to \S5.2.\\
@@ -20,34 +50,124 @@ until that file is \cs{input}.
 \end{tabularx}
 \end{center}
 
+\subsection*{The lecture's own coordinate}
+
+\begin{manexsource}
+\documentclass{LectureNotes}
+\begin{document}
+\booksection{2.5}{The Chain Rule}
+\end{manexsource}
+
+That is the whole of it for a course with no online text: the head reads
+``2.5: The Chain Rule'', and no base, no text layer and no URL are
+involved anywhere. It replaces the \cs{section*} a lecture used to open
+with --- the head \emph{is} the title, so there is one place the title is
+written and no way for head and body to drift apart.
+
+A course whose book is online adds the page, and nothing else changes:
+
+\begin{manexsource}
+\documentclass{LectureNotes}
+\begin{document}
+\booksection[link=sec_chainrule.html]{2.5}{The Chain Rule}
+\end{manexsource}
+
+The base comes from the course's text layer, which is loaded for you --- see
+\emph{Loading the text layer} below. Note there is still no \cs{input}.
+
+\textbf{The page lives in the lecture, not in a shared list.} That looks
+like the thing this package was built to avoid --- a URL per file, each
+rotting on its own schedule --- but it is not. It is one page per file,
+in a fixed position, and it can only rot when the book restructures,
+which renumbers the section too, so you are editing that line anyway. The
+failure that genuinely wants central handling is a publisher moving
+domains, and that is still one edit: the base is declared once and only
+the page is local.
+
+\textbf{Options, not more arguments.} \texttt{link} and \texttt{text} are
+keyval options for the same reason \cs{importproblem} takes
+\texttt{points=} and \texttt{desc=} that way --- and because it is what
+lets the link be genuinely optional, instead of an empty \texttt{\{\}} in
+every lecture of every course that has no URL to give.
+
+\textbf{The number is the book's, not the course's.} A course that
+teaches a topic earlier than its text does still cites where the material
+\emph{lives} --- a lecture eighth in the term can perfectly well carry
+\cs{booksection}\texttt{\{5.1\}}. Sequence and text coordinate are
+independent; the filename carries one, this line the other.
+
+\subsection*{Loading the text layer}
+
+A course's text data lives in \file{.textbook/}, and \textbf{no master
+\cs{input}s it by path.} \file{.latexmkrc} puts that one folder on
+\env{TEXINPUTS}, so the file is found \emph{by name} from any depth. That
+is what lets a lecture sit anywhere in the tree: there is no \texttt{../..}
+in a master to keep true to the folder layout, and moving a file deeper or
+shallower breaks nothing. Only \file{.textbook/*.tex} is exposed this way,
+not the rest of the course.
+
+Which file loads depends on what the master says:
+
+\begin{itemize}
+  \item \textbf{Nothing} --- \file{textbook.tex} is loaded if it exists.
+    The ordinary case: a course with one book writes no \cs{usetext}
+    anywhere.
+  \item \cs{usetext}\texttt{\{apex\}} --- loads \file{apex.tex} instead.
+    For a course drawing chapters from more than one book.
+  \item Neither, and no \file{textbook.tex} --- nothing loads, and nothing
+    breaks. A course with no online text needs no \file{.textbook/} folder
+    at all; \cs{booksection} still sets the head.
+\end{itemize}
+
+\textbf{The presence of \file{textbook.tex} is what declares whether the
+course has a default book}, so there is no separate switch. A course with
+two books simply omits it, which makes naming the book in each lecture
+mandatory rather than merely possible --- worth having, because a lecture
+then carries its book with it, and ``which lectures use the other book?''
+is a positive grep rather than a search for absence. If you would rather
+have a default anyway, \file{textbook.tex} containing nothing but
+\cs{usetext}\texttt{\{apex\}} gives one that a lecture can still override.
+
+\textbf{Why a document names its book, rather than each reference.} Two
+kinds of fact live in a text layer. The base URL is resolved per call, so
+\cs{booksection}\texttt{[text=\dots]} can link into a second book from
+anywhere. But the notes noun and the \cs{NewTextResult} vocabulary are
+document-wide --- a document cannot call worked items ``Example'' and
+``Exercise'' at once, nor declare one result environment twice. So the
+document, not the reference, is the thing that has to choose. That
+granularity is also what makes the duplicate-vocabulary error unreachable:
+two books may both name a result, because they are never loaded together.
+
 \subsection*{Three decisions that shape it}
 
-\textbf{Keyed on the section, never finer.} Table 5.2.3, Key Idea 5.2.1
+\textbf{Section granularity, never finer.} Table 5.2.3, Key Idea 5.2.1
 and Example 5.2.6 all resolve to the top of \S5.2, and the student
-scrolls. Page URLs are the stable part of a web text; in-page anchors are
-exactly what rots. So the manifest is about forty lines for a course
-rather than several hundred, and it survives a re-edition that renumbers
-items \emph{within} a section. A full coordinate is accepted anyway --
-\cs{textbookref}\texttt{\{5.2.3\}} truncates to \texttt{5.2} on a miss --
-so you can type what you read off the page.
+scrolls --- which is a feature, not a concession: it puts the section's
+context in front of them. Page URLs are also the stable part of a web
+text, where in-page anchors are exactly what rots, and it survives a
+re-edition that renumbers items \emph{within} a section. A full
+coordinate is accepted anyway --- \cs{textbookref}\texttt{\{5.2.3\}}
+truncates to \texttt{5.2} on a miss --- so you can type what you read off
+the page.
 
-\textbf{Graceful degradation is the point.} The label text always prints.
-It becomes a link only if the manifest resolves the key \emph{and}
-hyperref is loaded. A missing text layer, a typo'd key, or an Assessment
-master (which deliberately loads no hyperref -- a link on paper is a dead
-end) all demote the reference to correct plain text. Nothing breaks, and
-nothing is silently wrong.
+\textbf{Graceful degradation is the point.} The text always prints. It
+becomes a link only if the base (and, for \cs{textbookref}, the key)
+resolves \emph{and} hyperref is loaded. An undeclared book, a typo'd key,
+or an Assessment master (which deliberately loads no hyperref --- a link
+on paper is a dead end) all demote the reference to correct plain text.
+Nothing breaks, and nothing is silently wrong.
 
 \textbf{Misses are reported.} Degrading silently would let a whole rotted
-manifest pass unnoticed, since the document still compiles and still
-reads correctly. So each unresolved key gets one \cs{PackageInfo} in the
-\file{.log} (deduplicated -- a section cited twenty times logs once), and
-the end of the run warns with the full list:
+set of links pass unnoticed, since the document still compiles and still
+reads correctly. So each unresolved key or book gets one \cs{PackageInfo}
+in the \file{.log} (deduplicated --- a section cited twenty times logs
+once), and the end of the run warns with the full list. Both kinds of
+failure share one list, so a build is never half-warned:
 
 \begin{manexsource}
 Package TextRef Warning: Textbook references printed WITHOUT links
-(no matching \DeclareSection):
-(TextRef)                9.9, 10.4.
+(no matching \DeclareSection or \DeclareTextBase):
+(TextRef)                text `nosuchbook', 9.9.
 \end{manexsource}
 
 \subsection*{The layering rule}
@@ -60,7 +180,7 @@ if it stays where the text is known:
     import-time \env{desc=}.
   \item \textbf{No:} inside \file{CourseBoxes.sty} or
     \file{Exercises.sty} -- that would couple text-agnostic machinery to
-    a particular manifest.
+    a particular book.
   \item \textbf{No:} inside a \file{problems/} or \file{facts/} file.
     Those are reused across courses and texts; a baked-in reference would
     point at the wrong book the moment the file is borrowed.
@@ -74,42 +194,55 @@ where the text is known and \file{Exercises.sty} merely re-emits it:
   {../facts/}{power-rule.tex}
 \end{manexsource}
 
-\subsection*{One text layer per master}
+\subsection*{A course drawn from two books}
 
-A course may draw its chapters from more than one book -- an opening
-review chapter out of one text, the rest out of another. Mount one text
-layer per book. But \textbf{every master \cs{input}s exactly one of
-them}, and never two.
+An opening review chapter out of one text and the rest out of another is
+a normal situation, and it needs no special handling. Declare both bases,
+and let each lecture name the book it means:
 
-That costs nothing, because it is how notes are written anyway: a lecture
-guides students through \emph{one} book. And the two things that would
-collide fail very differently, which is the reason to be deliberate
-rather than to find out:
+\begin{manexsource}
+\DeclareTextBase{apex}{https://example.org/apex/}
+\DeclareTextBase{openstax}{https://example.org/openstax/}
+\SetDefaultText{apex}
+\end{manexsource}
 
-\begin{itemize}
-  \item \textbf{Vocabulary collides loudly.} \cs{NewTextResult}
-    (section~\ref{sec:ref-courseboxes}) ends in
-    \cs{NewDocumentEnvironment}, which \emph{errors} on a name already
-    taken. Two layers that both name a result stop the build. Annoying,
-    but it tells you.
-  \item \textbf{Links collide silently.} \cs{DeclareSection} is
-    last-declaration-wins, so a second layer's \texttt{1.1} quietly
-    replaces the first's. Both books have a \S1.1; they are different
-    sections. The document compiles, reads correctly, and links to the
-    wrong book.
-\end{itemize}
+\begin{manexsource}
+\booksection[text=openstax, link=review-of-functions]{1.1}{Review of Functions}
+\end{manexsource}
 
-Last-wins is not an oversight -- it is what lets a course-local
-declaration override one it inherits, which is worth more than an error
-on duplicates. So the discipline lives here, in the rule, rather than in
-a check.
+Because each lecture carries its own coordinate, two books whose section
+numbers collide --- and they will, every book has a \S1.1 --- cannot be
+confused for one another. The book is part of what the lecture declares.
+
+\textbf{Cross-references belong to the text, not the course.} This is the
+easy thing to get wrong. A lecture that says
+\cs{usetext}\texttt{\{openstax\}} never loads the other book's file, so
+that file's \cs{DeclareSection} entries are simply unavailable to it. Each
+text file therefore carries the sections \emph{its own} lectures point at.
+The demo repo shows the whole arrangement: \file{.textbook/textbook.tex}
+and \file{.textbook/openstax.tex} side by side, with a lecture built on
+each.
+
+One thing still cannot be shared between two books in a single document:
+\emph{vocabulary}. The box factory
+(section~\ref{sec:ref-courseboxes}) ends in a fresh environment
+definition, which errors on a name already taken --- so two books that
+both name a result cannot both declare it in one master. That is a loud
+failure: it stops the build and tells you. In practice it does not arise,
+since students read one book and the second is merely somewhere you
+point.
 
 \subsection*{Why no URL registry}
 
 The eventual link-checker (harvest every external link, \texttt{curl}
 them, report rot on your schedule rather than in front of a class) reads
-the \emph{sources}: one file of \cs{DeclareSection} lines, plus every
-\cs{demo} call (section~\ref{sec:ref-titling}). It does not read anything
-this package writes at compile time, and there is deliberately nothing to
-write. Same discipline as ProblemMeta and FactMeta: ``what does this
-course contain?'' must be answerable without running \LaTeX.
+the \emph{sources}. There are three places to look: the
+\cs{booksection} line in each lecture; the base and cross-reference
+lines in the course's text layer; and every \cs{demo} call
+(section~\ref{sec:ref-titling}). It does not read anything this package
+writes at compile time, and there is deliberately nothing to write. Same
+discipline as ProblemMeta and FactMeta: ``what does this course
+contain?'' must be answerable without running \LaTeX.
+
+That is also the reason for one rule of style: \textbf{keep each
+declaration on one line}. It is the whole contract the checker relies on.

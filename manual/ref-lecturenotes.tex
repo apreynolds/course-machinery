@@ -26,6 +26,11 @@ stack. Workflow: section~\ref{sec:lectures}.
   (default \emph{Example}); redefine per \emph{text}, in
   \file{.textbook/textbook.tex}. Routed into \cs{ProblemLabelWord} so a
   shared text layer cannot disturb Assessment's fixed ``Q''.\\
+\cs{booksection}, \cs{lecturetitle} & the lecture's title and, for
+  \cs{booksection}, the section of the book it covers (with an optional
+  \texttt{link=} to that section's page). Supplied by TextRef
+  (section~\ref{sec:ref-textref}); the class renders it as the running
+  head.\\
 \end{tabularx}
 \end{center}
 
@@ -47,9 +52,14 @@ Other deliberate class behaviour:
     three levels.
   \item Paragraph spacing is airier than the parskip default
     (\texttt{skip=1em}) -- room to annotate, legible from the back row.
-  \item No running head; the handout has a centred page number, the
-    projector copy none (it is scrolled, not paged -- hence the back-to-top
-    footer arrow instead).
+  \item The running head is the lecture's \cs{booksection} coordinate
+    (linked if the book is online), on every page \emph{including} the
+    projector copy -- a scrolled
+    document is where persistent orientation is worth most. It carries a
+    rule, which disappears along with the head if the lecture declares no
+    coordinate. Page \emph{numbers} are the opposite case: the handout has a
+    centred one, the projector copy none (it is never collated, so a number
+    is noise -- hence the back-to-top footer arrow instead).
   \item Headings and links stay black: lectures sit with assessments on
     the ``clear, not fancy'' side; colour belongs to CourseDocument.
 \end{itemize}

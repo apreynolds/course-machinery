@@ -179,48 +179,55 @@ worth drawing:
 \fi
 % \renewcommand{\NotesProblemLabelWord}{Exercise}
 
-\SetTextBase{https://opentext.uleth.ca/apex-calculus/}
-\DeclareSection{2.1}{sec_derivative.html}
-\DeclareSection{2.2}{sec_common_der.html}
+\DeclareTextBase{apex}{https://opentext.uleth.ca/apex-calculus/}
+\SetDefaultText{apex}
+
+\DeclareSection{1.3}{sec_limit_analytically.html}   % cross-references only
 \end{manexsource}
 
-Masters \cs{input} it in the preamble (\cs{newtheorem} must run before
-the document starts), by relative path:
-\file{\textbackslash input\{../../.textbook/textbook\}}. The
-\cs{ifdefined} guard is what lets \emph{one} file serve every master: an
-Assessment document loads no CourseBoxes, skips the factory calls, and
-still picks up non-box overrides like the notes noun. The manifest lines
-need no guard -- all three classes load TextRef
+No master \cs{input}s it. \file{.latexmkrc} puts \file{.textbook/} on
+\env{TEXINPUTS}, so the file is found by \emph{name} and loaded at the end
+of the preamble, which is early enough for \cs{newtheorem}. That is what
+frees a lecture to sit at any depth: no master carries a \texttt{../..}
+that has to stay true to the folder layout. A course with two books names
+the one it means (\cs{usetext}, section~\ref{sec:ref-textref}); a course
+with no online text has no such folder and nothing loads.
+
+The \cs{ifdefined} guard is what lets \emph{one} file serve every master:
+an Assessment document loads no CourseBoxes, skips the factory calls, and
+still picks up non-box overrides like the notes noun. The rest needs no
+guard -- all three classes load TextRef.
+
+\textbf{What is deliberately not here: the section map.} Each lecture
+declares its own coordinate with \cs{booksection}, so a section's page
+lives in the file it describes rather than in a list that has to be kept
+in step with the lectures. What remains here is the \emph{base} those
+pages hang off, plus the handful of sections the course
+\emph{cross-references} -- points at without being. That is why the list
+above is one line rather than ninety.
+
+A course whose text is not online, or which teaches from no text, needs
+none of section 3 at all: \cs{booksection} takes its page as an
+\emph{option}, so those lectures simply do not give one and still get
+their heading. The file then holds only the vocabulary.
+
+This also settles the case of a course drawn from two books, an opening
+review chapter out of one text and the rest out of another: keep a file
+per book (\file{textbook.tex} and \file{openstax.tex} in the demo), and
+each lecture names the book it means with \cs{usetext}. Two books whose
+section numbers collide -- and they will, every book has a \S1.1 -- cannot
+be confused, because the book is part of what the lecture declares. Note
+that the cross-reference list goes in each \emph{text} file: a lecture
+built on one book never loads the other's
 (section~\ref{sec:ref-textref}).
 
-\textbf{Why a folder for one file.} The folder is the unit that travels.
-Teach three courses out of the same book and \file{.textbook/} is exactly
-what you would promote to a shared submodule (\file{.apex/}) mounted in
-all three: the text's vocabulary and link map then live \emph{once}, and
-a publisher moving domains is one edit for every course that uses it.
-Nothing depends on which it is -- plain folder today, submodule tomorrow,
-and no master changes either way. The single \cs{input} is the same
-insulation: should the section manifest ever become machine-generated
-(scraped from the book's contents, so a regeneration cannot clobber
-hand-written vocabulary), \file{textbook.tex} becomes a two-line
-aggregator and no document notices.
-
-Promoting it also frees the \emph{name}. \file{.textbook/} is the neutral
-choice, and the right one while a course has a single book; a course that
-mounts a submodule may instead name the folder for the text it holds
-(\file{.apex/apex.tex}), so the tree says at a glance which book the
-course teaches out of and each master's \cs{input} line names the text it
-is citing. Nothing in the machinery reads the path -- masters \cs{input}
-it by relative path and that is the whole coupling -- so this is purely
-whether you want the name to carry the information.
-
-Naming earns its keep once a course needs \emph{two}: an opening review
-chapter drawn from one book, the rest from another. Mount one layer per
-book; two named folders sit side by side without ambiguity, and a
-transition year that runs both can do so without either shadowing the
-other. The constraint that comes with it is that a given master
-\cs{input}s exactly \emph{one} layer, which is worth reading before you
-try it (section~\ref{sec:ref-textref}).
+\textbf{Why a folder.} It is the boundary of what the build can see. The
+whole mechanism rests on \file{.textbook/} being on \env{TEXINPUTS}, and
+naming the folder rather than the course root is what keeps that exposure
+narrow: only \file{.textbook/*.tex} becomes findable by bare name, so
+nothing else in the course can be picked up by accident. The folder also
+stops being an oddity as soon as a course has two books, since then it
+holds \file{apex.tex} and \file{openstax.tex} side by side.
 
 To restyle course-wide, prefer the named extension points -- the
 \env{cb/*} tcolorbox styles and \env{cb*} head styles

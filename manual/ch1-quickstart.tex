@@ -7,10 +7,12 @@ reference layout:
 \begin{manexsource}
 course-demo/
   .course-machinery/   the toolkit (classes, packages, scripts)
-  .latexmkrc           puts the machinery on TEXINPUTS
+  .latexmkrc           puts the machinery and .textbook on TEXINPUTS
   .MIRRORDIR           optional PDF mirror destination
-  .textbook/           the text layer: what the course's book
-    textbook.tex       names things, and where it lives online
+  .textbook/           the text layer: what a book names things,
+    textbook.tex       and where it lives online. This one is the
+    openstax.tex       course default; a second file is a second book,
+                       chosen per lecture with \usetext
   derivatives/         a topic (a course has several, same shape)
     problems/          problem bank: one problem per file
     lectures/          LectureNotes masters (+ .latexmkrc)
@@ -59,10 +61,13 @@ images that file loads resolve against the \emph{file's own} directory.
 The one course-wide content file is \file{.textbook/textbook.tex}, the
 \emph{text layer}: everything that depends on which book the course is
 taught from -- the named result boxes it uses (APEX's ``Key Idea''), the
-noun lectures call an example, and the section-to-URL map behind
-\cs{textbookref}. Masters \cs{input} it in the preamble by relative path.
-Section~\ref{sec:extending} explains the one-question test for what
-belongs there, why it is a folder, and why it is guarded.
+noun lectures call an example, and the base URL the book lives at.
+Masters do not \cs{input} it --- it is found by name and loaded
+automatically, so a lecture may sit at any depth and a new master cannot
+forget it. Section~\ref{sec:extending} explains the one-question test for
+what belongs there, and why it is guarded. Which \emph{section} of the book a
+given lecture covers is declared in that lecture, not here
+(section~\ref{sec:ref-textref}).
 
 \subsection{The five-minute loop}
 
