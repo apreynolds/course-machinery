@@ -41,3 +41,32 @@
   \par{\small\itshape Updated \@date\TitleStamp\TitleMarker}%
   \vspace{0.5em}%
 }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THE RUNNING HEAD
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% A lecture's running head is its \booksection coordinate (TextRef.sty), which
+% doubles as the document's title: "2.5: The Chain Rule", linked to that section
+% of the book. What it LOOKS like belongs here for the same reason \maketitle
+% does -- so the documents that carry one agree, and the look is changed in one
+% place rather than per class.
+%
+% Deliberately NOT a \fancypagestyle. A named style would have to own the footer
+% too, and the footer is exactly what the classes differ on (LectureNotes swaps a
+% page number for a back-to-top arrow on the projector copy). So this supplies
+% the head's CONTENT and RULE, each class wires them into its own fancyhdr setup:
+%
+%   \renewcommand{\headrulewidth}{\CourseHeadRule}
+%   \fancyhead[R]{\CourseRunningHead}
+%
+% No fancyhdr dependency here -- these are read at shipout, by which time the
+% class that wanted a head has loaded it.
+\newcommand{\CourseHeadRule}{0.4pt}
+
+% \BookSectionHead is TextRef's; \providecommand because Titling loads first and
+% a class may use this head without TextRef ever being asked for a coordinate,
+% in which case the head is empty and the rule sits over nothing.
+\providecommand{\BookSectionHead}{}
+% \small: a running head is signage, not content, and at the projector copy's
+% 17pt base a full-size head would crowd the material it labels.
+\newcommand{\CourseRunningHead}{{\small\scshape\BookSectionHead}}
