@@ -40,6 +40,28 @@ case $kind in
   *)  echo "$prog: unknown --kind: $kind (want problem|fact)" >&2; exit 2 ;;
 esac
 
+usage() {
+  # Generated from the active kind, the way find-meta's usage is: the header
+  # of THIS file documents the engine ("not meant to be called directly"),
+  # which is exactly the wrong thing for `pick-problems --help' to print.
+  echo "$prog — fzf picker over the $noun bank; emits \\import$noun lines"
+  echo
+  echo "Usage: $prog [--from DIR] [FILTER ...] [PATH ...]"
+  echo
+  echo "An interactive front-end to find-${noun}s: feeds its --tsv listing into fzf"
+  echo "(multi-select, metadata shown, the .tex previewed), then turns the chosen"
+  echo "entries into paste-ready \\import$noun lines via --import. The import block"
+  echo "is printed to stdout -- pipe it, or paste it into a document."
+  echo
+  echo "  --from DIR    make the emitted directory arguments relative to DIR (the"
+  echo "                folder of the document you will paste into). Without it,"
+  echo "                paths are relative to the search root and usually need a"
+  echo "                ../ or two."
+  echo
+  echo "Every other argument is forwarded to \`find-${noun}s --tsv', so all of its"
+  echo "filters and PATH operands work here too; see \`find-${noun}s --help'."
+}
+
 # find-meta is our sibling in the same directory. Call it by path rather than
 # assume it is on PATH: it is not installed globally -- each course carries its
 # own copy in .course-machinery, and that is the one we want. We drive it with
@@ -50,7 +72,18 @@ if [[ ! -x $fm ]]; then
   echo "$prog: cannot find find-meta next to me ($fm)" >&2
   exit 2
 fi
-engine=("$fm" --kind "$kind" --as "find-$noun")
+# fzf and bat are hard dependencies of the picker itself (the selector and the
+# preview); check up front so a missing one fails with a plain message rather
+# than a mid-pipeline error after find-meta has already run.
+for dep in fzf bat; do
+  if ! command -v "$dep" >/dev/null; then
+    echo "$prog: $dep is required but not on PATH" >&2
+    exit 2
+  fi
+done
+# --as names the PLURAL shim (find-problems, find-facts): that is the command a
+# user can actually run, so it is the name any engine diagnostic should print.
+engine=("$fm" --kind "$kind" --as "find-${noun}s")
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ARGUMENTS
@@ -62,9 +95,13 @@ from=""
 feed_args=()
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -h | --help) sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    --kind)      shift 2 ;;
-    --as)        shift 2 ;;
+    -h | --help) usage; exit 0 ;;
+    # Consumed in the pre-scan; only stepped over here. The guard matters:
+    # `shift 2' with one argument left shifts NOTHING (it fails and leaves $#
+    # alone), so a trailing --as would spin this loop forever.
+    --kind | --as)
+      [[ $# -ge 2 ]] || { echo "$prog: $1 needs a value" >&2; exit 2; }
+      shift 2 ;;
     --from)      from=${2:?--from needs a directory}; shift 2 ;;
     *)           feed_args+=("$1"); shift ;;
   esac

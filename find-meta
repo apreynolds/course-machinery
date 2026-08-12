@@ -129,8 +129,12 @@ paths=()                    # search operands: directories and/or individual fil
 while [[ $# -gt 0 ]]; do
   case $1 in
     -h | --help)   usage; exit 0 ;;
-    --kind)        shift 2 ;;   # consumed in the pre-scan
-    --as)          shift 2 ;;   # ditto
+    # --kind/--as were consumed in the pre-scan; only stepped over here. The
+    # guard matters: `shift 2' with one argument left shifts NOTHING (it fails
+    # and leaves $# alone), so a trailing --as would spin this loop forever.
+    --kind | --as)
+      [[ $# -ge 2 ]] || { echo "$prog: $1 needs a value" >&2; exit 2; }
+      shift 2 ;;
     --vocab)       mode="vocab";    shift ;;
     --import)      mode="import";   shift ;;
     --untagged)    mode="untagged"; shift ;;
@@ -325,17 +329,13 @@ if [[ $mode == tsv ]]; then
         }
         return 0
       }
-      BEGIN {
-        open_re = "\\\\" ENVIRON["fm_macro"] "[[:space:]]*[{]"
-        ncol  = split(ENVIRON["fm_cols"], col, ",")
-        nfilt = (ENVIRON["fm_filters"] == "") ? 0 : split(ENVIRON["fm_filters"], fk, ",")
-      }
-      # New file: reset state. split("",v) empties the array portably.
-      FNR == 1 { path = FILENAME; inblock = 0; split("", v) }
-      $0 ~ open_re { inblock = 1; next }
-      # Block close: filter, then emit one row (path + the schema columns).
-      inblock && /^[[:space:]]*\}/ {
-        inblock = 0
+      # One row per FILE, emitted at the file boundary -- matching the generic
+      # path, which dumps a whole file with read_meta and then reads each key
+      # with field() (first occurrence wins there too). Emitting per BLOCK
+      # would diverge the moment a file held two blocks or lost its closing
+      # brace, and the contract is byte-identical output.
+      function emit(   ok, i, j, out) {
+        if (!had_block) return
         ok = 1
         for (i = 1; i <= nfilt; i++)
           if (!csv_match(v[fk[i]], ENVIRON["flt_" fk[i]])) { ok = 0; break }
@@ -344,9 +344,19 @@ if [[ $mode == tsv ]]; then
           for (j = 1; j <= ncol; j++) out = out "\t" v[col[j]]
           print out
         }
-        next
       }
-      # Key line inside the block -- read_meta parsing rules, verbatim.
+      BEGIN {
+        open_re = "\\\\" ENVIRON["fm_macro"] "[[:space:]]*[{]"
+        ncol  = split(ENVIRON["fm_cols"], col, ",")
+        nfilt = (ENVIRON["fm_filters"] == "") ? 0 : split(ENVIRON["fm_filters"], fk, ",")
+      }
+      # New file: emit the row for the file just finished, then reset state.
+      # split("",v) empties the array portably.
+      FNR == 1 { emit(); path = FILENAME; inblock = 0; had_block = 0; split("", v) }
+      $0 ~ open_re { inblock = 1; had_block = 1; next }
+      inblock && /^[[:space:]]*\}/ { inblock = 0; next }
+      # Key line inside the block -- read_meta parsing rules, verbatim. First
+      # occurrence of a key wins, exactly like field() on the generic path.
       inblock {
         line = $0
         gsub(/\\%/, "\001", line); sub(/%.*$/, "", line); gsub(/\001/, "\\%", line)
@@ -354,11 +364,13 @@ if [[ $mode == tsv ]]; then
           key = line; sub(/[[:space:]]*=.*$/, "", key); gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
           val = line; sub(/^[^=]*=[[:space:]]*/, "", val); sub(/,[[:space:]]*$/, "", val)
           gsub(/^\{|\}$/, "", val); gsub(/\\#/, "#", val); gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
-          v[key] = val
+          if (!(key in v)) v[key] = val
         }
       }
+      END { emit() }
     '
-  exit 0
+  # No `exit 0': with pipefail, a failure in awk/xargs must reach the caller.
+  exit
 fi
 
 matches=()

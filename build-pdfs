@@ -17,7 +17,7 @@
 # mirror, keeping both. Blank and #-comment lines are ignored; the path and the
 # BOTH keyword may appear in either order. A nearer .MIRRORDIR (in a subdirectory)
 # wins, letting a subtree mirror elsewhere. (COPY, a songsheets synonym for
-# BOTH, is intentionally not recognised here yet.)
+# BOTH, is deliberately not wired here; it warns and is ignored.)
 #
 # Named destinations for selected views: besides the bare mirror-base line, a
 # .MIRRORDIR may carry `LABEL: path' lines (e.g. `TA-dir: ~/shared/calc-ta'). A view
@@ -74,12 +74,26 @@ usage() {
   sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
 }
 
-case "${1:-}" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-esac
+# Honour -h/--help anywhere in the arguments, not just first -- `build-pdfs
+# foo.tex --help' should print help, not count --help as a failed build.
+for arg in "$@"; do
+  case $arg in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+  esac
+done
+
+# A `LABEL: path' named-destination line: a label (letters, digits, _ or -),
+# a colon, then REQUIRED whitespace. The space is load-bearing -- it keeps a
+# Windows-style bare path like C:/course-pdfs parseable as a path (see
+# NOTE-ON-WINDOWS.md). The ONE classifier, shared by parse_dest_file (which
+# skips these lines) and resolve_label (which reads them), so the two parsers
+# can never disagree about what counts as a label line.
+is_label_line() {
+  [[ $1 =~ ^[A-Za-z0-9_-]+:[[:space:]] ]]
+}
 
 # Parse a .MIRRORDIR file for its mirror base: blank and #-comment lines are ignored,
 # an optional BOTH keyword and the bare base path may appear in either order, and
@@ -88,7 +102,8 @@ esac
 # ~ expanded) — or warns and echoes nothing if the file names no base at all.
 # VALIDATING the base is the caller's job (read_mirrordir requires it to exist; it
 # creates the mirror sub-directory itself). (COPY, a songsheets synonym for BOTH,
-# is intentionally not recognised here yet.)
+# is deliberately not wired here: it warns and is ignored, so a songsheets
+# .MIRRORDIR carried over cannot silently lose its mirror base to the keyword.)
 parse_dest_file() {
   local f=$1 line trimmed lower path="" mode="MOVE"
   while IFS= read -r line || [[ -n $line ]]; do
@@ -101,10 +116,23 @@ parse_dest_file() {
       mode="BOTH"                  # keep a local copy too
       continue
     fi
+    if [[ $lower == copy ]]; then
+      echo "build-pdfs: $f: COPY is a songsheets keyword, not recognised here -- ignored" >&2
+      continue
+    fi
     # A `LABEL: path' line is a named view destination, resolved separately by
     # resolve_label -- never the bare mirror-base path.
-    [[ $trimmed =~ ^[A-Za-z0-9_-]+:[[:space:]] ]] && continue
-    [[ -z $path ]] && path=$trimmed  # first non-keyword line = path
+    is_label_line "$trimmed" && continue
+    if [[ -z $path ]]; then
+      path=$trimmed                # first non-keyword line = path
+      # `TA-dir:/x' (no space after the colon) is NOT a label line, so it just
+      # became the mirror base -- almost certainly a mistyped label. Warn but
+      # carry on; read_mirrordir's base-must-exist check is the backstop.
+      # ({2,} spares a Windows drive letter like C:/ the false alarm.)
+      if [[ $trimmed =~ ^[A-Za-z0-9_-]{2,}:[^[:space:]] ]]; then
+        echo "build-pdfs: $f: '$trimmed' taken as the mirror base, but it looks like a label line missing the space after ':'" >&2
+      fi
+    fi
   done <"$f"
 
   if [[ -z $path ]]; then
@@ -177,6 +205,9 @@ resolve_label() {
   while IFS= read -r line || [[ -n $line ]]; do
     trimmed=${line#"${line%%[![:space:]]*}"}
     trimmed=${trimmed%"${trimmed##*[![:space:]]}"}
+    # Same shape test as parse_dest_file skips, so a line one parser treats as
+    # a label the other can never treat as the mirror base (and vice versa).
+    is_label_line "$trimmed" || continue
     [[ $trimmed == "$label:"* ]] || continue
     path=${trimmed#"$label":}                       # strip 'LABEL:'
     path=${path#"${path%%[![:space:]]*}"}           # trim leading space
@@ -273,7 +304,7 @@ compile_view() {
 # Build one .tex file. Runs in a subshell so the cd stays local to this build.
 build_file() {
   local src=$1 dir base jobname auxkey auxdir outinfo mode outdir movedir pdfdir
-  local view name label suffix inject varaux
+  local views view name label suffix inject varaux
   dir=$(dirname -- "$src")
   base=$(basename -- "$src")
   jobname=${base%.tex}
@@ -304,7 +335,11 @@ build_file() {
       fi
     fi
 
-    latexmk -pdf -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} "$base" || exit
+    # -interaction=nonstopmode: without it a TeX error drops pdflatex to its
+    # interactive `?' prompt and the build hangs waiting for input. The view
+    # builds already run nonstop (compile_view's -pdflatex override); this
+    # keeps the base build's failure mode the same as theirs.
+    latexmk -pdf -interaction=nonstopmode -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} "$base" || exit
     echo "    ok: $jobname.pdf"
     if [[ $mode == BOTH ]]; then
       cp -- "$jobname.pdf" "$outdir/" || exit
@@ -322,7 +357,11 @@ build_file() {
     # build's log) and follows the same MOVE/BOTH output handling as the default
     # build above. A `view:LABEL' token additionally drops a flat copy into the
     # named .MIRRORDIR destination; `default:LABEL' does the same for the base PDF.
-    for view in $(read_views "$base"); do
+    # mapfile, not `for view in $(...)': read_views emits one token per line,
+    # and word-splitting would shred a token containing a space (a label like
+    # `instructor:TA dir') and glob-expand any stray * against the build dir.
+    mapfile -t views < <(read_views "$base")
+    for view in "${views[@]}"; do
       name=$view; label=""
       if [[ $view == *:* ]]; then name=${view%%:*}; label=${view#*:}; fi
       case $name in
