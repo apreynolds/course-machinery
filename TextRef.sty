@@ -7,40 +7,57 @@
 % 5.2.1", "see 2.5.4". Hand-typing a deep link every time gives you a hundred
 % URLs scattered through the sources, each rotting on its own schedule.
 %
-% So this package supplies the MECHANISM and nothing else:
+% So this package supplies the MECHANISM and nothing else, in two halves.
 %
-%   \SetTextBase{https://example.org/the-text/}     % where the text lives
-%   \DeclareSection{5.2}{sec_definite_integral.html} % section -> page
-%   ...in the body:  \textbookref{5.2}{Table 5.2.3}
+% THE PRIMARY HALF -- every lecture declares the section it IS:
 %
-% THE DATA LIVES OUTSIDE THIS FILE, in the course's own text layer
-% (.textbook/textbook.tex -- see the manual's architecture chapter). This file
-% must stay free of any particular textbook: no base URL, no section names, no
-% publisher. That is the same mechanism-in-machinery / data-in-the-course split
-% as the box factory in CourseBoxes.sty vs. the course's "Key Idea" declaration.
+%   \DeclareTextBase{apex}{https://example.org/the-text/}  % once, course-wide
+%   ...at the top of the lecture:
+%   \booksection{5.2}{The Definite Integral}{sec_definite_integral.html}
+%
+% The class prints that as a running head and links it, so the tie between a
+% lecture and its section is STRUCTURAL: every lecture links, whether or not the
+% author remembered to cite. One line per file, and the slug sits in the file it
+% describes rather than in a manifest that has to be kept in step with it.
+%
+% THE SECONDARY HALF -- pointers to some OTHER section, usually a prerequisite:
+%
+%   \DeclareSection{1.3}{sec_limits_analytically.html}   % only what you cite
+%   ...in the body:  \textbookref{1.3}{\S1.3}
+%
+% These are the references a lecture's own coordinate cannot cover, and they are
+% sparse, so the manifest only needs the handful of sections a course actually
+% cross-references -- not the whole book.
+%
+% THE DATA LIVES OUTSIDE THIS FILE: slugs in the lectures, bases (and any
+% cross-reference manifest) in the course's own setup. This file must stay free
+% of any particular textbook -- no base URL, no section names, no publisher. That
+% is the same mechanism-in-machinery / data-in-the-course split as the box
+% factory in CourseBoxes.sty vs. the course's "Key Idea" declaration.
 %
 % THREE DESIGN DECISIONS worth knowing before you extend it:
 %
-% 1. KEYED ON THE SECTION, not the fine coordinate. Table 5.2.3, Key Idea 5.2.1
-%    and Example 5.2.6 all resolve to the top of section 5.2 and the student
-%    scrolls. Page URLs are the stable part of a web text; in-page anchors are
-%    exactly what rots. One manifest entry per section (~40 lines for a course)
-%    instead of one per referenced item (hundreds), and it survives a re-edition
-%    that renumbers items within a section.
+% 1. SECTION GRANULARITY, never finer. Table 5.2.3, Key Idea 5.2.1 and Example
+%    5.2.6 all resolve to the top of section 5.2 and the student scrolls -- which
+%    is pedagogically a feature, not a concession. Page URLs are the stable part
+%    of a web text; in-page anchors are exactly what rots. It also survives a
+%    re-edition that renumbers items within a section.
 %
-% 2. GRACEFUL DEGRADATION IS THE POINT. \textbookref ALWAYS prints its label
-%    text. It hyperlinks that text only if the loaded manifest resolves the key
-%    AND hyperref is present. A missing manifest, a typo'd key, or a class that
-%    loads no hyperref (Assessment) demotes the reference to correct plain text
-%    -- never a broken link, never a compile error. Misses are logged instead
-%    (see MISS REPORTING), so silence never hides a rotted reference.
+% 2. GRACEFUL DEGRADATION IS THE POINT. \booksection and \textbookref ALWAYS
+%    print their text. They hyperlink it only if the base (and, for \textbookref,
+%    the key) resolves AND hyperref is present. An undeclared text, a typo'd key,
+%    or a class that loads no hyperref (Assessment) demotes the reference to
+%    correct plain text -- never a broken link, never a compile error. Misses are
+%    logged instead (see MISS REPORTING), so silence never hides a rotted
+%    reference.
 %
 % 3. NO RUNTIME URL REGISTRY. The eventual link-checker harvests URLs by
-%    GREPPING the sources (\SetTextBase + \DeclareSection lines in one file,
-%    plus \demo calls in Hyperlinks.sty's format), not by reading something this
-%    package writes at compile time. Same discipline as ProblemMeta/FactMeta:
-%    the question "what links does this course have?" must be answerable without
-%    running LaTeX.
+%    GREPPING the sources (\booksection lines in the lectures, \DeclareTextBase
+%    and \DeclareSection in the course setup, plus \demo calls in Hyperlinks.sty's
+%    format), not by reading something this package writes at compile time. Same
+%    discipline as ProblemMeta/FactMeta: the question "what links does this course
+%    have?" must be answerable without running LaTeX. KEEP ONE DECLARATION PER
+%    LINE -- that is the whole contract the checker relies on.
 %
 % LAYERING RULE (important). \textbookref is a TEXT-TIED citizen. Use it in
 % lecture bodies, in box titles at the call site, and in import-time desc=.
@@ -52,15 +69,101 @@
 % -- the call site is text-tied, and Exercises just re-emits desc= opaquely.
 
 \RequirePackage{etoolbox}
+\RequirePackage{keyval}        % \booksection's [key=value] options
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LOADING THE COURSE'S TEXT LAYER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The data this package resolves against is course-side, in .textbook/. NO
+% MASTER \inputs IT BY PATH: .latexmkrc puts .textbook/ on TEXINPUTS, so the file
+% is found BY NAME from any depth. That is what frees a lecture to sit anywhere
+% in the tree -- there is no ../.. in a master to keep true to the folder layout,
+% and a master that is moved deeper or shallower still builds.
+%
+%   \usetext{apex}     -- this document is an APEX document; loads apex.tex.
+%
+% WHY A DOCUMENT NAMES ITS BOOK, rather than each reference naming it. Two kinds
+% of fact live in a text layer, and they need different granularity:
+%
+%   - the base URL, which \booksection resolves PER CALL -- so one document can
+%     link into two books (\booksection[text=openstax]{...});
+%   - the notes noun and the \NewTextResult vocabulary, which are DOCUMENT-WIDE.
+%     A document cannot call worked items "Example" and "Exercise" at once, and
+%     cannot declare the same result environment twice (that is a hard error).
+%
+% The second kind is why \booksection's text= is not sufficient on its own. And
+% the granularity is natural: a lecture is one document, taught out of one book.
+% It also makes the duplicate-vocabulary error unreachable -- two books can both
+% name a result, because they are never loaded together.
+%
+% THE DEFAULT. If a master says nothing, textbook.tex is loaded when it exists.
+% So a one-book course writes no \usetext anywhere; and a course drawing on two
+% books simply has no textbook.tex, which makes naming the book mandatory rather
+% than merely possible. The presence of that one file IS the course's statement
+% of whether it has a default text -- there is no separate switch to set.
+%
+% A course can have both if it wants: a textbook.tex holding nothing but
+% \usetext{apex} gives a default that an individual lecture can still override.
+%
+% Deferred to \AtEndPreamble because the master's preamble must have had its
+% chance to call \usetext first -- the class finishes long before the preamble
+% does. Still before \begin{document}, which \NewTextResult requires.
+\newbool{TextRef@textchosen}
+\newcommand{\usetext}[1]{%
+  \booltrue{TextRef@textchosen}%
+  \IfFileExists{#1.tex}%
+    {\input{#1.tex}}%
+    {\PackageWarning{TextRef}{No text layer `#1.tex' found on the
+       path.\MessageBreak Expected .textbook/#1.tex in the course root;
+       references\MessageBreak will print as plain text}}%
+}
+\AtEndPreamble{%
+  \ifbool{TextRef@textchosen}{}{%
+    \IfFileExists{textbook.tex}{\input{textbook.tex}}{}%
+  }%
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % THE MANIFEST
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% The base URL every slug hangs off. Empty by default, which is the honest state
-% for a course that has not declared a text: every reference then degrades to
-% plain text. Include the trailing slash -- entries are appended verbatim.
-\newcommand{\TextRefBase}{}
-\newcommand{\SetTextBase}[1]{\renewcommand{\TextRefBase}{#1}}
+% The base URL every slug hangs off, stored PER TEXT NAME -- one macro per name,
+% exactly as \DeclareSection stores sections below, so lookup is a single
+% \ifcsdef. Naming the text is what lets a course whose opening chapter comes
+% from one book and whose remainder comes from another declare both:
+%
+%   \DeclareTextBase{apex}{https://opentext.uleth.ca/apex-calculus/}
+%   \DeclareTextBase{openstax}{https://openstax.org/books/calculus-volume-1/pages/}
+%   \SetDefaultText{apex}
+%
+% Include the trailing slash -- slugs are appended verbatim.
+\newcommand{\DeclareTextBase}[2]{\csgdef{TextRef@base@#1}{#2}}
+
+% The text assumed when \booksection is given no optional argument, and the one
+% \textbookref resolves against. Empty by default, which is the honest state for
+% a course that has declared no text at all: every reference degrades to plain
+% text.
+\newcommand{\TextRef@defaulttext}{}
+\newcommand{\SetDefaultText}[1]{\renewcommand{\TextRef@defaulttext}{#1}}
+
+% A course with ONE book never needs to name it. \SetTextBase declares the base
+% for whatever the default text is -- the empty name, unless \SetDefaultText has
+% said otherwise -- so a single-text course writes one line and never meets the
+% naming machinery at all.
+\newcommand{\SetTextBase}[1]{\DeclareTextBase{\TextRef@defaulttext}{#1}}
+
+% Kept as the documented spelling for "the base currently in force". Nothing
+% internal reads it -- the code below resolves through \TextRef@resolvebase,
+% which cannot be mistaken for a stored value -- but a document that wants to
+% print or test the base still has a name for it.
+\newcommand{\TextRefBase}{\csuse{TextRef@base@\TextRef@defaulttext}}
+
+% Result of a base lookup: the URL, or empty for "no such text declared".
+\newcommand{\TextRef@base}{}
+\newcommand{\TextRef@resolvebase}[1]{%
+  \ifcsdef{TextRef@base@#1}%
+    {\letcs\TextRef@base{TextRef@base@#1}}%
+    {\renewcommand{\TextRef@base}{}}%
+}
 
 % \DeclareSection{5.2}{sec_the_definite_integral.html}
 %
@@ -108,22 +211,181 @@
 %
 % Deduplicated by a per-key flag: a section cited twenty times must not produce
 % twenty log lines.
+% Two things can fail to resolve, so there are two entry points -- but ONE list
+% and one end-of-run warning. A second reporting channel would mean a build could
+% be half-warned: you would fix the sections it named and never learn the base
+% was missing too.
 \newcommand{\TextRef@misslist}{}
+\newcommand{\TextRef@record}[1]{%
+  % Separator BEFORE each entry but the first: \PackageWarning appends its own
+  % full stop, so a trailing ", " would read as "5.2, ." in the terminal.
+  \ifdefempty{\TextRef@misslist}{\gappto\TextRef@misslist{#1}}%
+                                {\gappto\TextRef@misslist{, #1}}%
+}
+
+% An undeclared SECTION: \textbookref could not resolve its key.
 \newcommand{\TextRef@miss}[1]{%
   \ifcsdef{TextRef@missed@#1}{}{%
     \csgdef{TextRef@missed@#1}{}%
     \PackageInfo{TextRef}{No section declared for `#1'; printed as plain text}%
-    % Separator BEFORE each entry but the first: \PackageWarning appends its own
-    % full stop, so a trailing ", " would read as "5.2, ." in the terminal.
-    \ifdefempty{\TextRef@misslist}{\gappto\TextRef@misslist{#1}}%
-                                  {\gappto\TextRef@misslist{, #1}}%
+    \TextRef@record{#1}%
   }%
 }
+
+% An undeclared TEXT: a slug was given, so a link was intended, but the text it
+% hangs off has no \DeclareTextBase. Deduplicated in its own flag namespace so a
+% text name and a section number can never collide as keys.
+% An empty name is the commonest form of this: a document that never selected a
+% text at all (no \usetext, and no textbook.tex to fall back on) but whose
+% \booksection asked for a link. Reporting that as "text `'" would be a puzzle
+% at exactly the moment the author needs a hint, so it gets its own wording.
+% Both callers pass a MACRO (\BookSectionText, \TextRef@defaulttext), not a
+% literal, so the name is \edef'd out first: \ifstrempty on the raw argument
+% would see a token and never report empty.
+\newcommand{\TextRef@basemiss}[1]{%
+  \edef\TextRef@bm{#1}%
+  \ifcsdef{TextRef@missedbase@\TextRef@bm}{}{%
+    \csgdef{TextRef@missedbase@\TextRef@bm}{}%
+    \ifdefempty{\TextRef@bm}%
+      {\PackageInfo{TextRef}{A link was given but no text is selected; add
+         \string\usetext\space or a textbook.tex}%
+       \TextRef@record{no text selected (missing \string\usetext?)}}%
+      {\PackageInfo{TextRef}{No base URL declared for text `\TextRef@bm';
+         printed as plain text}%
+       \TextRef@record{text `\TextRef@bm'}}%
+  }%
+}
+
 \AtEndDocument{%
   \ifdefempty{\TextRef@misslist}{}{%
     \PackageWarningNoLine{TextRef}{Textbook references printed WITHOUT links
-      (no matching \string\DeclareSection):\MessageBreak \TextRef@misslist}%
+      (no matching \string\DeclareSection\space or
+      \string\DeclareTextBase):\MessageBreak \TextRef@misslist}%
   }%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \booksection -- THE LECTURE'S OWN COORDINATE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   \booksection{2.5}{The Chain Rule}
+%   \booksection[link=sec_chainrule.html]{2.5}{The Chain Rule}
+%   \booksection[text=openstax, link=review-of-functions]{1.1}{Review of Functions}
+%   \lecturetitle{A First Look at Antiderivatives}
+%
+% One line at the top of a lecture, declaring which section of the course's book
+% the document IS. It names the file (the class prints it as a running head), so
+% a lecture is tied to its section STRUCTURALLY rather than by remembering to
+% cite.
+%
+% THE LINK IS OPTIONAL, AND THAT IS THE POINT. The first form above is the base
+% shape and works for ANY course: a printed text, a text with no usable web
+% edition, or no text at all still gets "2.5: The Chain Rule" as its head. Only
+% a course with an online text adds `link=', and it is the same command either
+% way -- there are not two setups to choose between.
+%
+%   link= is a PAGE APPENDED TO THE BASE, not a full URL. The base is declared
+%   once per course (\DeclareTextBase), so a publisher moving domains stays one
+%   edit even though the pages are per-lecture.
+%   text= names the book, for a course drawing on more than one. Omitted, the
+%   default text is used (\SetDefaultText).
+%
+% Keeping the page here rather than in a shared manifest is deliberate: it is one
+% URL per file, in a fixed position, greppable, and it can only rot when the book
+% restructures -- which renumbers the section too, so you are editing this line
+% anyway.
+%
+% keyval, rather than more mandatory arguments, because that is how the rest of
+% the toolkit takes options (\importproblem's [points=..., desc=...], and the
+% \ProblemMeta / \FactMeta blocks) -- and because it is what makes the link
+% optional without an empty {} in every lecture that has no URL to give.
+%
+% \lecturetitle is for a lecture with no counterpart in the book at all -- a
+% topic split differently from the text, or one the course adds. It is a
+% different statement, not a different setup, and it is what avoids
+% \booksection{}{Title}.
+%
+% NOTHING IS TYPESET HERE. These commands only record; the class decides where
+% the head goes, so a class that wants no running head simply never reads
+% \BookSectionHead. The same mechanism/presentation split as everywhere else.
+
+\newcommand{\BookSectionText}{}
+\newcommand{\BookSectionNumber}{}
+\newcommand{\BookSectionTitle}{}
+\newcommand{\BookSectionSlug}{}
+\newcommand{\BookSection@url}{}
+
+% Between number and title in the head. A knob because "2.5: Title" is a house
+% style, not a fact about the book.
+\providecommand{\BookSectionSeparator}{:\space}
+
+% The unlinked form, and the one every degraded path falls back to. An empty
+% number (the \lecturetitle case) prints the title alone.
+\newcommand{\BookSection@plain}{%
+  \ifdefempty{\BookSectionNumber}%
+    {\BookSectionTitle}%
+    {\BookSectionNumber\BookSectionSeparator\BookSectionTitle}%
+}
+
+% What the class prints. Empty until one of the two commands runs, so a master
+% that declares neither gets no head at all -- the same degrade-to-nothing rule
+% the rest of the package follows.
+%
+% The \href decision is deferred to HERE, at shipout, rather than taken when the
+% coordinate is declared. Hyperlinks.sty loads hyperref from an \AtEndPreamble
+% hook, so \href does not yet exist while a preamble is being read; testing at
+% use time means \booksection works from the preamble or the body without the
+% author having to know that. The URL itself is still assembled by \edef at
+% declaration time, because \href will not expand macros in its first argument.
+\providecommand{\BookSectionHead}{}
+\newcommand{\BookSection@head}{%
+  \ifdefempty{\BookSection@url}%
+    {\BookSection@plain}%
+    {\ifdefined\href
+       \expandafter\href\expandafter{\BookSection@url}{\BookSection@plain}%
+     \else
+       % No hyperref (an Assessment master): the coordinate still reads right.
+       \BookSection@plain
+     \fi}%
+}
+
+% Builds the URL, if there is one to build, from what has already been stored.
+% It reads the \BookSection* macros rather than taking arguments, because the
+% options arrive as macros and the TITLE must never be expanded -- \let-ing the
+% pieces into place and resolving here keeps every \xdef away from it.
+\newcommand{\BookSection@resolve}{%
+  \gdef\BookSection@url{}%
+  % A page is the author saying "link this". Only then is a missing base an
+  % error worth reporting -- a lecture that gives none simply wants no link,
+  % which is the ordinary case for a course with no online text.
+  \ifdefempty{\BookSectionSlug}{}{%
+    \TextRef@resolvebase{\BookSectionText}%
+    \ifdefempty{\TextRef@base}%
+      {\TextRef@basemiss{\BookSectionText}}%
+      {\xdef\BookSection@url{\TextRef@base\BookSectionSlug}}%
+  }%
+  \global\let\BookSectionHead\BookSection@head
+}
+
+\define@key{booksection}{text}{\def\BookSection@optext{#1}}
+\define@key{booksection}{link}{\def\BookSection@optlink{#1}}
+
+\NewDocumentCommand{\booksection}{O{} m m}{%
+  \let\BookSection@optext\TextRef@defaulttext
+  \def\BookSection@optlink{}%
+  \setkeys{booksection}{#1}%
+  \gdef\BookSectionNumber{#2}%
+  \gdef\BookSectionTitle{#3}%
+  \global\let\BookSectionText\BookSection@optext
+  \global\let\BookSectionSlug\BookSection@optlink
+  \BookSection@resolve
+}
+
+\newcommand{\lecturetitle}[1]{%
+  \gdef\BookSectionText{}%
+  \gdef\BookSectionNumber{}%
+  \gdef\BookSectionTitle{#1}%
+  \gdef\BookSectionSlug{}%
+  \BookSection@resolve
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -137,20 +399,31 @@
 % label must never split from its number). Use the plain form whenever the
 % printed text is not simply label-then-key ("the start of \S5.2", "the
 % definition of flux").
+%
+% This is the reference \booksection does NOT cover: a pointer to some OTHER
+% section, typically a prerequisite ("if limit laws feel distant, re-read 1.3").
+% Those still resolve through the \DeclareSection manifest, which therefore only
+% ever needs the handful of sections a course actually cross-references.
 \NewDocumentCommand{\textbookref}{s m m}{%
   \IfBooleanTF{#1}{\def\TextRef@text{#3~#2}}{\def\TextRef@text{#3}}%
   \TextRef@resolve{#2}%
   \ifdefempty{\TextRef@slug}%
     {\TextRef@miss{#2}\TextRef@text}%
-    {\ifdefined\href
-       % \href does catcode surgery on its first argument and will NOT expand
-       % macros there, so the URL is assembled by \edef first and handed over
-       % pre-tokenised. Consequence: a slug must be plain text -- write \% and
-       % \# in the manifest if a URL ever needs them.
-       \edef\TextRef@url{\TextRefBase\TextRef@slug}%
-       \expandafter\href\expandafter{\TextRef@url}{\TextRef@text}%
-     \else
-       % No hyperref (an Assessment master): the text is still right.
-       \TextRef@text
-     \fi}%
+    {\TextRef@resolvebase{\TextRef@defaulttext}%
+     \ifdefempty{\TextRef@base}%
+       % The section resolved but the text it hangs off did not, so there is no
+       % URL to build. Report it: a manifest full of good sections and no base
+       % would otherwise degrade the whole document in silence.
+       {\TextRef@basemiss{\TextRef@defaulttext}\TextRef@text}%
+       {\ifdefined\href
+          % \href does catcode surgery on its first argument and will NOT expand
+          % macros there, so the URL is assembled by \edef first and handed over
+          % pre-tokenised. Consequence: a slug must be plain text -- write \% and
+          % \# in the manifest if a URL ever needs them.
+          \edef\TextRef@url{\TextRef@base\TextRef@slug}%
+          \expandafter\href\expandafter{\TextRef@url}{\TextRef@text}%
+        \else
+          % No hyperref (an Assessment master): the text is still right.
+          \TextRef@text
+        \fi}}%
 }
