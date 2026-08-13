@@ -14,16 +14,40 @@
 %
 %   \FactMeta{
 %     source = {apex},
+%     kind   = {theorem},
+%     name   = {Power Rule},
 %     number = {2.1},
 %     topics = {differentiation, power-rule},
-%     desc   = {},
 %   }
 %
 % This is ProblemMeta's little sibling -- same store-only design, same textual
 % parser (find-meta, via the find-facts shim), same disciplines -- but a smaller
 % schema: a fact has no type or difficulty (those describe a *problem*'s form and
-% challenge), and nothing extrinsic like points. The keys are source, number,
-% topics, desc.
+% challenge), and nothing extrinsic like points. The keys are source, kind, name,
+% number, topics.
+%
+% NO `desc': it was dropped 2026-08-13 when ProblemMeta's `desc' was renamed to
+% `name'. The two were the same idea under two names, and a fact never used it
+% (every block in the bank had `desc = {}'). Provenance is source/number.
+%
+% KIND AND NAME are what let a fact render as the result it actually is. The
+% `facts' bank is a catch-all -- definitions, theorems, axioms -- and `kind' names
+% the CourseBoxes environment the import site should wrap it in, `name' the title
+% that environment displays: kind={theorem}, name={Power Rule}, number={2.1} gives
+% "Theorem 2.1 (Power Rule)". Both are OPTIONAL; a fact with no kind imports bare,
+% exactly as before.
+%
+% `kind' IS DIFFERENT IN NATURE from every other key here, and worth flagging:
+% the rest are descriptive (search keys), while kind is FUNCTIONAL -- it selects an
+% environment. So a typo is not merely a fragmented search, it is a fact that
+% cannot be boxed. Two things contain that: \importfact guards the environment at
+% use and degrades to a bare import with a warning rather than erroring, and
+% `find-facts --vocab' lists the kinds in the bank so drift (thm vs theorem) is
+% visible WITHOUT running LaTeX -- the same discipline --vocab already enforces on
+% topics, for a sharper reason.
+%
+% The vocabulary is closed in practice: a kind is only usable if the course's text
+% layer (.textbook/textbook.tex) declared it with \NewTextResult.
 %
 % Keep ONE KEY PER LINE, values braced. find-facts parses the block textually,
 % line by line; reflowing it onto a single line still compiles fine but makes the
@@ -45,8 +69,9 @@
 % mistyped key (`topic' for `topics') errors at compile time. The metadata itself
 % is read off disk by find-facts, never from these.
 \define@key{FactMeta}{source}{}
+\define@key{FactMeta}{kind}  {}
+\define@key{FactMeta}{name}  {}
 \define@key{FactMeta}{number}{}
 \define@key{FactMeta}{topics}{}
-\define@key{FactMeta}{desc}  {}
 
 \newcommand{\FactMeta}[1]{\setkeys{FactMeta}{#1}\ignorespaces}

@@ -20,7 +20,7 @@
 %   \importproblem[points=5, ...]{DIR}{FILE}  \import a problem; keyval options:
 %                                             points= / nocount / hint / nohint
 %                                             ([5] alone is shorthand for points=5)
-%   \importfact[number=, desc=]{DIR}{FILE} \import a bare fact; provenance only,
+%   \importfact[kind=, name=, number=]{DIR}{FILE} \import a fact from the bank,
 %                                             shown via the opt-in \ShowFactMeta
 %   \printtotalpoints                      the summed points of the assessment
 %
@@ -148,10 +148,15 @@
 \newcommand{\CurrentProblemNumber}{}
 
 % Free-text parenthetical shown after the heading, set by \importproblem's
-% `desc' key -- e.g. "Example (similar to 2.1.8)". Empty (default) prints
-% nothing. Like `number', pure presentation: the notes heading appends it in
-% parentheses; Assessment.cls ignores it (an exam question is not annotated).
-\newcommand{\CurrentProblemDesc}{}
+% `name' key -- e.g. "Example (domain from an expression)". Empty (default)
+% prints nothing. Like `number', pure presentation: the notes heading appends it
+% in parentheses and the check-in box puts it in its title; Assessment.cls
+% ignores it (an exam question is not annotated).
+%
+% `name' was called `desc' until 2026-08-13 -- renamed to match FactMeta, which
+% had grown a `name' doing the same job. It is a CONTENT LABEL, never provenance:
+% that is what source/number are for, and they stay store-only.
+\newcommand{\CurrentProblemName}{}
 
 % Whether the current import prints at all. \importproblem's `noprint' flag
 % (equivalently print=false) clears this, and \importproblem then SKIPS the
@@ -298,7 +303,8 @@
 %   nohint        suppress this problem's hint, regardless of the global toggle
 %   number=2.1.8  literal display number (e.g. a textbook's); steps NO counter,
 %                 used as the \label text. Empty = the context numbers it (or not).
-%   desc={...}    parenthetical shown after the heading in a notes context.
+%   name={...}    short content label; a parenthetical after the heading in a
+%                 notes context, and the check-in box's title.
 %   noprint       skip this import entirely (equivalently print=false): no output,
 %                 no counter step, no points, no \label -- the file is not read.
 %   checkin       render as a "check-in": wrap in a neutral box with a run-in
@@ -356,7 +362,7 @@
 \define@key{eximport}{hint}[true]{\gdef\CurrentProblemHint{on}}
 \define@key{eximport}{nohint}[true]{\gdef\CurrentProblemHint{off}}
 \define@key{eximport}{number}{\gdef\CurrentProblemNumber{#1}}
-\define@key{eximport}{desc}{\gdef\CurrentProblemDesc{#1}}
+\define@key{eximport}{name}{\gdef\CurrentProblemName{#1}}
 % `noprint' is the flag form (matching nocount/nohint); `print=false' the value
 % form, for toggling from a variable. Anything but "false" reads as true.
 \define@key{eximport}{noprint}[true]{\global\CurrentProblemPrintfalse}
@@ -371,7 +377,7 @@
   \global\Ex@hintseenfalse
 
   \gdef\CurrentProblemNumber{}%
-  \gdef\CurrentProblemDesc{}%
+  \gdef\CurrentProblemName{}%
   \global\CurrentProblemPrinttrue
   \global\checkinmodefalse
   \global\CurrentProblemBonusfalse
@@ -402,7 +408,7 @@
 % but never shown, a spec quietly ignored, a requested hint that cannot appear).
 % Anything that would corrupt the bookkeeping outright is an error elsewhere;
 % these are the one-notch-down cases. Deliberately NOT warned: presentation keys
-% a class ignores by design (points= under LectureNotes, number=/desc= under
+% a class ignores by design (points= under LectureNotes, number=/name= under
 % Assessment) -- that cross-context tolerance is the point of the extrinsic model.
 %
 % checkin + a points spec: check-in mode suppresses the problem heading (the box
@@ -453,8 +459,9 @@
 }
 % \importcheckin[OPTS]{DIR}{FILE} -- shorthand for \importproblem[checkin, OPTS].
 % OPTS is key=value only (points make no sense on an ungraded notes check-in, so
-% the lone-integer shorthand is deliberately not offered here); `desc' is the
-% usual one, e.g. \importcheckin[desc={from APEX}]{...}{...}.
+% the lone-integer shorthand is deliberately not offered here); `name' is the
+% usual one -- it becomes the check-in box's title, e.g.
+% \importcheckin[name={reading a derivative off a graph}]{...}{...}.
 \NewDocumentCommand{\importcheckin}{O{} m m}{%
   \ifblank{#1}{\importproblem[checkin]{#2}{#3}}{\importproblem[checkin, #1]{#2}{#3}}%
 }
@@ -462,18 +469,19 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FACT IMPORT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \importfact[number={2.1}, desc={from APEX}]{DIR}{FILE} -- the fact-bank
-% counterpart to \importproblem. A "fact" is a bare snippet (a definition, a
-% formula) with no structure of its own, so -- unlike \importproblem -- there is
-% NO points/checkin/hint/print bookkeeping: the wrapper just \imports the file.
-% Its optional keys carry provenance (number and desc, the same intrinsic pair
-% find-facts injects) into \CurrentFact... registers, and by default it renders
-% NOTHING extra -- an imported fact stays bare, as the fact files promise. A
-% document that DOES want the provenance shown -- a formula sheet listing "Power
-% Rule ... Sec 2.1" -- redefines the \ShowFactMeta hook to typeset from those
-% registers. This mirrors the old ProblemMeta margin display (removed
-% 2026-07-18): the metadata is captured and available, never silently dropped,
-% but display is opt-in.
+% \importfact[kind={theorem}, name={Power Rule}, number={2.1}]{DIR}{FILE} -- the
+% fact-bank counterpart to \importproblem. A "fact" is a bare snippet (a
+% definition, a formula) with no structure of its own, so -- unlike
+% \importproblem -- there is NO points/checkin/hint/print bookkeeping.
+%
+% Its keys are the same ones find-facts injects from the file's own \FactMeta
+% block, captured into \CurrentFact... registers: `kind'/`number'/`name' select,
+% number and title the box the fact is wrapped in (see below). With NO kind the
+% fact renders bare, as the fact files promise, and the registers are merely
+% available -- a formula sheet that wants "Power Rule 2.1" printed beside each
+% entry redefines \ShowFactMeta to typeset from them. Same shape as the old
+% ProblemMeta margin display (removed 2026-07-18): captured and available, never
+% silently dropped, display opt-in.
 %
 % Kept here beside \importproblem because this package already owns the import
 % wrappers and everything \importfact needs (import, keyval) is already loaded --
@@ -481,20 +489,71 @@
 % formula-sheet class ever wants \importfact WITHOUT the problem/solution
 % machinery, lift this block into a small Facts.sty and load that instead.
 \define@key{eximportfact}{number}{\gdef\CurrentFactNumber{#1}}
-\define@key{eximportfact}{desc}  {\gdef\CurrentFactDesc{#1}}
+\define@key{eximportfact}{kind}  {\gdef\CurrentFactKind{#1}}
+\define@key{eximportfact}{name}  {\gdef\CurrentFactName{#1}}
 \newcommand{\importfact@reset}{%
   \gdef\CurrentFactNumber{}%
-  \gdef\CurrentFactDesc{}%
+  \gdef\CurrentFactKind{}%
+  \gdef\CurrentFactName{}%
 }
-% The opt-in provenance hook: empty by default so an imported fact renders bare.
+% The opt-in display hook: empty by default so an imported fact renders bare.
 % \renewcommand\ShowFactMeta{...} (e.g. in a formula-sheet preamble) to print
-% from \CurrentFactNumber / \CurrentFactDesc. Runs before the fact body.
+% from \CurrentFactName / \CurrentFactNumber. Runs before the fact body -- and
+% before the box, so it is really for the BARE case: with a `kind' the box head
+% already shows "Theorem 2.1 (Power Rule)" and this would duplicate it.
 \newcommand{\ShowFactMeta}{}
+% RENDERING A FACT AS THE RESULT IT IS. `kind' names a CourseBoxes environment and
+% the import gets wrapped in it: kind={theorem}, name={Power Rule}, number={2.1}
+% renders "Theorem 2.1 (Power Rule)" in the usual box, and lands in a contents list
+% through the ordinary CourseBoxes hook -- so a fact needs no listing machinery of
+% its own. No kind = bare import, exactly as before (a formula sheet wanting a
+% dense list simply omits it).
+%
+% Splitting \begin/\end across \import is the same trick check-in mode uses above,
+% and safe for the same reason: \import introduces no group to break the nesting.
+%
+% GUARDED, because `kind' is the one key here that can name something that does not
+% exist -- an environment the course's text layer never declared. Erring out mid
+% import would be a hard stop for a cosmetic problem, so a bad kind warns and the
+% fact imports bare. \Fact@boxed records what actually happened so the close cannot
+% fire without the open: an asymmetric guard would leave a dangling \end.
+%
+% An empty number takes the STARRED environment (CourseBoxes' unnumbered twin) --
+% \begin{theorem}{} would print a stray "Theorem ." with nothing after it.
+\newif\ifFact@boxed
+\newcommand{\Fact@openbox}{%
+  \Fact@boxedfalse
+  \ifdefempty{\CurrentFactKind}{}{%
+    \ifdefempty{\CurrentFactNumber}%
+      {\edef\Fact@env{\CurrentFactKind*}}%
+      {\edef\Fact@env{\CurrentFactKind}}%
+    \@ifundefined{\Fact@env}%
+      {\PackageWarning{Exercises}%
+         {kind=\CurrentFactKind\space names no such environment --\MessageBreak
+          declare it with \string\NewTextResult\space in the text layer.\MessageBreak
+          Importing the fact bare}}%
+      {\Fact@boxedtrue
+       \ifdefempty{\CurrentFactNumber}%
+         {\ifdefempty{\CurrentFactName}%
+            {\expandafter\begin\expandafter{\Fact@env}}%
+            {\expandafter\begin\expandafter{\Fact@env}[\CurrentFactName]}}%
+         {\ifdefempty{\CurrentFactName}%
+            {\expandafter\begin\expandafter{\Fact@env}{\CurrentFactNumber}}%
+            {\expandafter\begin\expandafter{\Fact@env}{\CurrentFactNumber}[\CurrentFactName]}}%
+      }%
+  }%
+}
+\newcommand{\Fact@closebox}{%
+  \ifFact@boxed\expandafter\end\expandafter{\Fact@env}\fi
+  \Fact@boxedfalse
+}
 \NewDocumentCommand{\importfact}{O{} m m}{%
   \importfact@reset
   \setkeys{eximportfact}{#1}%
   \ShowFactMeta
+  \Fact@openbox
   \import{#2}{#3}%
+  \Fact@closebox
   \importfact@reset
 }
 
@@ -572,7 +631,7 @@
 %   \ProblemGroupHeadingFormat{STEM}  the same, for a \problemgroup's numbered stem.
 %
 %   Assessment.cls overrides these to "Q N" over a points \fbox hung in the left margin;
-%   LectureNotes.cls to a run-in "Example." (+ optional literal number / desc).
+%   LectureNotes.cls to a run-in "Example." (+ optional literal number / name).
 \newcommand{\ProblemLabelWord}{Problem}
 \newcommand{\ProblemNumberText}{\ProblemLabelWord\ \theproblem}
 \newcommand{\ProblemHeadingFormat}{%
@@ -688,9 +747,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PROBLEM GROUPS (subquestions)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \begin{problemgroup}{STEM} ... \end{problemgroup} -- a numbered "Problem N."
-% carrying a shared instruction (STEM), under which each imported problem prints
-% as a lettered part (a), (b), .... This is the ASSEMBLY-TIME wrapper: the parts
+% \begin{problemgroup}[name={...}]{STEM} ... \end{problemgroup} -- a numbered
+% "Problem N." carrying a shared instruction (STEM), under which each imported
+% problem prints as a lettered part (a), (b), .... This is the ASSEMBLY-TIME wrapper: the parts
 % stay atomic one-problem files in the bank and are pulled in with \importproblem
 % exactly as anywhere else; the group only changes how they render. Use it for
 % independent items sharing an instruction ("Evaluate the following integrals:").
@@ -707,9 +766,26 @@
 % \GroupFirstParttrue lets the problem env run the FIRST part into the stem line
 % (see the problem env's leading-break branch); the rest each break. The trailing
 % \par flushes the last part.
-\newenvironment{problemgroup}[1]{%
+%
+% THE OPTIONAL `name' is a short content label for the group as a whole, the same
+% key (and the same meaning) \importproblem takes. It exists because a STEM is a
+% sentence -- "Differentiate each of the following." -- which is fine on the page
+% and poor in a contents list; `name' gives the class something short to list.
+% What the class DOES with it is the class's business (LectureNotes lodges a
+% contents entry only when it is non-empty, so an unnamed group stays out of the
+% list rather than adding an indistinguishable bare "Example").
+%
+% Its own key family rather than `eximport': that one carries points/hint/checkin
+% and friends, none of which mean anything on a group, and accepting them here
+% would let them be written and quietly misbehave.
+\define@key{exgroup}{name}{\gdef\CurrentProblemName{#1}}
+\NewDocumentEnvironment{problemgroup}{O{} m}{%
   \par\refstepcounter{problem}%
-  \ProblemGroupHeadingFormat{#1}%
+  % Clear first: the register is shared with \importproblem, and the heading hook
+  % below must see THIS group's name or nothing at all.
+  \gdef\CurrentProblemName{}%
+  \setkeys{exgroup}{#1}%
+  \ProblemGroupHeadingFormat{#2}%
   \inproblemgrouptrue
   \global\GroupFirstParttrue
   % Swallow the source whitespace before the first \importproblem, else the first
@@ -717,6 +793,9 @@
   \ignorespaces
 }{%
   \par
+  % The first member's \importproblem@reset already cleared it; this covers the
+  % degenerate empty group, so a name can never leak past \end.
+  \gdef\CurrentProblemName{}%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1196,7 +1275,7 @@
 % rule, no fill -- because the colored labels inside carry the visual identity.
 % NON-breakable: a check-in should not split across a page. NO title bar; instead
 % a run-in sans-serif all-caps "CHECK IN:" header at the top of the box, with
-% \importproblem's `desc' appended in parentheses if given.
+% \importproblem's `name' appended in parentheses if given.
 \tcbset{ex@checkin/.style={%
   enhanced, sharp corners,
   boxrule=2pt, colframe=black!55, colback=white,%  <-- box thickness: raise boxrule
@@ -1208,7 +1287,7 @@
 \newcommand{\CheckinBodySkip}{\bigskipamount}
 \newcommand{\CheckinBox@header}{%
   {\sffamily\bfseries CHECK IN%
-    \ifdefempty{\CurrentProblemDesc}{}{\ \mdseries(\CurrentProblemDesc)\bfseries}%
+    \ifdefempty{\CurrentProblemName}{}{\ \mdseries(\CurrentProblemName)\bfseries}%
     :}\par\nobreak\vspace{\CheckinHeaderSkip}}
 \newcommand{\CheckinBox@begin}{\begin{tcolorbox}[ex@checkin]\CheckinBox@header}
 \newcommand{\CheckinBox@end}{\end{tcolorbox}}

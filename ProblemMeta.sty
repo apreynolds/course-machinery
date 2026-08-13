@@ -17,8 +17,16 @@
 %     difficulty = {basic},
 %     source     = {stewart-8e},
 %     number     = {3.1.2},
-%     desc       = {},
+%     name       = {},
 %   }
+%
+% `name' WAS CALLED `desc' until 2026-08-13. Same key, same job -- a short content
+% label -- renamed because FactMeta had grown a `name' doing exactly this, and one
+% job under two names across two banks is a coin-flip every time you write an
+% import. Provenance is `source'/`number' and was never this key's business,
+% though the old name invited it (nearly every `desc' in the demo had drifted to
+% "from APEX"). A stale `desc=' is now an unknown-key error, deliberately: loud
+% and pointing at the line beats an alias that keeps both spellings alive.
 %
 % Keep ONE KEY PER LINE, values braced. The companion script (find-problems)
 % parses the block textually, line by line; reflowing it onto a single line
@@ -47,6 +55,6 @@
 \define@key{ProblemMeta}{difficulty}{}
 \define@key{ProblemMeta}{source}    {}
 \define@key{ProblemMeta}{number}    {}
-\define@key{ProblemMeta}{desc}      {}
+\define@key{ProblemMeta}{name}      {}
 
 \newcommand{\ProblemMeta}[1]{\setkeys{ProblemMeta}{#1}\ignorespaces}
