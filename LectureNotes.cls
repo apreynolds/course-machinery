@@ -97,18 +97,32 @@
 
 % Run-in heading: the label word, then -- only if given at import -- a literal
 % number (\importproblem[number=2.1.8], typically the textbook's) and a
-% parenthetical description (\importproblem[desc={similar to 2.1.8}]). No points
+% parenthetical name (\importproblem[name={domain from an expression}]). No points
 % (notes are ungraded) and no auto counter (an unnumbered example is the default;
 % the `problem' counter still steps unseen). Renders as, e.g.:
 %   Example.            Example 2.1.8.
-%   Example (similar to 2.1.8).      Example 2.1.8 (from APEX).
+%   Example (domain from an expression).      Example 2.1.8 (tangent lines).
 % The exact bold span / period are presentation; tune here freely.
+%
+% It also lodges the contents entry (see TOC below), through the SAME renderer the
+% CourseBoxes results use -- so an imported "Example 2.1.8" and a written
+% "Definition 2.1.1" cannot end up formatted differently in the list. This hook is
+% the right place because Exercises only calls it for a TOP-LEVEL problem: a
+% \problemgroup part renders as "(a)" through another branch, and a check-in
+% suppresses the heading entirely (Exercises.sty:647-657), so parts and check-ins
+% stay out of the contents for free.
+%
+% The NAME goes into the entry. It could not while the key was `desc', because
+% that had drifted into provenance and could hold a \textbookref -- a link nested
+% inside the contents entry's own link. As a content label it is exactly what a
+% contents line wants, and carries no links.
 \renewcommand{\ProblemHeadingFormat}{%
+  \CourseBoxTocEntry{\ProblemLabelWord}{\CurrentProblemNumber}{\CurrentProblemName}%
   \par\addvspace{\medskipamount}%
   \noindent
   \textbf{\ProblemLabelWord
     \ifdefempty{\CurrentProblemNumber}{}{\space\CurrentProblemNumber}}%
-  \ifdefempty{\CurrentProblemDesc}{}{ \textnormal{(\CurrentProblemDesc)}}%
+  \ifdefempty{\CurrentProblemName}{}{ \textnormal{(\CurrentProblemName)}}%
   \textbf{.}\quad\ignorespaces
 }
 
@@ -116,8 +130,18 @@
 % the stem (the parts letter themselves (a),(b),... as usual). Without this
 % override, Exercises' default stem would print the invisibly-stepped counter
 % -- "Example 3." -- beside standalone examples that show no number at all.
-% (number=/desc= are per-member import keys, so the stem has none to show.)
+% (number= is a per-member import key, so the stem has none to show.)
+%
+% CONTENTS ENTRY ONLY IF THE GROUP IS NAMED. The stem itself is deliberately not
+% used for it: it is a sentence ("Differentiate each of the following."), which
+% reads badly in a list and may carry maths or a link. And a group with no name
+% would otherwise contribute a bare "Example" -- indistinguishable from every
+% other one, so several groups would give several identical lines. Naming a group
+% is therefore how you opt it into the list, which suits something used rarely.
+% The group has already run \refstepcounter, so the entry links to it.
 \renewcommand{\ProblemGroupHeadingFormat}[1]{%
+  \ifdefempty{\CurrentProblemName}{}{%
+    \CourseBoxTocEntry{\ProblemLabelWord}{}{\CurrentProblemName}}%
   \par\addvspace{\medskipamount}%
   \noindent\textbf{\ProblemLabelWord.}\quad\ignorespaces#1%
 }
@@ -186,7 +210,7 @@
 \RequirePackage{titlesec}
 \RequirePackage{titletoc}
 \setcounter{secnumdepth}{1}
-\setcounter{tocdepth}{3}
+% tocdepth is set with the rest of the contents machinery, in TOC below.
 
 % titlesec calls \<name>break before each such title (titlesec.sty:435-437), so
 % this really does \clearpage before every subsection. It looks inert because
@@ -211,25 +235,101 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TOC
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\titlecontents{section}[1em]
+% A lecture's contents list is NOT mostly sections -- most lectures have none. It
+% is mostly the things that actually structure the hour: definitions, theorems,
+% facts, examples. Those arrive as `cbresult' entries via \CourseBoxTocEntry
+% (CourseBoxes' hook, rendered just below); \section/\subsection appear too, when
+% a lecture happens to use them.
+%
+% HENCE FLAT, AND HENCE TYPEFACE RATHER THAN INDENT. Indentation implies hierarchy;
+% in the common no-section lecture there is none to imply, and indenting every
+% result would push the whole list right for nothing. So every level sits at one
+% margin and the DISTINCTION IS THE FACE -- sans for headings (echoing
+% \titleformat's \sffamily\bfseries on the page), serif roman for results. A
+% sectionless lecture then reads as a plain flat list, and a sectioned one still
+% separates at a glance. No conditional layout, nothing measured across runs.
+\setcounter{tocdepth}{3}
+
+% The pseudo-level the box hook writes. \titlecontents defines \l@cbresult, but a
+% custom entry type needs its LEVEL declared too -- and there are TWO registries
+% for that, which is a genuine trap:
+%
+%   \toclevel@cbresult  LaTeX/hyperref. Read by \addcontentsline's tocdepth test
+%                       and by hyperref for bookmark nesting; without it every
+%                       entry bookmarks at level 0.
+%   \ttll@cbresult      titletoc's own (titletoc.sty:283-292). Without it titletoc
+%                       warns "Unknown TOC type cbresult" while READING the .toc
+%                       and assigns level -1000, which also skews its
+%                       level-change logic and its own tocdepth test (:538).
+%
+% Same number in both, or the two disagree about what this entry is.
+\newcommand*{\toclevel@cbresult}{2}
+\def\ttll@cbresult{2}
+
+% Leaders and the page column, in ONE place because the two views differ: the
+% handout is paged and gets both; the projector prints NO page numbers anywhere
+% (see HEADERS), so a page column there would point at numbers the reader cannot
+% see. Its entries are still hyperlinks -- and with \LinkColor black they look like
+% plain text and behave as taps, which is the whole navigation story on the room
+% copy now that the back-to-top arrow is gone.
+\ifProjector
+  \newcommand{\CourseTocFill}{}
+\else
+  \newcommand{\CourseTocFill}{\titlerule*[0.8pc]{.}\normalfont\thecontentspage}
+\fi
+
+\titlecontents{section}[0em]
+  {\sffamily\bfseries}
+  {\thecontentslabel.\enspace}
   {}
-  {\bfseries\thecontentslabel. \normalfont \enspace }
-  {\normalfont\enspace}
-  {\titlerule*[0.8pc]{.} \bfseries \thecontentspage}[]
+  {\CourseTocFill}[]
 
-\titlecontents{subsection}[2.5em]
-  {\small}
-  {\thecontentslabel. \enspace }
-  {\enspace}
-  {\hfill \thecontentspage}[]
+\titlecontents{subsection}[0em]
+  {\sffamily\bfseries\small}
+  {\thecontentslabel.\enspace}
+  {}
+  {\CourseTocFill}[]
 
-\titlecontents{subsubsection}[3.5em]
-  {\small}
-  {\thecontentslabel. \enspace }
-  {\enspace}
-  {\hfill \thecontentspage}[]
+\titlecontents{subsubsection}[0em]
+  {\sffamily\small}
+  {\thecontentslabel.\enspace}
+  {}
+  {\CourseTocFill}[]
 
-\contentsmargin{1em}
+\titlecontents{cbresult}[0em]
+  {}
+  {}
+  {}
+  {\CourseTocFill}[]
+
+% The projector list needs no reserved right margin, having nothing to put there.
+\ifProjector\contentsmargin{0pt}\else\contentsmargin{1em}\fi
+
+% CourseBoxes' hook, rendered. Composes "Definition 2.1.1 (Derivative)", dropping
+% whichever pieces are absent -- an unnumbered result (\begin{example*}) gives
+% "Example (Cubic)" or bare "Example", and a named-but-unnumbered fact likewise.
+% Built up by \protected@edef rather than assembled inside \addcontentsline's
+% argument, so the conditionals run here as conditionals and only finished text
+% reaches the .toc write.
+\renewcommand{\CourseBoxTocEntry}[3]{%
+  \def\CB@tocline{#1}%
+  \ifblank{#2}{}{\protected@edef\CB@tocline{\CB@tocline\space#2}}%
+  \ifblank{#3}{}{\protected@edef\CB@tocline{\CB@tocline\space(#3)}}%
+  \addcontentsline{toc}{cbresult}{\CB@tocline}%
+}
+
+% \lecturetoc -- what a lecture actually writes. The class owns the presentation
+% (page break, and whatever heading \tableofcontents' \section* renders as) so a
+% lecture spends one token and the look stays tunable in one place. DOCUMENT-called
+% rather than class-emitted, deliberately: a one-topic lecture wants no list at all,
+% and only the author knows which those are.
+%
+% The trailing \clearpage does not risk a blank page when the first \subsection
+% also breaks: \clearpage on a page with no contributed material does nothing.
+\newcommand{\lecturetoc}{%
+  \tableofcontents
+  \clearpage
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HEADERS
