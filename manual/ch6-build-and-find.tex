@@ -146,9 +146,11 @@ Four modes round it out:
   \item \texttt{-{}-import} prints the matches as paste-ready
     \cs{importproblem} (or \cs{importfact}) lines. Two opt-in modifiers
     refine the output:
-    \texttt{-{}-with LIST} injects a comma subset of \env{number,desc} as
-    options where a file carries them (\env{points} stays manual -- it is
-    extrinsic), and \texttt{-{}-from DIR} rewrites each line's directory
+    \texttt{-{}-with LIST} injects a comma subset of the injectable keys as
+    options where a file carries them -- \env{number} and \env{name} for a
+    problem; for a fact also \env{kind} and \env{name}, which choose and
+    title the box it is wrapped in (\env{points} stays manual --
+    it is extrinsic) -- and \texttt{-{}-from DIR} rewrites each line's directory
     argument relative to \env{DIR}, the importing document's folder, so the
     pasted line needs no \texttt{../} hand-fixing.
   \item \texttt{-{}-tsv} prints one tab-separated row per match (path, then the

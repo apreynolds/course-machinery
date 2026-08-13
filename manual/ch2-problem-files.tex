@@ -74,7 +74,7 @@ That design puts one discipline on the author -- the block is parsed
 \end{itemize}
 
 The recognised keys are \env{topics}, \env{type}, \env{difficulty},
-\env{source}, \env{number}, and \env{desc}. On the LaTeX side they are validated
+\env{source}, \env{number}, and \env{name}. On the LaTeX side they are validated
 but discarded -- a mistyped key (\env{topic} for \env{topics}) errors at compile
 time, so typos cannot silently un-index a problem. Before inventing a new type, run
 \texttt{find-problems -{}-vocab} to see the vocabulary already in use, and reuse
@@ -246,7 +246,6 @@ context; the file is just the content plus its metadata:
   source = {apex},
   number = {2.1},
   topics = {differentiation, power-rule},
-  desc   = {},
 }
 \textbf{Power Rule.}\quad
 For any real constant $n$,
@@ -259,17 +258,26 @@ design (the block typeset nothing above), the same textual reader
 two disciplines -- one key per line with braced values (a reflowed block
 still compiles but silently vanishes from the script's index), and
 \texttt{\#} written \texttt{\char`\\\#}. The schema is smaller: \env{source},
-\env{number}, \env{topics}, \env{desc}. A fact has no \env{type} or
-\env{difficulty} -- those describe a \emph{problem}'s form and challenge --
-and, as ever, nothing extrinsic.
+\env{kind}, \env{name}, \env{number}, \env{topics}. A fact has
+no \env{type} or \env{difficulty} -- those describe a \emph{problem}'s form
+and challenge -- and, as ever, nothing extrinsic. \env{kind} and \env{name}
+say \emph{what the fact is} (\texttt{theorem}, \texttt{definition}) and what
+to call it, so the catch-all bank can render each snippet as its real
+result; \env{kind} joins \texttt{--vocab}, because a typo there costs a box
+rather than just splitting a search.
 
 A lecture or formula sheet pulls a fact in with
-\cs{importfact}\texttt{[number=\dots, desc=\dots]\{DIR\}\{FILE\}}
-(section~\ref{sec:lectures}). By default the imported fact renders bare; a
-document that wants the provenance shown -- a formula sheet printing
-``\S2.1'' beside each rule, say -- opts in by redefining the
-\cs{ShowFactMeta} hook (section~\ref{sec:ref-factmeta}). The demo bank is
-\file{derivatives/facts/} in the course repo.
+\cs{importfact}\texttt{[kind=\dots, name=\dots, number=\dots,
+number=\dots]\{DIR\}\{FILE\}} (section~\ref{sec:lectures}). \env{kind} names
+the CourseBoxes environment to wrap the snippet in and \env{name} titles it,
+so one bank of bare snippets renders as the theorems and definitions they
+actually are; omit \env{kind} and the fact renders bare, which is what a
+dense formula sheet wants -- and for that bare case a document can still print
+the name and number by redefining the \cs{ShowFactMeta} hook
+(section~\ref{sec:ref-factmeta}). You do not retype any of it:
+\texttt{find-facts --import --with kind,name,number} reads the block off
+disk and writes the line. The demo bank is \file{derivatives/facts/} in the
+course repo.
 
 \subsection{Finding problems in the bank}\label{sec:find-problems-taste}
 

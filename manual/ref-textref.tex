@@ -88,7 +88,7 @@ the page is local.
 
 \textbf{Options, not more arguments.} \texttt{link} and \texttt{text} are
 keyval options for the same reason \cs{importproblem} takes
-\texttt{points=} and \texttt{desc=} that way --- and because it is what
+\texttt{points=} and \texttt{name=} that way --- and because it is what
 lets the link be genuinely optional, instead of an empty \texttt{\{\}} in
 every lecture of every course that has no URL to give.
 
@@ -178,21 +178,28 @@ Package TextRef Warning: Textbook references printed WITHOUT links
 if it stays where the text is known:
 
 \begin{itemize}
-  \item \textbf{Yes:} lecture bodies, box titles at the call site, and
-    import-time \env{desc=}.
+  \item \textbf{Yes:} lecture bodies, and box titles written at the call
+    site.
   \item \textbf{No:} inside \file{CourseBoxes.sty} or
     \file{Exercises.sty} -- that would couple text-agnostic machinery to
     a particular book.
   \item \textbf{No:} inside a \file{problems/} or \file{facts/} file.
     Those are reused across courses and texts; a baked-in reference would
     point at the wrong book the moment the file is borrowed.
+  \item \textbf{No:} an import key. \env{name=} is a short \emph{content
+    label} -- it titles the box and becomes the contents-list entry, and a
+    link nested inside a contents entry's own link is not something to
+    invite. Provenance is \env{source}/\env{number} in the file's metadata
+    block, and the displayed \env{number} already says where it came from.
 \end{itemize}
 
-The reference therefore goes in the lecture \emph{around} the import,
-where the text is known and \file{Exercises.sty} merely re-emits it:
+The reference therefore goes in the lecture \emph{around} the import --
+prose the author writes where the text is known:
 
 \begin{manexsource}
-\importfact[number={2.1}, desc={from \textbookref{2.1}{APEX 2.1}}]%
+The rule below is stated as \textbookref{2.1}{APEX 2.1}:
+
+\importfact[kind={theorem}, name={Power Rule}, number={2.1}]%
   {../facts/}{power-rule.tex}
 \end{manexsource}
 

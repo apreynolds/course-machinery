@@ -10,15 +10,22 @@ of the exercise system (Exercises works without it). One command:
   difficulty = {basic},
   source     = {stewart-8e},
   number     = {3.1.2},
-  desc       = {},
+  name       = {},
 }
 \end{manexsource}
 
 Keys: \env{topics}, \env{type}, \env{difficulty}, \env{source},
-\env{number}, \env{desc}. \env{topics} lists every subject the problem
+\env{number}, \env{name}. \env{topics} lists every subject the problem
 touches (and echoes its folder); \env{type} is its form or character;
 \env{source}/\env{number} are a clean provenance origin and its locator;
-\env{desc} is an optional short content label, sparse by design.
+\env{name} is an optional short content label, sparse by design.
+
+\env{name} was called \env{desc} until 2026-08-13. Same key, same job --
+renamed because FactMeta had grown a \env{name} doing exactly this, and one
+job under two names across two banks is a coin-flip every time you write an
+import. The old name also invited provenance into a slot that was never for it
+(\env{source}/\env{number} own that). A stale \texttt{desc=} is now an
+unknown-key error, deliberately -- loud, and it names the line.
 On the LaTeX side the block is \emph{validated but discarded}: a mistyped
 key errors at compile time; nothing is typeset. The real reader is
 \file{find-problems}, which parses the block textually off disk -- hence

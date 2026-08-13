@@ -27,6 +27,12 @@ stack. Workflow: section~\ref{sec:lectures}.
   (default \emph{Example}); redefine per \emph{text}, in
   \file{.textbook/textbook.tex}. Routed into \cs{ProblemLabelWord} so a
   shared text layer cannot disturb Assessment's fixed ``Q''.\\
+\cs{lecturetoc} & the lecture's table of contents. Document-called, not
+  class-emitted: a short lecture wants none, and only you know which those
+  are. Put it straight after \cs{booksection} (lectures have no title
+  block). See ``The contents list'' below.\\
+\cs{CourseBoxTocEntry} & CourseBoxes' contents hook, rendered here. Renew it
+  to change what an entry says.\\
 \cs{booksection}, \cs{lecturetitle} & the lecture's title and, for
   \cs{booksection}, the section of the book it covers (with an optional
   \texttt{link=} to that section's page). Supplied by TextRef
@@ -39,8 +45,8 @@ stack. Workflow: section~\ref{sec:lectures}.
 
 Imported problems render with a run-in bold heading, unnumbered by default:
 \textbf{Example.}\ -- plus the literal \texttt{number=} and parenthetical
-\texttt{desc=} if the import supplied them (``Example 2.1.8 (from
-APEX).'').\ The problem counter still steps invisibly, so cross-references
+\texttt{name=} if the import supplied them (``Example 2.1.8
+(differentiating a polynomial).'').\ The problem counter still steps invisibly, so cross-references
 stay sound. The \env{problemgroup} stem takes the same unnumbered form.
 Points keys are ignored -- notes are ungraded.
 
@@ -69,4 +75,45 @@ Other deliberate class behaviour:
     the right edge of the screen, over the projected text.
   \item Headings and links stay black: lectures sit with assessments on
     the ``clear, not fancy'' side; colour belongs to CourseDocument.
+\end{itemize}
+
+\subsection*{The contents list}
+
+A lecture's contents list is \emph{not} mostly sections -- most lectures
+have none. It is mostly the things that actually structure the hour, and it
+is assembled from three sources:
+
+\begin{itemize}
+  \item every CourseBoxes \textbf{text result} -- definitions, theorems,
+    facts, examples, and whatever else the text layer declares -- via
+    \cs{CourseBoxTocEntry}. \textbf{Asides never appear}, and not by a list
+    of exceptions: they are a different factory, so the exclusion cannot
+    drift when a text layer adds a name.
+  \item every \textbf{top-level imported problem}, through the same
+    renderer, so ``Example 2.1.8'' and ``Definition 2.1.1'' cannot end up
+    formatted differently. Parts inside a \env{problemgroup} and check-ins
+    stay out for free -- neither reaches the heading hook.
+  \item a \env{problemgroup}, \emph{if} it was given a \texttt{name=}. The
+    group's stem is a sentence and reads badly in a list, so the name is what
+    gets listed; without one the group stays out, since a bare ``Example''
+    would be indistinguishable from any other.
+  \item \cs{section}/\cs{subsection}, when a lecture uses them.
+\end{itemize}
+
+Entries read \emph{Kind number (name)}, dropping whatever is absent:
+``Definition 2.1.1 (Derivative)'', ``Example 2.1.5'', ``Theorem (Product,
+Quotient, and Chain Rules)''.
+
+Two deliberate presentation choices:
+
+\begin{itemize}
+  \item \textbf{Flat, with the typeface carrying the hierarchy.}
+    Indentation implies structure; in a sectionless lecture there is none to
+    imply, and indenting every result would push the list right for nothing.
+    So all levels sit at one margin and sans-bold (headings, echoing the
+    page) separates from serif roman (results).
+  \item \textbf{Page numbers on the handout only.} The projector copy prints
+    no page numbers anywhere, so a page column there would point at numbers
+    the reader cannot see. Its entries are hyperlinks instead -- black, so
+    they read as plain text and behave as taps.
 \end{itemize}

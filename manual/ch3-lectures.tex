@@ -113,15 +113,15 @@ not a text citation:
 \importproblem{../problems/}{power-rule-basic.tex}
 % -> "Example.  Differentiate f(x) = ..."
 
-\importproblem[number={2.1.8}, desc={from APEX}]
+\importproblem[number={2.1.8}, name={differentiating a polynomial}]
   {../problems/}{power-rule-basic.tex}
-% -> "Example 2.1.8 (from APEX).  Differentiate f(x) = ..."
+% -> "Example 2.1.8 (differentiating a polynomial). ..."
 \end{manexsource}
 
 The \texttt{number=} key sets a \emph{literal} display number (typically the
 textbook's -- the same declared-number philosophy as the boxes; a \cs{ref} to
-the problem reads ``2.1.8'' too), and \texttt{desc=} adds a parenthetical
-note. Points keys are simply ignored in notes -- the same import line can
+the problem reads ``2.1.8'' too), and \texttt{name=} adds a parenthetical
+content label -- which also becomes the problem's contents-list entry. Points keys are simply ignored in notes -- the same import line can
 move between a test and a lecture unchanged.
 
 Three more import forms round out the lecture repertoire:
@@ -134,14 +134,21 @@ Three more import forms round out the lecture repertoire:
   \item \env{problemgroup} assembles independent one-file problems under a
     shared stem; in notes the stem stays an unnumbered ``Example.''\ and the
     members letter themselves (a), (b) (see section~\ref{sec:assessments}
-    for the graded version).
-  \item \cs{importfact} (same shape again: \texttt{[number, desc]} then
-    directory and file) drops in a snippet from the \emph{fact} bank
-    (section~\ref{sec:fact-files}) -- a definition or rule stated once in
-    \file{facts/} and quoted wherever a lecture or formula sheet wants it.
-    The fact renders bare unless the document opts in to showing its
-    provenance via the \cs{ShowFactMeta} hook
-    (section~\ref{sec:ref-factmeta}).
+    for the graded version). Its optional \texttt{name=} is what puts the
+    \emph{group} in the contents list -- the stem is a sentence and reads
+    badly there, so the class lists the name, and an unnamed group stays out
+    of the list rather than contributing an indistinguishable bare
+    ``Example''.
+  \item \cs{importfact} (same shape again: \texttt{[kind, name,
+    number]} then directory and file) drops in a snippet from the \emph{fact}
+    bank (section~\ref{sec:fact-files}) -- a definition or rule stated once
+    in \file{facts/} and quoted wherever a lecture or formula sheet wants
+    it. \env{kind} names the CourseBoxes environment to wrap it in, so
+    \texttt{kind=\{theorem\}, name=\{Power Rule\}, number=\{2.1\}} heads it
+    ``Theorem 2.1 (Power Rule)''; omit \env{kind} and the fact renders bare
+    as before, which is what a dense formula sheet wants. A kind the text
+    layer never declared warns and imports bare rather than failing the
+    build.
 \end{itemize}
 
 The ``Example'' noun itself is a per-\emph{text} choice (books say Example /

@@ -8,18 +8,41 @@ says without running \LaTeX. One command:
 \begin{manexsource}
 \FactMeta{
   source = {apex},
+  kind   = {theorem},
+  name   = {Power Rule},
   number = {2.1},
   topics = {differentiation, power-rule},
-  desc   = {},
 }
 \end{manexsource}
 
-Keys: \env{source}, \env{number}, \env{topics}, \env{desc} -- a strict subset of
-ProblemMeta's. A fact has \emph{no} \env{type} or \env{difficulty} (those
+Keys: \env{source}, \env{kind}, \env{name}, \env{number}, \env{topics}.
+A fact has \emph{no} \env{type} or \env{difficulty} (those
 describe a \emph{problem}'s form and challenge), and nothing extrinsic like
 points. \env{topics} lists every subject the fact touches (and echoes its
-folder); \env{source}/\env{number} are a provenance origin and its locator;
-\env{desc} is an optional short label. On the \LaTeX{} side the block is
+folder); \env{source}/\env{number} are a provenance origin and its locator.
+There is no \env{desc}: it was dropped 2026-08-13 when ProblemMeta's
+\env{desc} was renamed \env{name}, the two being the same idea under two
+names -- and no fact had ever used it.
+
+\env{kind} and \env{name} are what let a fact render as the result it
+actually \emph{is}. The fact bank is a catch-all -- definitions, theorems,
+axioms -- so \env{kind} names the CourseBoxes environment the import site
+should wrap the snippet in and \env{name} the title that environment
+displays: the block above imports as ``Theorem 2.1 (Power Rule)''. Both are
+optional; with no \env{kind} a fact imports bare, exactly as before.
+
+\textbf{\env{kind} differs in nature from every other key here}, which is
+worth knowing. The rest are descriptive -- search keys. \env{kind} is
+\emph{functional}: it selects an environment, so a typo is not a fragmented
+search but a fact that will not box. Two things contain that:
+\cs{importfact} guards the environment at use and degrades to a bare import
+with a warning rather than erroring, and \texttt{find-facts --vocab} lists
+the kinds in the bank so drift (\texttt{thm} vs \texttt{theorem}) is visible
+\emph{without} running \LaTeX. The vocabulary is closed in practice: a kind
+is only usable if the course's text layer declared it with
+\cs{NewTextResult}.
+
+On the \LaTeX{} side the block is
 \emph{validated but discarded}: a mistyped key errors at compile time, nothing is
 typeset. The real reader is \file{find-facts}, which parses the block textually
 off disk -- hence the same two disciplines (one key per line with braced values,
@@ -36,12 +59,22 @@ Design notes worth keeping in mind:
     Exercises' \cs{AtBeginDocument} stub swallows leftover \cs{FactMeta} blocks
     and every document still builds.
   \item \textbf{Import wrapper.} A picked fact is inserted as
-    \cs{importfact}\texttt{[number, desc]\{DIR\}\{FILE\}} (defined in
-    \file{Exercises.sty}, beside \cs{importproblem}). By default it renders the
-    fact bare; the injected \env{number}/\env{desc} are captured into
-    \cs{CurrentFactNumber}/\cs{CurrentFactDesc} but shown only if a document
-    opts in by redefining the \cs{ShowFactMeta} hook -- e.g.\ a formula sheet
-    that wants ``Power Rule\ldots{} \S2.1'' beside each fact. This mirrors the
-    ProblemMeta margin display that once existed: metadata captured and
-    available, display opt-in.
+    \cs{importfact}\texttt{[kind, name, number]\{DIR\}\{FILE\}} (defined
+    in \file{Exercises.sty}, beside \cs{importproblem}). All three are captured
+    into \cs{CurrentFactKind}, \cs{CurrentFactName} and \cs{CurrentFactNumber},
+    and drive the wrapping box: ``Theorem 2.1 (Power Rule)''. With no \env{kind}
+    there is no box, and a document can still print the name and number by
+    redefining the \cs{ShowFactMeta} hook -- e.g.\ a formula sheet listing
+    ``Power Rule 2.1'' beside each entry.
+  \item \textbf{You do not retype these.} Ask \texttt{find-facts} for an
+    import line with \texttt{--with kind,name,number} and it reads the block
+    off disk, writing them into the emitted \cs{importfact} line. That the
+    values land at the \emph{call site}
+    is also what lets one import override them: the same fact can be a
+    \env{theorem} in one course and a \env{keyidea} in another without editing
+    the file.
+  \item \textbf{An unnumbered fact still works.} With \env{name} but no
+    \env{number} the import reaches for the kind's starred form, heading
+    ``Theorem (Product, Quotient, and Chain Rules)''. A fact that resists a
+    concise name can equally give \env{number} and no \env{name}.
 \end{itemize}

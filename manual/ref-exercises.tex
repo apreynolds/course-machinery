@@ -15,9 +15,11 @@ section~\ref{sec:assessments}.
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \env{problem} & a numbered, cross-referenceable problem (flat document-wide
   counter; \cs{counterwithin} to restart per section).\\
-\env{problemgroup}\texttt{\{STEM\}} & assembly-time grouping: ``Problem
-  $N$.''\ $+$ stem, members render as parts (a), (b). Label the group
-  \emph{inside} it, before the first part.\\
+\env{problemgroup}\texttt{[name=\{...\}]\{STEM\}} & assembly-time grouping:
+  ``Problem $N$.''\ $+$ stem, members render as parts (a), (b). Label the group
+  \emph{inside} it, before the first part. The optional \texttt{name=} is a
+  short content label for the group as a whole -- the stem is a sentence, so
+  the class lists the name instead, and only when one is given.\\
 \env{qparts} / \cs{qpart} & dependent parts \emph{within} one problem file,
   lettered (a), (b); per-part points/workspace supplied at import.\\
 \env{solution}\texttt{[notitle]} & printed only in a solutions build;
@@ -62,7 +64,8 @@ per-import settings (keyval family \env{eximport});
   the document toggle.\\
 \texttt{number=\{2.1.8\}} & literal display number (notes): heading and
   \cs{ref} both read ``2.1.8''; no counter shown.\\
-\texttt{desc=\{...\}} & parenthetical after the heading (notes).\\
+\texttt{name=\{...\}} & short content label: a parenthetical after the
+  heading, the check-in box's title, and the contents entry (notes).\\
 \texttt{noprint} & skip the file entirely -- not read, no counter step, no
   points, no label (deliberately not typeset-then-hide).\\
 \texttt{checkin} & wrap in the ``CHECK IN'' box with coloured A--E labels
@@ -71,7 +74,7 @@ per-import settings (keyval family \env{eximport});
 \end{center}
 
 Keys a context ignores are tolerated by design -- \texttt{points=} under
-LectureNotes, \texttt{number=}/\texttt{desc=} under Assessment -- so one
+LectureNotes, \texttt{number=}/\texttt{name=} under Assessment -- so one
 import line moves between documents unchanged.
 
 \cs{printtotalpoints} prints the two-pass sum of every \emph{counted,

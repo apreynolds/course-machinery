@@ -46,12 +46,13 @@ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
   backlog.\\
 \texttt{-{}-import} & matches as paste-ready \cs{importproblem} lines.\\
 \texttt{-{}-with LIST} & (with \texttt{-{}-import}) inject metadata keys as
-  options; \env{LIST} is a comma subset of \env{number,desc}, added where a
-  file has them. \env{points} stays manual.\\
+  options, added where a file has them; \env{LIST} is a comma subset of the
+  keys injectable for that bank -- \env{number,name} for problems,
+  \env{kind,name,number} for facts. \env{points} stays manual.\\
 \texttt{-{}-from DIR} & (with \texttt{-{}-import}) make each line's directory
   argument relative to \env{DIR}, the importing document's folder.\\
 \texttt{-{}-tsv} & one tab-separated row per match
-  (path, desc, topics, type, difficulty, source, number) -- the machine feed
+  (path, name, topics, type, difficulty, source, number) -- the machine feed
   for \file{pick-problems}. Respects the filters.\\
 \end{tabularx}
 \end{center}
@@ -84,7 +85,7 @@ exactly like their problem counterparts above but read \cs{FactMeta} blocks and
 emit \cs{importfact} lines, over the fact schema: the filters are
 \texttt{-{}-topic} and \texttt{-{}-source} only (a fact has no type or
 difficulty), and \texttt{-{}-tsv} columns are
-(path, desc, topics, source, number). The Vim command \texttt{:ImportFact}
+(path, name, kind, topics, source, number). The Vim command \texttt{:ImportFact}
 (\texttt{<Space>if}) mirrors \texttt{:ImportProblem}.
 
 Under the hood all four commands are thin shims over one shared engine,

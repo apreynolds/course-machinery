@@ -14,6 +14,13 @@ tcolorbox frames:
     the section number.
 \end{itemize}
 
+Which family a name belongs to is a per-\emph{text} call made in the text
+layer, not here: ``Key Idea'' is a numbered result in APEX and a plain
+aside in a course whose text does not number it. \textbf{The factory you
+declare it with is the decision} -- including whether it reaches a table of
+contents (section~\ref{sec:ref-lecturenotes}), since results call the
+contents hook and asides never do.
+
 Load-order contract: amsthm must already be loaded, which Typefaces'
 newtxmath owns -- so CourseBoxes comes \emph{after} Typefaces (enforced by
 a \cs{PackageError}); hyperref (for the boxes' link anchors) arrives via
@@ -26,6 +33,18 @@ Universal text results (every textbook has them):
 \env{theorem}, \env{proposition}, \env{lemma}, \env{corollary} (italic
 body); \env{definition}, \env{example}, \env{remark} (upright body). Call
 site: \texttt{\char`\\begin\{theorem\}\{2.1.3\}[Power Rule]}.
+
+\env{example} is the one text result that is \textbf{not boxed}, and
+deliberately: the same word reaches the page two ways -- written here, or
+as an imported problem shown as ``Example'' (section~\ref{sec:lectures}) --
+and boxing one but not the other made two identical-sounding things look
+unrelated. The imported route cannot be boxed safely (a problem carries
+hints, solutions and \cs{workspace}), so neither is. The L-rule marks the
+text's \emph{results}; a worked example is not one.
+
+What then distinguishes an example \emph{from the text} from one of your
+own is the \textbf{number}, not the frame --- which is what the starred
+form below is for.
 
 Shared asides (the author's voice, consistent course to course):
 \env{caution} (red, warning glyph), \env{takeaway} (blue),
@@ -45,11 +64,26 @@ not ship here -- it is declared in the course's text layer,
 \cs{NewTextResult}\texttt{[head]\{env\}\{Name\}\{box\}} & declare a
   numbered text result; call site
   \texttt{\char`\\begin\{env\}\{num\}[name]}. Default head \env{cbdefn}
-  (upright); pass \env{cbthm} for italic.\\
+  (upright); pass \env{cbthm} for italic. An \emph{empty} box argument
+  means no box at all (\env{example} uses this) -- not a blank frame:
+  tcolorbox is never invoked, so such a result cannot affect pagination.\\
 \cs{NewAside}\texttt{[head]\{env\}\{Name\}\{box\}} & declare an unnumbered
   aside. Default head \env{cbaside} (black sans).\\
 \end{tabularx}
 \end{center}
+
+Every \cs{NewTextResult} also declares an \textbf{unnumbered twin},
+\env{env*}, taking only the optional name:
+\texttt{\char`\\begin\{example*\}[Cubic]} heads ``Example (Cubic)'' and
+\texttt{\char`\\begin\{example*\}} just ``Example''. It shares the plain
+form's head style and box, so the two cannot drift apart.
+
+The number is mandatory in the plain form on purpose -- a declared number
+is the norm -- so the star is the visible way to say ``this one has none''.
+A starred result sets \texttt{[unnumbered \emph{Name}]} as its label text,
+the same loud-sentinel trick asides use: without it an unnumbered result
+would still be \cs{label}-able and \cs{ref} would expand to \emph{nothing},
+leaving ``by Theorem~'' and a blank space in the PDF.
 
 \subsection*{Restyling knobs}
 
@@ -59,7 +93,11 @@ Named once, referenced everywhere -- each is a one-line edit:
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 tcolorbox styles & \env{cb/textresult} (quiet grey L-rule),
   \env{cb/note} (blue box), \env{cb/caution} (red), \env{cb/tip}
-  (orange).\\
+  (orange). An empty style is the ``no box'' case.\\
+\cs{CourseBoxTocEntry}\texttt{\{Name\}\{num\}\{name\}} & called once per
+  text result (never by an aside), a no-op here. A class that has a table
+  of contents renews it; LectureNotes does
+  (section~\ref{sec:ref-lecturenotes}).\\
 amsthm head styles & \env{cbthm}, \env{cbdefn}, \env{cbaside},
   \env{cbnote}, \env{cbnotecolon} (colon punctuation), \env{cbcaution},
   \env{cbtip}. Head punctuation is the style's sixth argument.\\
