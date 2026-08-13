@@ -96,10 +96,43 @@ the five, live:
 \end{manexample}
 
 The full set: \env{caution}, \env{takeaway}, \env{yourturn}, \env{prepwork},
-and \env{tip} -- where \env{tip} takes an optional audience tier,
-\texttt{[surviving]} or \texttt{[thriving]}, that stamps the box for the
+\env{notcovered}, and \env{tip} -- where \env{tip} takes an optional audience
+tier, \texttt{[surviving]} or \texttt{[thriving]}, that stamps the box for the
 struggling or the confident reader respectively (a bare \env{tip} is for
 everyone).
+
+\subsection{Announcing what you are skipping}
+
+\env{notcovered} states what the course has decided \emph{in advance} to leave
+out -- a section, a result the text numbers, a topic. A silent omission draws
+the same question from twenty students, and a co-instructor reading your notes
+cannot otherwise tell a deliberate cut from an oversight.
+
+\begin{manexample}
+\begin{notcovered}
+  The text's Lemma 2.1.3, which it uses only to extend the
+  Power Rule to irrational exponents.
+  \InstructorInline{Cut deliberately, not for time: the proof
+  wants logarithmic differentiation, three weeks away.}
+\end{notcovered}
+\end{manexample}
+
+Note what it is \emph{not}: a mark on the skipped thing itself. Content decided
+in advance to be cut is simply not written -- the declared-number scheme already
+tolerates the gap (a lecture runs 2.1.2 to 2.1.4 and every \cs{ref} still
+resolves), and problems and facts live in their banks, so dropping one is
+deleting an import line with nothing lost. There is therefore nothing left in
+the source to strike through, and one box near the top says it instead, at
+whatever granularity is useful.
+
+Running out of time in the room is a different thing and is not this: that is an
+announcement, not a source edit.
+
+Being an aside, it never reaches the contents list -- ``what we are not doing''
+is meta-content, not part of the lecture. \cs{textbookref} works inside it, so a
+skipped section can link to the book; and \cs{InstructorInline}, as above, is
+how the \emph{reason} for a cut reaches co-instructors without reaching
+students.
 
 \subsection{Importing problems as examples}
 

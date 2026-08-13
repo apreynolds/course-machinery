@@ -249,10 +249,30 @@
 %%% multiple-choice problem (\importcheckin, in Exercises.sty): a neutral titled
 %%% box whose choice labels are the colored A/B/C flashcard boxes. The old prose
 %%% \begin{checkin} aside is retired.
+%%% `notcovered' announces what the course has DECIDED IN ADVANCE to leave out --
+%%% a section, a result the text numbers, a topic. It exists because a silent
+%%% omission generates the same question from twenty students, and because a
+%%% co-instructor reading these notes cannot otherwise tell a deliberate cut from
+%%% an oversight. It levels the field: everyone gets the same information.
+%%%
+%%% NOT a marker on the skipped thing itself, deliberately. Content decided in
+%%% advance to be cut is simply not written -- the declared-number scheme already
+%%% tolerates the gap (a lecture jumps 2.1.2 -> 2.1.4 and every \ref still
+%%% resolves), and problems and facts live in their banks, so dropping one is
+%%% deleting an import line and nothing is lost. There is therefore nothing left
+%%% in the source to strike through; ONE box near the top says it instead, at
+%%% whatever granularity is useful. Running out of time in the room is a
+%%% different thing and is not this: that is an announcement, not a source edit.
+%%%
+%%% An aside, so it never reaches a contents list -- "what we are not doing" is
+%%% meta-content, not part of the lecture. \textbookref works inside it, so a
+%%% skipped section can link to the book; and \InstructorInline works too, which
+%%% is how the reason for a cut reaches co-instructors without reaching students.
 \NewAside[cbcaution]  {caution} {\faExclamationTriangle\ CAUTION}{cb/caution}
 \NewAside[cbnote]     {takeaway}{TAKEAWAY}                       {cb/note}
 \NewAside[cbnotecolon]{yourturn}{\faPenFancy\ Your turn}        {cb/note}
 \NewAside[cbnote]     {prepwork}{\faBookOpen\ Prepwork}          {cb/note}
+\NewAside[cbnote]     {notcovered}{\faForward\ Not covered}      {cb/note}
 
 %%% Tip -- a shared aside with an OPTIONAL audience tier. \begin{tip} is neutral;
 %%% [surviving] / [thriving] append "for the <tier>" to the head. Built by hand
