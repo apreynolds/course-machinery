@@ -27,7 +27,8 @@
 # Other modes: --untagged (invert: files with NO block -- the tagging backlog),
 # --vocab (ignore filters, print the topic/type vocabulary with counts, the
 # antidote to `integration' vs `integrals'), --import (paste-ready \import<kind>
-# lines; --with LIST injects number,desc as options where present; --from DIR
+# lines; --with LIST injects metadata keys as options where present (which keys
+# are injectable depends on the kind -- see the case below); --from DIR
 # rewrites the directory argument relative to the importing document's folder),
 # and --tsv (one tab-separated row per match, the machine feed for a picker).
 #
@@ -60,20 +61,30 @@ prog=${as:-find-meta}
 # this case. filter_specs are `flag:key' pairs -- each becomes a --flag PATTERN
 # filter on that metadata key (the flag is singular by habit: --topic -> topics).
 # tsv_cols / vocab_keys are metadata keys in report order. block/emit are the
-# LaTeX macros. number,desc are the only injectable --with keys, the same for
-# both kinds, so that stays hard-coded below.
+# LaTeX macros. with_keys are the keys --with may inject as \import<kind> options,
+# in the canonical order they are emitted -- per-kind, because a fact's kind/name
+# select and title the environment it is wrapped in and a problem has no analogue.
 case $kind in
   problem)
     noun="problem"; block_macro="ProblemMeta"; emit_macro="importproblem"
     filter_specs=(topic:topics type:type difficulty:difficulty source:source)
-    tsv_cols=(desc topics type difficulty source number)
+    tsv_cols=(name topics type difficulty source number)
     vocab_keys=(topics type difficulty)
+    with_keys=(number name)
     ;;
   fact)
     noun="fact"; block_macro="FactMeta"; emit_macro="importfact"
+    # NO kind: filter -- the flag would be `--kind', which this engine already
+    # spends on choosing the bank (problem|fact), and the pre-scan would read the
+    # filter's value as the bank. --vocab covers the audit need; add it under a
+    # different flag name if filtering by kind is ever actually wanted.
     filter_specs=(topic:topics source:source)
-    tsv_cols=(desc topics source number)
-    vocab_keys=(topics)
+    tsv_cols=(name kind topics source number)
+    # kind is in the vocabulary for a sharper reason than topics: it names an
+    # environment, so `thm' where the bank says `theorem' is a fact that will not
+    # box, not merely a split search. --vocab is how that is caught off disk.
+    vocab_keys=(topics kind)
+    with_keys=(kind name number)
     ;;
   '') echo "$prog: --kind is required (problem|fact)" >&2; exit 2 ;;
   *)  echo "$prog: unknown --kind: $kind (want problem|fact)" >&2; exit 2 ;;
@@ -113,7 +124,7 @@ usage() {
   echo "  --untagged  invert: list .tex files with NO \\$block_macro block."
   echo "  --vocab     ignore filters; print the ${vocab_keys[*]} vocabulary with counts."
   echo "  --import    print matches as paste-ready \\$emit_macro lines."
-  echo "    --with LIST   subset of {number, desc}: inject those as options where set."
+  echo "    --with LIST   subset of {$(IFS=,; echo "${with_keys[*]}")}: inject those as options where set."
   echo "    --from DIR    rewrite each directory argument relative to DIR."
   cols="path"; for c in "${tsv_cols[@]}"; do cols+="<TAB>$c"; done
   echo "  --tsv       one row per match: $cols"
@@ -122,7 +133,7 @@ usage() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ARGUMENTS
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-with_keys="" from_dir=""    # --import modifiers (validated below)
+with_request="" from_dir=""  # --import modifiers (validated below)
 mode="list"                 # list | vocab | import | untagged | tsv
 paths=()                    # search operands: directories and/or individual files
 
@@ -139,7 +150,7 @@ while [[ $# -gt 0 ]]; do
     --import)      mode="import";   shift ;;
     --untagged)    mode="untagged"; shift ;;
     --tsv)         mode="tsv";      shift ;;
-    --with)        with_keys=${2:?--with needs a comma-separated key list}; shift 2 ;;
+    --with)        with_request=${2:?--with needs a comma-separated key list}; shift 2 ;;
     --from)        from_dir=${2:?--from needs a directory};                 shift 2 ;;
     --*)
       f=${1#--}
@@ -156,25 +167,32 @@ done
 
 # --with / --from only make sense as modifiers of --import; reject them anywhere
 # else so a silent no-op cannot hide a typo.
-if [[ -n $with_keys || -n $from_dir ]] && [[ $mode != import ]]; then
+if [[ -n $with_request || -n $from_dir ]] && [[ $mode != import ]]; then
   echo "$prog: --with/--from only apply with --import" >&2
   exit 2
 fi
 
-# --with takes a comma-separated subset of the injectable keys -- and ONLY those
-# two: number and desc are the only metadata keys that map to \import<kind>
-# options, so the set is deliberately closed (no per-key flag creep). Collect the
-# request as a set for the emitter below.
+# --with takes a comma-separated subset of the injectable keys for THIS kind (the
+# with_keys set above) -- deliberately closed, so there is no per-key flag creep
+# and a typo is refused rather than silently ignored. Collect the request as a set
+# for the emitter below.
 declare -A want=()
-if [[ -n $with_keys ]]; then
-  IFS=, read -ra _wk <<< "$with_keys"
+if [[ -n $with_request ]]; then
+  IFS=, read -ra _wk <<< "$with_request"
   for k in "${_wk[@]}"; do
-    k="${k//[[:space:]]/}"                 # tolerate `number, desc' and trailing commas
-    case $k in
-      number | desc) want[$k]=1 ;;
-      "") ;;
-      *) echo "$prog: --with accepts only number,desc (got: $k)" >&2; exit 2 ;;
-    esac
+    k="${k//[[:space:]]/}"                 # tolerate `number, name' and trailing commas
+    [[ -z $k ]] && continue                # ...and trailing commas
+    _ok=0
+    for _allowed in "${with_keys[@]}"; do
+      [[ $k == "$_allowed" ]] && { _ok=1; break; }
+    done
+    if (( _ok )); then
+      want[$k]=1
+    else
+      printf '%s: --with accepts only %s for a %s (got: %s)\n' \
+        "$prog" "$(IFS=,; echo "${with_keys[*]}")" "$noun" "$k" >&2
+      exit 2
+    fi
   done
 fi
 
@@ -437,7 +455,7 @@ case $mode in
       # `#' has to be re-escaped to `\#': read_meta un-escaped it on the way in
       # (\# -> #), but `\%' it left intact, so % needs no re-escaping here.
       opts=""
-      for key in number desc; do
+      for key in "${with_keys[@]}"; do
         [[ -n ${want[$key]:-} ]] || continue
         v=$(field "${meta_of[$f]}" "$key")
         [[ -n $v ]] || continue

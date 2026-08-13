@@ -33,9 +33,13 @@ for ((_i = 0; _i < ${#_a[@]}; _i++)); do
 done
 prog=${as:-pick-meta}
 
+# inject_keys must track find-meta's per-kind `with_keys'. A fact's kind/name
+# select and title the box its import is wrapped in, so a picked fact that did not
+# carry them would paste an import line missing the very thing that makes it
+# render as a theorem rather than a bare snippet.
 case $kind in
-  problem) noun="problem" ;;
-  fact)    noun="fact" ;;
+  problem) noun="problem"; inject_keys="number,name" ;;
+  fact)    noun="fact";    inject_keys="kind,name,number" ;;
   '') echo "$prog: --kind is required (problem|fact)" >&2; exit 2 ;;
   *)  echo "$prog: unknown --kind: $kind (want problem|fact)" >&2; exit 2 ;;
 esac
@@ -132,7 +136,7 @@ selection=$(
 # find-meta, never duplicated here.
 mapfile -t files < <(printf '%s\n' "$selection" | cut -f1)
 
-import_args=(--import --with number,desc)
+import_args=(--import --with "$inject_keys")
 [[ -n $from ]] && import_args+=(--from "$from")
 
 "${engine[@]}" "${import_args[@]}" "${files[@]}"
