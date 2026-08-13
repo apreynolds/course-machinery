@@ -11,7 +11,8 @@ stack. Workflow: section~\ref{sec:lectures}.
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \texttt{projector} & the in-room copy: 17\,pt, tighter top margin, no
-  marginpar column, no page number, grey back-to-top arrow in the footer.
+  marginpar column, no page number, and the text block sitting left of
+  centre (same width, shifted -- see below).
   Normally you never write it -- the build's \env{projector} view injects
   \cs{ProjectorView} and the class switches by itself.\\
 \emph{(other)} & forwarded to \file{extarticle}.\\
@@ -59,7 +60,13 @@ Other deliberate class behaviour:
     rule, which disappears along with the head if the lecture declares no
     coordinate. Page \emph{numbers} are the opposite case: the handout has a
     centred one, the projector copy none (it is never collated, so a number
-    is noise -- hence the back-to-top footer arrow instead).
+    is noise); the projector foot is simply empty.
+  \item The projector text block is shifted left of centre
+    (\texttt{hmarginratio=\{3:7\}}, so the left margin is 60\% of the centred
+    one and the rest falls to the right). Its \emph{width} is the same measure
+    as everywhere else -- this moves the block, it does not reflow it. The
+    reason is the room: presenting from a tablet puts the app's tool bar down
+    the right edge of the screen, over the projected text.
   \item Headings and links stay black: lectures sit with assessments on
     the ``clear, not fancy'' side; colour belongs to CourseDocument.
 \end{itemize}

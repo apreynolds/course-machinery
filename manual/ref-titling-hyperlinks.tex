@@ -27,7 +27,7 @@ Also home of \file{datetime2}, the date's formatter.
 
 \subsection*{Hyperlinks}
 
-hyperref plus a back-to-top anchor. The load itself is the point:
+hyperref, plus \cs{demo}. The load itself is the point:
 hyperref patches much of LaTeX, so anything loaded after it can silently
 undo those patches -- Hyperlinks therefore defers it with
 \cs{AtEndPreamble}, which runs after every package the \emph{document}
@@ -41,10 +41,6 @@ loads too, not merely after the class
   sets its identity colour). Read late, so overrides anywhere in the
   preamble win.\\
 \cs{UrlColor} & external URLs (default \texttt{RoyalBlue}).\\
-\cs{BackToTopLink}\texttt{\{...\}} & wrap anything in a jump to the top
-  anchor (the projector footer's grey arrow).\\
-\cs{TopAnchorName} & the anchor's name (\texttt{CourseTop}), placed at
-  the very top of the body.\\
 \cs{demo}\texttt{[tool]\{URL\}} & a link out to an interactive tool; see
   below.\\
 \cs{DemoLabel}, \cs{DemoMarker} & the student-facing wording

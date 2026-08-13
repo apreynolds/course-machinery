@@ -1,8 +1,7 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{Hyperlinks}[2026/07/22 hyperref (loaded last) + back-to-top anchor + \string\demo]
+\ProvidesPackage{Hyperlinks}[2026/08/13 hyperref (loaded last) + \string\demo]
 
-% hyperref for the course classes, plus the anchor a back-to-top link jumps to,
-% plus \demo (links out to an interactive tool).
+% hyperref for the course classes, plus \demo (links out to an interactive tool).
 %
 % Requires the loading class to have done, before \ProcessOptions:
 %     \PassOptionsToPackage{dvipsnames}{xcolor}
@@ -43,22 +42,10 @@
   }%
 }
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% BACK-TO-TOP ANCHOR
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% The destination a back-to-top link jumps to: the very top of the body, which is
-% also where a \tableofcontents sits when the document has one.
-%
-% Emitted at \AtBeginDocument -- deliberately, not earlier: \hypertarget needs
-% hyperref, which does not exist until the \AtEndPreamble above has run, and
-% \AtEndPreamble fires before any \AtBeginDocument hook.
-%
-% \BackToTopLink{<stuff>} wraps its argument in the jump. Kept separate from any
-% styling so the caller decides what the link looks like -- LectureNotes uses a
-% grey arrow in the projector footer; nothing else uses it yet.
-\newcommand{\TopAnchorName}{CourseTop}
-\AtBeginDocument{\hypertarget{\TopAnchorName}{}}
-\newcommand{\BackToTopLink}[1]{\hyperlink{\TopAnchorName}{#1}}
+% RETIRED 2026-08-13: a back-to-top anchor (\TopAnchorName = CourseTop, emitted at
+% \AtBeginDocument) and \BackToTopLink{<stuff>} to jump to it. Its only caller was
+% the grey arrow in LectureNotes' projector footer, which went unused in the room.
+% Both are gone; nothing else referenced them.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \demo -- LINK OUT TO AN INTERACTIVE TOOL

@@ -136,8 +136,20 @@
 \RequirePackage{geometry}
 \geometry{letterpaper}
 \ifProjector
-  % Room copy: no marginpar, top margin tightened to buy vertical space.
+  % Room copy: no marginpar, top margin tightened to buy vertical space, and the
+  % body pushed LEFT of centre.
+  %
+  % hmarginratio is the whole of that last part. With textwidth given and neither
+  % `left' nor `right', geometry splits the leftover width by this ratio -- 3:7
+  % hands the left margin 30% of it where the default 1:1 hands it 50%, i.e. 60%
+  % of the margin it used to have, with the difference falling to the right. The
+  % MEASURE IS UNTOUCHED: only where the block sits moves, never how wide it is.
+  % (Same knob CourseDocument uses to switch between its 2:3 and 1:1 splits.)
+  %
+  % The reason is the room, not the page: presenting from an iPad puts the app's
+  % tool bar down the RIGHT edge of the screen, over the projected text.
   \geometry{top=0.25in, bottom=0.75in, textwidth=2.6\alphabet,
+            hmarginratio={3:7},
             includehead, headheight=22pt, headsep=8pt}
 \else
   % Handout: left margin fixed, remainder falls to the right and carries the
@@ -248,19 +260,10 @@
     \vskip-\CourseHeadRule}%
 }
 
-\ifProjector
-  % Back-to-top arrow, bottom right of every page. The projector copy is scrolled
-  % rather than paged, so a way back to the top earns its keep -- and grey keeps
-  % it from competing with the content when projected.
-  %
-  % The FOOTER is the whole trick. songsheets' equivalent (MyLeadsheets.sty's
-  % \MyLStochint) emits into the text body, so it needs \pagegoal/\pagetotal
-  % arithmetic and a fit test to avoid forcing an extra page -- and a full page
-  % silently gets no link. A footer is reserved space: every page, no arithmetic,
-  % cannot overflow.
-  \definecolor{TopLinkGray}{gray}{0.5}
-  \fancyfoot[R]{\BackToTopLink{\textcolor{TopLinkGray}{\large$\uparrow$}}}
-\else
+% The projector foot stays empty: a grey back-to-top arrow lived here (the copy is
+% scrolled, so a jump to the top looked worth its space) but went unused in the
+% room and was retired 2026-08-13 along with the anchor behind it.
+\ifProjector\else
   \fancyfoot[C]{\small\thepage}
 \fi
 \pagestyle{fancy}
