@@ -11,10 +11,17 @@
 %%%     all just work, because nothing here counts. (Mechanism and rationale:
 %%%     manual/ch-architecture.tex, "Declared numbers".)
 %%%
-%%%   ASIDES (category B) -- MY pedagogical interjections (Key Idea, Tip,
-%%%     Caution). Unnumbered, and deliberately NOT \label-able: references point
-%%%     at the primary text, not at my notes. A stray \label fails LOUD (prints
-%%%     "[unlabelled aside]") rather than silently grabbing the section number.
+%%%   ASIDES (category B) -- MY pedagogical interjections (Tip, Caution,
+%%%     Takeaway, Your turn). Unnumbered, and deliberately NOT \label-able:
+%%%     references point at the primary text, not at my notes. A stray \label
+%%%     fails LOUD (prints "[unlabelled aside]") rather than silently grabbing
+%%%     the section number.
+%%%
+%%%     WHICH FAMILY a name belongs to is a per-TEXT call, made in the text layer,
+%%%     not here: "Key Idea" is a numbered result in APEX (declared with
+%%%     \NewTextResult in .textbook/textbook.tex) and a plain aside in a course
+%%%     whose text does not number it. The factory you declare it with IS the
+%%%     decision -- including whether it reaches a table of contents.
 %%%
 %%% This file ships the FACTORY plus a UNIVERSAL default vocabulary. Text-specific
 %%% names (Key Idea, Axiom, ...) are declared in the course's own TEXT LAYER
@@ -41,6 +48,9 @@
     {Load Typefaces (whose newtxmath pulls amsthm in at the right moment)
      before CourseBoxes, as the course classes do.}}
 
+\RequirePackage{etoolbox}            % \ifblank (the "no box" test in \NewTextResult).
+                                     % tcolorbox pulls it in anyway; named here so the
+                                     % dependency is stated rather than inherited.
 \RequirePackage[most]{tcolorbox}     % \tcolorboxenvironment, enhanced, breakable
 \RequirePackage{fontawesome5}        % topic glyphs + expressive faces (pdflatex-safe,
                                      % monochrome, inherit surrounding colour). NOT
@@ -125,10 +135,42 @@
   {\topsep}{\topsep}{}{}{\sffamily\bfseries\color{TipTextColor}}{:}
   {.5em}{\thmname{#1}\thmnote{ #3}}
 
+%%% --- Table-of-contents hook -------------------------------------------------
+%%% \CourseBoxTocEntry{Display Name}{number}{name}  -- called once per text result,
+%%% from the begin code below. Either of the last two may be empty.
+%%%
+%%% A NO-OP HERE, deliberately: this package knows that a result is a listable
+%%% thing, not whether the document has a table of contents or what an entry should
+%%% look like. LectureNotes.cls \renewcommand's it; a class that wants no such
+%%% listing renews nothing and pays nothing. Same mechanism/presentation split as
+%%% Exercises.sty's \ProblemHeadingFormat.
+%%%
+%%% ASIDES DELIBERATELY DO NOT CALL IT. That is the whole reason the two families
+%%% are separate factories: what belongs in a contents list is decided once, here,
+%%% by which factory declared the environment -- never by a hand-maintained list of
+%%% environment names that would drift the moment a text layer adds one.
+\providecommand{\CourseBoxTocEntry}[3]{}
+
 %%% --- The factories ----------------------------------------------------------
 %%% \NewTextResult[amsthm-style]{env}{Display Name}{tcb style}
 %%%   Default style is cbdefn (upright); pass [cbthm] for an italic-bodied result.
-%%%   Call site: \begin{env}{number}[optional name].
+%%%   Call site: \begin{env}{number}[optional name]
+%%%              \begin{env*}[optional name]        <- UNNUMBERED (see below)
+%%%
+%%% An EMPTY tcb style means NO BOX: the result renders as a bare amsthm run-in
+%%% heading. That is not a "blank" tcolorbox -- \tcolorboxenvironment is not called
+%%% at all, so tcolorbox's breaking machinery never enters the picture and the
+%%% result cannot shift pagination. `example' uses this (see the vocabulary below).
+%%%
+%%% THE STARRED FORM is how a result goes unnumbered. The number is mandatory in
+%%% the plain form on purpose -- a declared number is the norm -- so `\begin{env*}'
+%%% is the deliberate, visible way to say "this one has none" (an example I wrote
+%%% myself rather than one the text numbers).
+%%%
+%%% Its \@currentlabel is a LOUD SENTINEL, the same trick \NewAside uses. Without
+%%% it an unnumbered result would still be \label-able and \ref would expand to
+%%% NOTHING -- "by Theorem~" followed by blank space, a silent wrong answer in the
+%%% PDF. With it, a stray \ref prints "[unnumbered Example]" and you see it.
 %%%
 %%% Mechanics: \phantomsection and the
 %%% \@currentlabel assignment run in the BEGIN CODE, before \begin{cb@env}, i.e.
@@ -137,11 +179,23 @@
 \NewDocumentCommand{\NewTextResult}{O{cbdefn} m m m}{%
   \theoremstyle{#1}%
   \newtheorem*{cb@#2}{#3}%                 % base: starred = no counter
-  \tcolorboxenvironment{cb@#2}{#4}%        % box the base
+  \ifblank{#4}{}{\tcolorboxenvironment{cb@#2}{#4}}%   % box the base, unless no style
   \NewDocumentEnvironment{#2}{m o}{%
     \phantomsection
     \protected@edef\@currentlabel{##1}%    % \label will record the typed number
+    % After \phantomsection, so the contents entry links to THIS result.
+    \IfValueTF{##2}{\CourseBoxTocEntry{#3}{##1}{##2}}{\CourseBoxTocEntry{#3}{##1}{}}%
     \IfValueTF{##2}{\begin{cb@#2}[##1 (##2)]}{\begin{cb@#2}[##1]}%
+  }{%
+    \end{cb@#2}%
+  }%
+  % Unnumbered twin. Same cb@ base (same head style, same box or lack of one), so
+  % the two forms cannot drift apart; only the number and the label differ.
+  \NewDocumentEnvironment{#2*}{o}{%
+    \phantomsection
+    \protected@edef\@currentlabel{[unnumbered #3]}%   % loud, never empty
+    \IfValueTF{##1}{\CourseBoxTocEntry{#3}{}{##1}}{\CourseBoxTocEntry{#3}{}{}}%
+    \IfValueTF{##1}{\begin{cb@#2}[(##1)]}{\begin{cb@#2}}%
   }{%
     \end{cb@#2}%
   }%
@@ -166,12 +220,23 @@
 %%% --- Universal default vocabulary -------------------------------------------
 %%% Present in every text; not course-specific, so it ships here. A course adds
 %%% only its text-specific extras in its text layer (Key Idea, Axiom, ...).
+%%% EXAMPLE IS DELIBERATELY UNBOXED (empty tcb style), and it is the only one.
+%%% The same word reaches the page two ways -- \begin{example} written here, and an
+%%% imported problem shown as "Example" via \ProblemHeadingFormat -- and boxing one
+%%% but not the other made two identical-sounding things look unrelated. Since the
+%%% imported route cannot be boxed safely (a problem carries hints, solutions and
+%%% \workspace; wrapping it risks pagination and the overlay contract), the
+%%% reconciliation goes the other way: neither is boxed. The L-rule is for the
+%%% text's RESULTS -- definitions, theorems, remarks -- not for worked examples.
+%%%
+%%% What distinguishes an example FROM THE TEXT from one of my own is then the
+%%% NUMBER, not the frame: \begin{example}{2.1.5} vs \begin{example*}.
 \NewTextResult[cbthm]{theorem}    {Theorem}    {cb/textresult}
 \NewTextResult[cbthm]{proposition}{Proposition}{cb/textresult}
 \NewTextResult[cbthm]{lemma}      {Lemma}      {cb/textresult}
 \NewTextResult[cbthm]{corollary}  {Corollary}  {cb/textresult}
 \NewTextResult      {definition} {Definition} {cb/textresult}
-\NewTextResult      {example}    {Example}    {cb/textresult}
+\NewTextResult      {example}    {Example}    {}
 \NewTextResult      {remark}     {Remark}     {cb/textresult}
 
 %%% --- Shared pedagogical asides (MY voice, consistent course-to-course) -------
