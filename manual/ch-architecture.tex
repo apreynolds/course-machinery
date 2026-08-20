@@ -297,8 +297,16 @@ corner of the toolkit, worth a skim before debugging anything odd:
 \subsection{Decoupling checklist}
 
 The machinery still carries a little scaffolding from the course it was
-built in; a final decoupling pass before any standalone handoff should:
-remove the \texttt{TEMPORARY} babel/blindtext loads at the foot of
-LectureNotes and CourseDocument (this manual and the demo syllabus lean
-on \cs{blindtext} for filler); and revisit the hardcoded
-\file{~/.cache/latexmk} aux location in \file{build-pdfs}.
+built in. One item remains for a final decoupling pass before any
+standalone handoff: the hardcoded \file{~/.cache/latexmk} aux location in
+\file{build-pdfs}, which should derive its root from
+\texttt{XDG\_CACHE\_HOME} (or drop \texttt{-auxdir} altogether and let
+latexmk write beside the source).
+
+The \texttt{TEMPORARY} babel/blindtext loads that sat at the foot of
+LectureNotes and CourseDocument are \emph{gone}. Nothing had ever called
+\cs{blindtext} -- the filler they were loaded for was never written -- and
+with both classes rebuilt without them, every document in the demo course
+and this manual produce byte-identical page counts and the same diagnostics
+as before. If you want filler while drafting, load \file{blindtext} in the
+document's own preamble rather than in a class.

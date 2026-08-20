@@ -368,6 +368,3 @@
 \fi
 \pagestyle{fancy}
 
-% TEMPORARY, testing purposes only
-\RequirePackage[english]{babel}
-\RequirePackage[math]{blindtext}
