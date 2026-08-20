@@ -33,7 +33,8 @@ anatomy of a course repo") is the fastest way to see the shape of the whole
 system.
 
 Everything below is orientation only. The manual is the authority — where the
-two disagree, the manual is right.
+two disagree, the manual is right. What the toolkit does *not* do yet is listed
+separately, in [`TODO.md`](TODO.md).
 
 ## What's here
 

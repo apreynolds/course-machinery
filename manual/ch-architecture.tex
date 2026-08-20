@@ -294,19 +294,17 @@ corner of the toolkit, worth a skim before debugging anything odd:
     \cs{workspace*}.
 \end{itemize}
 
-\subsection{Decoupling checklist}
+\subsection{Where the scaffolding still shows}
 
-The machinery still carries a little scaffolding from the course it was
-built in. One item remains for a final decoupling pass before any
-standalone handoff: the hardcoded \file{~/.cache/latexmk} aux location in
-\file{build-pdfs}, which should derive its root from
-\texttt{XDG\_CACHE\_HOME} (or drop \texttt{-auxdir} altogether and let
-latexmk write beside the source).
+One piece of scaffolding from the course this was built in is still
+visible in normal use: \file{build-pdfs} writes its auxiliary files under
+\file{~/.cache/latexmk}, a location it does not ask about and you cannot
+configure. Everything still works anywhere -- the directory is created on
+demand, and the path is keyed by each source's repo-relative path so two
+topics' same-named subdirectories never share latexmk state -- but the
+root is fixed rather than derived.
 
-The \texttt{TEMPORARY} babel/blindtext loads that sat at the foot of
-LectureNotes and CourseDocument are \emph{gone}. Nothing had ever called
-\cs{blindtext} -- the filler they were loaded for was never written -- and
-with both classes rebuilt without them, every document in the demo course
-and this manual produce byte-identical page counts and the same diagnostics
-as before. If you want filler while drafting, load \file{blindtext} in the
-document's own preamble rather than in a class.
+Outstanding work on the toolkit, this item included, is listed in
+\file{TODO.md} at the root of the repository. It is kept there rather
+than here so that this manual can stay a description of what the toolkit
+\emph{does}.

@@ -180,8 +180,11 @@
 \newif\ifcheckinmode
 \checkinmodefalse
 
-% How the points render next to the heading. Stylable in one place; the eventual
-% target is the quarry's margin \fbox, but an inline marker is enough for now.
+% How the points render next to the heading. Stylable in one place: the default
+% here is an INLINE marker, which suits a document with no margin rail (lectures,
+% prose); Assessment.cls renews this hook to put the marks in the right margin
+% instead (see its "Marks in the right margin" block). Override the hook, do not
+% branch at the call sites.
 % \ifnum picks "point" vs "points" -- which is also why points must be an INTEGER
 % (see \importproblem): \ifnum and the \addtocounter into the total both need one.
 \newcommand{\ProblemPointsFormat}[1]{%
@@ -1252,7 +1255,9 @@
 \newcommand{\ChoiceLabelFormat}[1]{[#1]}
 
 % The check-in palette: one background per letter, white text on the darker three
-% for contrast (the quarry's flashcard colors, kept exactly). Only A-E are
+% for contrast. These five values are FIXED by classroom use -- students learn the
+% letter-to-colour pairing across a term, so re-tuning them mid-course is worse
+% than leaving them imperfect. Change only the text/background contrast. Only A-E are
 % defined -- a check-in caps at five options; a sixth+ falls back to plain "(F)".
 \definecolor{checkinA}{RGB}{247,244,58}
 \definecolor{checkinB}{RGB}{123,104,238}
