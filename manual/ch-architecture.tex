@@ -294,17 +294,22 @@ corner of the toolkit, worth a skim before debugging anything odd:
     \cs{workspace*}.
 \end{itemize}
 
-\subsection{Where the scaffolding still shows}
+\subsection{Auxiliary files, and who else assumes their location}
 
-One piece of scaffolding from the course this was built in is still
-visible in normal use: \file{build-pdfs} writes its auxiliary files under
-\file{~/.cache/latexmk}, a location it does not ask about and you cannot
-configure. Everything still works anywhere -- the directory is created on
-demand, and the path is keyed by each source's repo-relative path so two
-topics' same-named subdirectories never share latexmk state -- but the
-root is fixed rather than derived.
+\file{build-pdfs} keeps auxiliary files out of your way, under
+\file{\$XDG\_CACHE\_HOME/latexmk/} -- \file{~/.cache/latexmk/} when that
+variable is unset, which is the usual case. The directory is created on
+demand, and the path is keyed by each source's repo-relative path, so two
+topics' same-named subdirectories never share latexmk state.
 
-Outstanding work on the toolkit, this item included, is listed in
-\file{TODO.md} at the root of the repository. It is kept there rather
-than here so that this manual can stay a description of what the toolkit
-\emph{does}.
+That root is worth knowing because it is a \emph{shared} assumption. An
+editor integration that reads the pdflatex \file{.log} to populate a
+quickfix list, or a housekeeping script that prunes old aux files, derives
+the same path independently. If you set \texttt{XDG\_CACHE\_HOME}, they
+have to derive it the same way -- and when they do not, the symptom is
+silence rather than an error, because a log that cannot be read looks the
+same as a build with nothing to report.
+
+Outstanding work on the toolkit is listed in \file{TODO.md} at the root of
+the repository, kept there rather than here so this manual can stay a
+description of what the toolkit \emph{does}.

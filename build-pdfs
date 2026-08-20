@@ -55,12 +55,19 @@
 # with no option at the call site -- see LectureNotes.cls / Assessment.cls.
 #
 # Auxiliary files (.aux/.log/etc.) go to a per-directory folder under
-# ~/.cache/latexmk/ so they clutter neither the repo nor the output directory.
+# $XDG_CACHE_HOME/latexmk/ -- ~/.cache/latexmk/ when that is unset -- so they
+# clutter neither the repo nor the output directory.
 # The folder is keyed by the directory's repo-relative path (so two topics'
 # same-named subdirectories never share latexmk state).
 # Relies on the repo's .latexmkrc to put .course-machinery on TEXINPUTS.
 
 set -uo pipefail
+
+# Where auxiliary files live. Honours XDG_CACHE_HOME; without it, the default is
+# the same ~/.cache path this has always used, so nothing moves for anyone who
+# has not set the variable. NB two other consumers assume this root -- see
+# TODO.md -- so if you ever set XDG_CACHE_HOME, they need to follow.
+cache_root=${XDG_CACHE_HOME:-$HOME/.cache}
 
 # Unwrap pdflatex's 79-column log lines so multi-line warnings keep their
 # "on input line N" tails intact for log parsers -- vim's quickfix reads these
@@ -314,7 +321,7 @@ build_file() {
     # (latexmk's out-dir defaults to cwd) and the .latexmkrc there is picked up.
     cd "$dir" || exit
     auxkey=$(aux_key)
-    auxdir="$HOME/.cache/latexmk/$auxkey-$jobname"
+    auxdir="$cache_root/latexmk/$auxkey-$jobname"
     mkdir -p "$auxdir" || exit
 
     # Output mirror: a governing top-level .MIRRORDIR mirrors the PDF to its base
@@ -379,7 +386,7 @@ build_file() {
           continue
           ;;
       esac
-      varaux="$HOME/.cache/latexmk/$auxkey-$jobname$suffix"
+      varaux="$cache_root/latexmk/$auxkey-$jobname$suffix"
       mkdir -p "$varaux" || exit
       compile_view "$jobname" "$base" "$varaux" "$suffix" "$inject" "$movedir" || exit
       echo "    + $jobname$suffix.pdf ($name)"

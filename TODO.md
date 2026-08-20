@@ -18,18 +18,16 @@ restated here — `CourseBoxes.sty:60` (the colour palette is provisional),
 
 ## Portability and handoff
 
-**`build-pdfs` hardcodes its auxiliary directory.**
-`build-pdfs:317` and `:382` build the latexmk aux path from `$HOME/.cache/latexmk`.
-Anyone running the script only needs *some* writable aux location, so either fix
-is sufficient: derive the root from `${XDG_CACHE_HOME:-$HOME/.cache}` (the
-standard idiom, and `mkdir -p` creates it anywhere), or drop `-auxdir` entirely
-and let latexmk write beside the source — zero configuration, at the cost of
-local clutter. If you fix it, make `build-pdfs` the single source of truth for
-the scheme; anything that reads the log at that path should follow it, not
-duplicate it.
-
-*(The path is keyed by the directory's repo-relative path, not its basename, so
-two topics' same-named subdirectories already cannot collide. That part is done.)*
+**If you set `XDG_CACHE_HOME`, other tools have to follow.**
+`build-pdfs` puts auxiliary files under `${XDG_CACHE_HOME:-$HOME/.cache}/latexmk/`,
+keyed by each source's repo-relative path. Nothing here needs changing — but the
+cache root is a *shared* assumption, and anything else that reads a build log or
+prunes that directory derives the same path independently rather than asking this
+script. If the variable is ever set in an environment where those other tools
+run, they must derive it the same way or they will silently look in the wrong
+place. Editor integrations that parse the `.log` are the ones to check: an
+unreadable log usually means "no errors", not "wrong path", so the failure is
+quiet.
 
 **There is no `LICENSE`.**
 The repository is public and carries no licence terms, which leaves anyone who
