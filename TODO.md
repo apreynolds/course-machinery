@@ -179,17 +179,3 @@ and per-offering data was that they change on different cadences. The open
 question is mechanical: it would be read by every master at three different
 depths, so finding it on `TEXINPUTS` — the way `.latexmkrc` already resolves
 this directory and the text layer — is the obvious next question.
-
----
-
-## Undecided
-
-**Whether to ship editor snippets.**
-A working set of editor snippets for this toolkit's API exists outside the
-repository, covering the boxes, the problem environments, multiple choice and
-matching, the metadata blocks, and workspace. They are useless to anyone else
-where they are, and they are already behind the code — nothing for the fact
-bank, the text-layer macros, the skip-announcement box, or the current metadata
-key names. Shipping them here would make them a maintained part of the toolkit;
-leaving them out keeps this repository to typesetting machinery alone. Not yet
-decided.
