@@ -81,8 +81,14 @@ per-bank commands are thin shims over them.
 - The fonts are **Libertinus** with **newtx** math, so those packages must be
   installed — they are part of a full TeX Live, but not of a minimal one.
   `fontawesome5` and `tcolorbox` likewise.
-- The scripts are **bash**, and the pickers additionally need
-  [`fzf`](https://github.com/junegunn/fzf).
+- The scripts need **bash 4.0 or newer** (they use associative arrays and
+  `mapfile`), and the pickers additionally need
+  [`fzf`](https://github.com/junegunn/fzf). **On macOS this is the one thing
+  likely to trip you up:** the system `/bin/bash` is 3.2 and will always stay
+  there, so install a newer bash (`brew install bash`, or MacPorts) and make sure
+  it precedes `/bin/bash` on your `PATH`. The scripts check, and say so, rather
+  than failing obscurely. Linux distributions and Git Bash on Windows already
+  ship bash 5.
 
 ## Using it in a course
 

@@ -19,6 +19,18 @@
 # Every other argument is forwarded verbatim to `find-<kind> --tsv', so all of
 # its filters and PATH operands work here too, to pre-narrow what is offered.
 
+# Bash 4+ is required (associative arrays, mapfile, ${var,,}). Written in 3.2-
+# compatible syntax and placed before any of those, so an old bash reaches this
+# message instead of failing with "declare: -A: invalid option" further down.
+# macOS still ships bash 3.2 as /bin/bash and always will (it is GPLv2).
+if [ -z "${BASH_VERSINFO:-}" ] || [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+  printf '%s: requires bash 4.0 or newer (running %s).\n' \
+    "${0##*/}" "${BASH_VERSION:-not bash}" >&2
+  printf 'macOS ships bash 3.2; install a newer one (e.g. `brew install bash`)\n' >&2
+  printf 'and make sure it comes before /bin/bash on your PATH.\n' >&2
+  exit 1
+fi
+
 set -uo pipefail
 
 # --kind / --as picked before the main loop (they select the engine and the name
