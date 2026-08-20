@@ -29,6 +29,22 @@
 \RequirePackage{import}
 \RequirePackage{graphicx}
 
+% Tunable lists: `[label=(\alph*)]' for lettered parts, `[nosep]' for tight
+% lists. Both are enumitem options, not stock list features.
+%
+% This is here for PARITY WITH Assessment.cls, which has always loaded it, and
+% the asymmetry was a real bug rather than a stylistic gap: Exercises.sty is
+% loaded by both classes, so a problems/ file is supposed to compile unchanged
+% as a lecture Example and as a test Question. One written with
+% \begin{enumerate}[label=(\alph*)] used to do neither -- it typeset on an
+% assessment and failed on a lecture. A shared bank cannot be context-neutral
+% while the two classes disagree about what a list can do.
+%
+% Prefer \begin{qparts}/\qpart inside a problem file where it fits; it letters
+% the parts itself and carries per-part points and workspace. This is for the
+% lists that are not question parts.
+\RequirePackage{enumitem}
+
 % The exercise system. Two independent packages, essential first:
 %   Exercises  -- \begin{problem}/\begin{solution} + the solutions toggle. A
 %                 lecture imports problem files too, and they may carry solutions.
