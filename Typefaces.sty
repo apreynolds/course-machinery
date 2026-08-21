@@ -50,7 +50,8 @@
 
 % SANS:
 % `sflining' is deliberate and NOT tied to the [osf] option: it is the sole
-% control of sans figures, and \course renders in sans. See FIGURES below.
+% control of sans figures, which is what keeps headings' numerals lining in an
+% osf document. See FIGURES below.
 \RequirePackage[
   sf, sflining, scaled=0.85 % roughly halfway between matching lowercase x (0.8) and uppercase X (0.9)
 ]{merriweather}
@@ -92,13 +93,17 @@
 % independent control, and only the first varies by document type:
 %
 %   serif body prose  -- \useosf, i.e. the [osf] option           <- the only knob
-%   sans (headings, \course) -- merriweather's sflining/sfoldstyle, fixed lining
+%   sans (headings)   -- merriweather's sflining/sfoldstyle, fixed lining
 %   math              -- newtxmath's `libertinus' option; always tabular lining
 %   tabular           -- the \AtBeginEnvironment hook below; always lining
 %
 % \useosf CANNOT reach the sans: it only renews \sfdefault when libertinus' own
 % sans is loaded (libertinus-type1.sty:204-206), which the `serif' option above
-% prevents. That independence is what keeps \course lining under [osf].
+% prevents. So sans figures are independent of the [osf] knob.
+%
+% \course used to exploit exactly that, borrowing the sans purely to reach its
+% pinned figures. It now pins its numerals directly with \liningnums instead --
+% see the bottom of this file -- so the sans row above is about headings alone.
 \ifTypefaces@osf
   \useosf % serif only; must come after the math font is loaded
 \fi
@@ -133,9 +138,20 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TYPEFACE-DEPENDENT STUFF
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \course{1013} -> MATH 1013, in sans. The \sffamily is load-bearing, not
-% decorative: it routes the numerals through merriweather, which is pinned to
-% lining, so course numbers stay lining even in an [osf] document.
+% \course{1013} -> MATH 1013, in the body serif. \liningnums is load-bearing,
+% not decorative: it pins the NUMERALS to Libertinus' lining figures, so a course
+% number stays lining in an [osf] document, where body prose is old-style. That
+% pinning is the whole reason this macro exists; without it \course would just be
+% "#1 #2" and you would type it.
+%
+% CHANGED 2026-08-21: this was {\sffamily #1 #2}, which pinned the numerals
+% INDIRECTLY -- routing them through Merriweather, whose figures this file fixes
+% to lining -- and so had to set the entire designation in sans to reach them,
+% subject word and all. \liningnums does the numeral job directly, which frees
+% the subject to stay in the body serif where it reads as prose rather than as a
+% label. Behaviour under [osf] is unchanged; only the typeface is.
+%
+% The tie is deliberate: a course designation should not break across lines.
 \newcommand{\course}[2][MATH]{%
-  {\sffamily #1 #2}%
+  #1~\liningnums{#2}%
 }

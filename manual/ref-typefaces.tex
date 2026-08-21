@@ -36,17 +36,19 @@ and only the first varies by document type:
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 serif body prose & the \texttt{[osf]} option -- \emph{the only knob}.\\
-sans (headings, \cs{course}) & pinned lining, always.\\
+sans (headings) & pinned lining, always.\\
 math & always lining (newtxmath).\\
 tabular contents & always lining, via an every-\env{tabular} hook.\\
 \end{tabularx}
 \end{center}
 
 So under \texttt{[osf]}, running prose gets old-style figures while course
-numbers, math and tables stay lining -- the sans pinning is what keeps
-\cs{course} lining, since \cs{useosf} cannot reach a sans that Libertinus
-did not load. Local overrides: \cs{liningnums}\texttt{\{2026\}} /
-\cs{oldstylenums}\texttt{\{2026\}}.
+numbers, math and tables stay lining. The sans row is independent of the
+knob because \cs{useosf} cannot reach a sans that Libertinus did not load.
+Local overrides: \cs{liningnums}\texttt{\{2026\}} /
+\cs{oldstylenums}\texttt{\{2026\}} -- and \cs{course} is built on the first
+of those, so its numerals are pinned outright rather than by borrowing the
+sans.
 
 Two caveats on that fourth row. The hook is on \env{tabular} itself, so a
 table built by another package -- \env{longtblr} and the rest of
@@ -63,9 +65,11 @@ global undo to reach for -- Libertinus defines \cs{useosf} and no
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
-\cs{course}\texttt{[MATH]\{1013\}} & the course designation in sans; the
-  optional prefix defaults to MATH. Sans is load-bearing: it routes the
-  numerals through the lining-pinned Merriweather.\\
+\cs{course}\texttt{[MATH]\{1013\}} & the course designation in the body
+  serif, joined by a tie so it cannot break across lines; the optional
+  prefix defaults to MATH. \cs{liningnums} on the number is load-bearing:
+  it is what keeps a course number lining under \texttt{[osf]}, and the
+  only reason the macro exists rather than typing the designation out.\\
 \cs{alphabet} & the measured width of the lowercase alphabet in the real
   body font. Classes set \texttt{textwidth} $= 2.6$\cs{alphabet} ($\approx
   66$ characters, the classic readable measure) -- a \emph{rule} that
