@@ -67,6 +67,23 @@ where a number should read as data, and math and \cs{course} numerals stay
 lining automatically. The full figure policy lives with
 \file{Typefaces.sty} (section~\ref{sec:ref-typefaces}).
 
+Not every prose document wants them, though. A syllabus is only half
+continuous reading: the other half is \emph{data} scanned rather than
+read -- test dates, room numbers, section codes, percentage weights --
+and a page of those in old-style figures reads as restless. When
+\cs{liningnums} starts appearing more often than not, stop reaching for
+it and set the class option instead:
+
+\begin{manexsource}
+\documentclass[11pt,lining]{CourseDocument}
+\end{manexsource}
+
+\noindent It is a class option and not something a preamble can do for
+itself, because Typefaces is loaded during \cs{documentclass} -- by the
+time a document could pass it an option, it is already in. The two
+choices are exclusive: name \texttt{lining} and the class passes exactly
+that to Typefaces in place of \texttt{osf}.
+
 Two things CourseDocument deliberately lacks: the exercise system (a
 syllabus imports no problems -- the class loads no Exercises/Workspace
 machinery), and any use of \cs{workspace}. It \emph{does} carry the

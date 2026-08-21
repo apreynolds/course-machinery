@@ -20,9 +20,11 @@ section~\ref{sec:load-order}.
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \texttt{osf} & old-style figures in serif body text (CourseDocument
-  passes it -- prose documents).\\
+  passes it by default -- prose documents).\\
 \texttt{lining} & the default, spelt out (LectureNotes, Assessment --
-  figures are information).\\
+  figures are information). CourseDocument passes this one instead when
+  given its own \texttt{[lining]} option
+  (section~\ref{sec:ref-coursedocument}).\\
 \end{tabularx}
 \end{center}
 
@@ -45,6 +47,17 @@ numbers, math and tables stay lining -- the sans pinning is what keeps
 \cs{course} lining, since \cs{useosf} cannot reach a sans that Libertinus
 did not load. Local overrides: \cs{liningnums}\texttt{\{2026\}} /
 \cs{oldstylenums}\texttt{\{2026\}}.
+
+Two caveats on that fourth row. The hook is on \env{tabular} itself, so a
+table built by another package -- \env{longtblr} and the rest of
+\file{tabularray}, which is not built on \env{tabular} -- does \emph{not}
+inherit it, and a schedule table full of dates will stay osf under
+\texttt{[osf]}. And when a whole document reads better in lining figures,
+the first row is a per-document choice, not a fixed property of the class:
+CourseDocument's \texttt{[lining]} option
+(section~\ref{sec:ref-coursedocument}) is the switch, because there is no
+global undo to reach for -- Libertinus defines \cs{useosf} and no
+\cs{uselining} twin.
 
 \subsection*{Commands and lengths}
 

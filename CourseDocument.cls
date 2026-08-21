@@ -5,6 +5,22 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newif\ifLegalPaper
 \DeclareOption{legalpaper}{\LegalPapertrue}
+
+% [lining] -- opt OUT of the old-style body figures below. osf is right for
+% continuous prose but clunky in a document that is mostly *data* read at a
+% glance: dates, room numbers, section codes, percentages. A syllabus is both,
+% and which one dominates is a per-document judgement, so it is a class option
+% rather than a fixed property of the class.
+%
+% This has to live here because a DOCUMENT cannot reach it: Typefaces is loaded
+% during \documentclass, so by the time a preamble could say
+% \PassOptionsToPackage{lining}{Typefaces} the package is already in. Nor is
+% there a global undo -- Libertinus defines \useosf and no \uselining twin
+% (libertinus-type1.sty:204), which is why the only alternative was
+% \liningnums{...} at every single call site.
+\newif\ifLiningFigures
+\DeclareOption{lining}{\LiningFigurestrue}
+
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
 
 % Options must reach xcolor before any other package loads it.
@@ -16,11 +32,20 @@
 \RequirePackage{import}
 \RequirePackage{graphicx}
 
-% [osf] -- prose-heavy documents get old-style figures in body text.
+% [osf] -- prose-heavy documents get old-style figures in body text; [lining]
+% above flips this document back to lining. Exactly one of the two options is
+% passed, deliberately: passing both would work (Typefaces processes its options
+% in DECLARED order, so `lining' would win as the later declaration), but only by
+% accident of that file's line order, which is not a thing to depend on.
+%
 % Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs,
 % and defines \alphabet (measured in the real body font -- so it must come
 % after \LoadClass, and the geometry below must come after it).
-\RequirePackage[osf]{Typefaces}
+\ifLiningFigures
+  \RequirePackage[lining]{Typefaces}
+\else
+  \RequirePackage[osf]{Typefaces}
+\fi
 \RequirePackage{Titling}
 \RequirePackage{Hyperlinks}
 

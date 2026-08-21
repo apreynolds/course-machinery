@@ -1,8 +1,9 @@
 \section{CourseDocument.cls}\label{sec:ref-coursedocument}
 
 The prose class: syllabus, TA information, policies -- and this manual.
-Article-based. Loads Typefaces \texttt{[osf]} (the only class with
-old-style body figures), Titling, Hyperlinks and InstructorNotes; no
+Article-based. Loads Typefaces \texttt{[osf]} by default (the only class
+with old-style body figures; \texttt{[lining]} opts out), Titling,
+Hyperlinks and InstructorNotes; no
 exercise machinery (a syllabus imports no problems -- add the packages in
 the preamble if a prose document ever needs them, as this manual does).
 Workflow: section~\ref{sec:prose-documents}.
@@ -12,6 +13,13 @@ Workflow: section~\ref{sec:prose-documents}.
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \texttt{legalpaper} & legal stock.\\
+\texttt{lining} & lining figures in body prose, instead of the class's
+  default old-style. For a prose document that is substantially
+  \emph{data} -- a syllabus of dates, room numbers, section codes and
+  percentages -- where osf reads as clunky. Forwarded to Typefaces
+  (section~\ref{sec:ref-typefaces}); it must be a class option because a
+  document cannot reach Typefaces, which is loaded during
+  \cs{documentclass}.\\
 \emph{(other)} & forwarded to \file{article} (\texttt{11pt},
   \texttt{twoside}, \dots).\\
 \end{tabularx}
