@@ -64,6 +64,14 @@ loads too, not merely after the class
   sets its identity colour). Read late, so overrides anywhere in the
   preamble win.\\
 \cs{UrlColor} & external URLs (default \texttt{RoyalBlue}).\\
+\cs{secref}\texttt{\{label\}} & a cross-reference by \emph{name}, not
+  number: ``the Exemptions section'', linked on the title. Numbers belong
+  on headings and in the table of contents, where they index; in a
+  sentence they make the reader hold a coordinate and go hunting.\\
+\cs{SecRefFormat}\texttt{\{linked title\}} & that wording, in one hook
+  (default \texttt{the \#1 section}). Note ``the'' lives \emph{inside} it,
+  so call sites write \cs{secref} bare --- ``see the \cs{secref}\ldots''
+  renders ``the the''.\\
 \cs{demo}\texttt{[tool]\{URL\}} & a link out to an interactive tool; see
   below.\\
 \cs{DemoLabel}, \cs{DemoMarker} & the student-facing wording

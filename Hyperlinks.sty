@@ -48,6 +48,35 @@
 % Both are gone; nothing else referenced them.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \secref -- A CROSS-REFERENCE BY NAME
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   ...for online assessments (see \secref{sec:webwork}).
+%       -> ...for online assessments (see the WeBWorK section).
+%
+% NO NUMBER, deliberately. A bare "see 3.4" makes the reader hold a coordinate
+% and go hunting; the title tells them what they are being sent to, which is the
+% thing they actually wanted to know. Numbers stay on the headings and in the
+% table of contents, where they are an index rather than a sentence.
+%
+% But the number was also doing a second job -- signalling "this is a pointer" --
+% and dropping it alone turns half a syllabus circular: "we use WeBWorK for
+% assessments (see WeBWorK)", "five biweekly Tests (see Tests)". That is what the
+% surrounding words are for. Same split as \demo below: the FORMAT hook owns the
+% wording, the macro owns the linking, and only the title goes inside the link,
+% because "the" and "section" are not part of what is being named.
+%
+% THE "the" IS INSIDE THE HOOK. Write `see \secref{x}', never `see the
+% \secref{x}' -- the latter renders "the the WeBWorK section". A reference whose
+% grammar the hook cannot produce (a plural, "sections A and B") should be
+% written out by hand rather than bent into this.
+%
+% \nameref does NOT exist yet at this point in the file: it arrives with hyperref,
+% which the block above defers to \AtEndPreamble. Harmless -- \secref is a body
+% macro and nothing here is evaluated until the document proper.
+\providecommand{\SecRefFormat}[1]{the #1 section}
+\newcommand{\secref}[1]{\SecRefFormat{\hyperref[#1]{\nameref*{#1}}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \demo -- LINK OUT TO AN INTERACTIVE TOOL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %   \demo{https://www.desmos.com/calculator/xxxxxxxx}
