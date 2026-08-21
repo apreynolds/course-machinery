@@ -76,9 +76,14 @@
 %
 % Lives here rather than in TextRef.sty deliberately: a demo link has nothing to
 % do with the textbook (it is your own Desmos page as often as not), and
-% Hyperlinks is loaded by both LectureNotes and CourseDocument, so \demo works
-% in a syllabus too. Assessment loads no hyperref -- correctly, since a link on
-% printed paper is a dead end -- and therefore has no \demo.
+% Hyperlinks is loaded by LectureNotes, CourseDocument AND Assessment, so \demo
+% works in a syllabus and in a worked solution too.
+%
+% Assessment was the late arrival, and the reason it used to be excluded is
+% worth keeping: a link on printed paper is a dead end. That judges the class by
+% its student paper alone, though -- the -SOLUTIONS and -INSTRUCTOR copies are
+% read on screen, and a solution is the natural home for "here is the graph
+% moving". Put \demo in solutions, not in question stems.
 
 % Knobs. The marker is \triangleright rather than the heavier \blacktriangleright
 % because the latter is an amssymb symbol and this package deliberately requires

@@ -78,11 +78,30 @@
 
 % \textbookref, and the auto-load of the course's text layer (.textbook/
 % textbook.tex, found by name; it calls \DeclareTextBase/\SetDefaultText/
-% \DeclareSection unguarded, which is safe from an assessment master too). This
-% class loads no hyperref -- correctly, a link on printed paper being a dead end
-% -- so references here degrade to their plain text, which is the whole point of
-% the mechanism. See TextRef.sty.
+% \DeclareSection unguarded, which is safe from an assessment master too).
+% See TextRef.sty.
 \RequirePackage{TextRef}
+
+% hyperref (configured) and \demo. REVERSES an earlier decision, recorded here
+% because the old reasoning still reads persuasively:
+%
+%   "This class loads no hyperref -- correctly, a link on printed paper being a
+%    dead end -- so references here degrade to their plain text."
+%
+% True of the STUDENT PAPER, and false of the other things this class builds.
+% A -SOLUTIONS or -INSTRUCTOR copy is read on screen, and a worked solution is
+% exactly where a link to an interactive graph earns its keep. The old rule
+% judged the class by its printed output alone.
+%
+% Cheap, and not a new combination: LectureNotes has always loaded Exercises and
+% Hyperlinks together, so hyperref coexisting with Exercises' \@currentlabel
+% handling is the proven configuration rather than an experiment. xcolor's
+% dvipsnames is already secured by Exercises above, which is the one ordering
+% constraint Hyperlinks states.
+%
+% On a printed student paper an unclicked \demo is simply coloured text, which
+% is why it belongs in solutions rather than in question stems.
+\RequirePackage{Hyperlinks}
 
 % No [osf] -- assessments must read clearly and standardly; figures stay lining.
 % Typefaces loads amsmath (and amsthm) itself, in the order newtxmath needs.
