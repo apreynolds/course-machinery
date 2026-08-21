@@ -29,12 +29,20 @@ Workflow: section~\ref{sec:prose-documents}.
 \subsection*{Colours, one name}
 
 The course identity colour is named once -- \env{CourseIdentity}, a
-mahogany -- and everything derives from it: \env{HeadingColor} and
-\env{TitleColour} (darkened blends), internal link colour, headings.
-Restyling a course document is a one-line \cs{colorlet}. The identity is
-deliberately not green: green means \emph{solutions / not for students}
-across the toolkit (\env{SolutionColor}), and a student-facing document
-must not read as green.
+mahogany -- and it is the colour that prints: headings, the title block
+and internal links all carry it unmodified, so restyling a course
+document is a one-line \cs{colorlet}. \env{HeadingColor} and
+\env{TitleColour} are aliases of it rather than shades of it; they exist
+only because titlesec, Titling and hyperref each want a colour \emph{name}
+to expand at use. The identity is deliberately not green: green means
+\emph{solutions / not for students} across the toolkit
+(\env{SolutionColor}), and a student-facing document must not read as
+green.
+
+If a restyle ever does want a darker heading, mix with lowercase
+\env{black} -- xcolor's grey, which darkens in RGB and holds the hue.
+Capital \env{Black} is dvipsnames cmyk $(0,0,0,1)$: it mixes in CMYK and
+raises $K$, greying the colour as it darkens.
 
 \subsection*{Page styles}
 

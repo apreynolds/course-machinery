@@ -97,15 +97,37 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % COLOURS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% The identity colour is named ONCE here and derived everywhere it appears
-% (title, headings, hyperref linkcolor), so it can be changed in one place.
+% The identity colour is named ONCE here, and it is the colour that actually
+% PRINTS -- change this line and every coloured mark in the document follows.
 % NOT green: green means "solutions / not for students" (SolutionColor in
 % Exercises.sty), so a student-facing course document must not read as green.
-% Mahogany is the rich brownish-red choice.
+% Mahogany is a dark, part-desaturated red -- hue 1 degree, #A61916 -- which is
+% what gives it its brownish cast; it is not a brown.
+%
+% HeadingColor and TitleColour are plain ALIASES, not shades. They exist because
+% the machinery reaches for a colour by NAME, not because anything is derived:
+% titlesec expands \color{HeadingColor} at each heading, Titling expands
+% \color{TitleColour} at \maketitle, and \LinkColor below hands the name
+% `HeadingColor' to \hypersetup. Nothing transforms them.
+%
+% RETIRED 2026-08-21: HeadingColor and TitleColour used to be Black!20! and
+% Black!40! blends of CourseIdentity. Those were the ONLY two uses of
+% CourseIdentity in the toolkit and both darkened it, so the declared identity
+% colour was a value that never appeared in any PDF while the two shades that did
+% appear went unnamed -- a derivation with a population of two, three lines
+% away. The title's extra darkness was also a distinction used exactly once, and
+% \maketitle already signals rank by size and weight.
+%
+% (If a future restyle does want a darker heading, mix with LOWERCASE `black' --
+% xcolor's grey, which darkens in RGB and holds the hue. Capital `Black' is
+% dvipsnames cmyk (0,0,0,1): it mixes in CMYK and raises K, so it greys the red
+% as it darkens, which is how the old Black!20! blend lost 17 points of
+% saturation. Undarkened Mahogany is 7.6:1 on white, so there is no legibility
+% pressure to darken at all.)
 \RequirePackage{xcolor}
 \colorlet{CourseIdentity}{Mahogany}
-\colorlet{HeadingColor}{Black!20!CourseIdentity}
-\colorlet{TitleColour}{Black!40!CourseIdentity}
+\colorlet{HeadingColor}{CourseIdentity}
+\colorlet{TitleColour}{HeadingColor}
 
 % Titling hooks: this is the class that colours, and the one that stamps a time.
 \renewcommand{\TitleColor}{\color{TitleColour}}
