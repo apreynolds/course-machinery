@@ -9,7 +9,30 @@ The shared title block for LectureNotes and CourseDocument -- title,
 subtitle, ``Updated $\langle$date$\rangle$'' -- structure written once,
 class differences reduced to hooks. (Assessment deliberately does not load
 it: an assessment opens with \cs{AssessmentTitle}, a different artefact.)
-Also home of \file{datetime2}, the date's formatter.
+Also home of \file{datetime2}, the date's formatter, loaded
+\texttt{[en-GB,calc]}.
+
+Both of those matter beyond \cs{@date}. \texttt{ord=raise} is set here, so
+\emph{every} date the toolkit sets gets a superscripted ordinal suffix ---
+\emph{3\textsuperscript{rd}}, not \emph{3rd} --- without a document ever
+saying \cs{textsuperscript}. And \texttt{calc} loads the module that
+computes a day-of-week index, which is what lets a document name a weekday:
+
+\begin{manexsource}
+\DTMsavedate{withdrawal}{2026-11-03}
+...the last day to withdraw is
+  {\DTMsetup{showdow}\DTMusedate{withdrawal}}.   % Tuesday 3rd November, 2026
+\end{manexsource}
+
+The braces are load-bearing: \texttt{showdow} is a boolean, so grouping it
+keeps the weekday on that date and off the \emph{Updated} line. The option
+has to be passed \emph{here} rather than by the document, because datetime2
+is loaded during \cs{documentclass} and disables its own \texttt{calc} key
+straight afterwards --- there is no way to ask for it late. It is opt-in
+upstream because it costs \file{pgfkeys} $+$ \file{pgfcalendar}; here it
+costs \file{pgfcalendar} alone, since both classes loading this file already
+carry \file{pgfkeys} via \file{tcolorbox}. Assessment pays nothing, loading
+neither this file nor datetime2.
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}

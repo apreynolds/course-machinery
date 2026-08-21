@@ -12,7 +12,24 @@
 
 % datetime2 is \@date's formatter, so it belongs with the title block rather
 % than in either class.
-\RequirePackage[en-GB]{datetime2}
+%
+% [calc] loads the datetime2-calc module, which is what computes a day-of-week
+% index from a date. Without it \ifDTMshowdow has nothing to print and
+% \DTMsetup{showdow} is an error, so a document that wants "Tuesday 3rd
+% November, 2026" cannot get there on its own: datetime2 is loaded during
+% \documentclass, and datetime2 disables its `calc' key immediately afterwards
+% (datetime2.sty:217), so no preamble can ask for it late. Passing it here is
+% the only place the decision can be made.
+%
+% It is opt-in upstream because it costs pgfkeys + pgfcalendar. Here it costs
+% pgfcalendar alone -- both classes that load this file are already carrying
+% pgfkeys via tcolorbox/tikz -- and tests pay nothing either way, since
+% Assessment.cls loads neither this file nor datetime2.
+%
+% ord=raise is what superscripts an ordinal suffix (the en-GB module renders it
+% as \DTMtexorpdfstring{\protect\textsuperscript{#1}}{#1}, so PDF bookmarks stay
+% plain text). It applies to every date the toolkit sets, \@date included.
+\RequirePackage[en-GB,calc]{datetime2}
 \DTMlangsetup[en-GB]{ord=raise,monthyearsep={,\space}}
 
 \newcommand*{\subtitle}[1]{\gdef\@subtitle{#1}}
