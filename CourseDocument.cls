@@ -32,6 +32,17 @@
 \RequirePackage{import}
 \RequirePackage{graphicx}
 
+% Tunable lists: `[nosep]' for tight lists, `[parsep=,itemsep=]' for the
+% loosely-spaced ones a policy document wants. Both are enumitem options, not
+% stock list features.
+%
+% This class was the last of the three without it, and that was the wrong way
+% round: a syllabus is more list than prose -- marking schemes, test policies,
+% plagiarism definitions, FAQ -- so the class whose documents lean hardest on
+% tunable lists was the one making every document \usepackage it by hand. Loaded
+% here, before parskip, matching where LectureNotes and Assessment put it.
+\RequirePackage{enumitem}
+
 % [osf] -- prose-heavy documents get old-style figures in body text; [lining]
 % above flips this document back to lining. Exactly one of the two options is
 % passed, deliberately: passing both would work (Typefaces processes its options
