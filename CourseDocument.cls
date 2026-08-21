@@ -43,6 +43,21 @@
 % here, before parskip, matching where LectureNotes and Assessment put it.
 \RequirePackage{enumitem}
 
+% Tables, on the same reasoning: a syllabus is more list AND TABLE than prose --
+% a grade scale, an instructor/section roster, a TA/room roster, a term schedule
+% -- so the class carries the table package rather than each document loading it.
+% Not in LectureNotes or Assessment: neither is table-shaped, and tabularray is a
+% heavy load (expl3) to hand a class that would not use it.
+%
+% The tabular-vs-tblr figure gap is real but does not bite here: Typefaces pins
+% lining figures with \AtBeginEnvironment{tabular}, and tblr is not built on
+% tabular, so a tblr full of dates stays osf under [osf]. Documents that are
+% substantially data pass [lining] anyway, which is the actual fix.
+%
+% Load position is free: Hyperlinks defers hyperref to \AtEndPreamble
+% (Hyperlinks.sty:33), so this is in well before hyperref either way.
+\RequirePackage{tabularray}
+
 % [osf] -- prose-heavy documents get old-style figures in body text; [lining]
 % above flips this document back to lining. Exactly one of the two options is
 % passed, deliberately: passing both would work (Typefaces processes its options
