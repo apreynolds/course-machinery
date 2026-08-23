@@ -164,12 +164,41 @@ trick, sentinel-valued, is why a stray \cs{label} on an aside prints
 \texttt{[unlabelled aside]} instead of silently grabbing the section
 number.)
 
-\subsubsection*{The text layer: .textbook/}
+\subsubsection*{Where course-specific things live: three tiers}
+
+Everything a document loads sits in one of three places, and one question
+decides which: \emph{is this shared across files?}
+
+\begin{manexsource}
+.course-machinery/        machinery shared across COURSES (this submodule)
+.course-machinery-local/  machinery specific to ONE course but still shared
+                          across files, so it must be findable from any depth
+beside the document       used only by the documents in one directory --
+                          found in the cwd, never on a search path
+\end{manexsource}
+
+Only the first two are search paths, and putting them there is the entire
+content of \file{.latexmkrc}. The third needs no help: TeX looks in the
+current directory first and \file{build-pdfs} has already put the build
+there. A package that draws a course's tables, together with the CSV files
+it reads, is tier three whenever the only documents that load it sit in the
+same folder.
+
+This is not a filing preference; it is the answer to a mechanical question.
+A file belongs on \env{TEXINPUTS} exactly when its readers sit at depths it
+cannot predict --- and it should stay off otherwise, because every entry
+widens what a bare name can resolve to. When a file's readership changes,
+it changes tier: that is a move, not a rewrite, since nothing anywhere
+names it by path.
+
+\subsubsection*{The text layer, tier two's first tenant}
 
 The shared machinery draws a deliberate line: vocabulary every text has
 (theorem, definition, \dots) and the author's own asides ship in
 CourseBoxes; anything \emph{specific to one text} lives in the course's
-own \textbf{text layer}, \file{.textbook/textbook.tex}.
+own \textbf{text layer}, \file{.course-machinery-local/textbook.tex}. It
+is tier two because every lecture in every topic folder needs it, at
+whatever depth those sit.
 
 \textbf{The membership test} is one question: \emph{would you look at the
 textbook to set this value?} ``Key Idea'' is what APEX calls its flagged
@@ -192,7 +221,8 @@ worth drawing:
 \DeclareSection{1.3}{sec_limit_analytically.html}   % cross-references only
 \end{manexsource}
 
-No master \cs{input}s it. \file{.latexmkrc} puts \file{.textbook/} on
+No master \cs{input}s it. \file{.latexmkrc} puts
+\file{.course-machinery-local/} on
 \env{TEXINPUTS}, so the file is found by \emph{name} and loaded at the end
 of the preamble, which is early enough for \cs{newtheorem}. That is what
 frees a lecture to sit at any depth: no master carries a \texttt{../..}
@@ -229,12 +259,13 @@ built on one book never loads the other's
 (section~\ref{sec:ref-textref}).
 
 \textbf{Why a folder.} It is the boundary of what the build can see. The
-whole mechanism rests on \file{.textbook/} being on \env{TEXINPUTS}, and
-naming the folder rather than the course root is what keeps that exposure
-narrow: only \file{.textbook/*.tex} becomes findable by bare name, so
-nothing else in the course can be picked up by accident. The folder also
-stops being an oddity as soon as a course has two books, since then it
-holds \file{apex.tex} and \file{openstax.tex} side by side.
+whole mechanism rests on \file{.course-machinery-local/} being on
+\env{TEXINPUTS}, and naming the folder rather than the course root is what
+keeps that exposure narrow: only what is deposited there becomes findable
+by bare name, so nothing else in the course can be picked up by accident.
+That narrowness is why the tier is a folder at all rather than a habit ---
+and it is why the folder is named for its \emph{role} rather than for the
+text layer that was once its only occupant.
 
 To restyle course-wide, prefer the named extension points -- the
 \env{cb/*} tcolorbox styles and \env{cb*} head styles

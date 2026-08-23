@@ -6,20 +6,21 @@ reference layout:
 
 \begin{manexsource}
 course-demo/
-  .course-machinery/   the toolkit (classes, packages, scripts)
-  .latexmkrc           puts the machinery and .textbook on TEXINPUTS
-  .MIRRORDIR           optional PDF mirror destination
-  .textbook/           the text layer: what a book names things,
-    textbook.tex       and where it lives online. This one is the
-    openstax.tex       course default; a second file is a second book,
-                       chosen per lecture with \usetext
-  derivatives/         a topic (a course has several, same shape)
-    problems/          problem bank: one problem per file
-    lectures/          LectureNotes masters (+ .latexmkrc)
-    facts/             fact bank: one tagged snippet per file
+  .course-machinery/        the toolkit (classes, packages, scripts)
+  .course-machinery-local/  machinery for THIS course, shared across files
+    textbook.tex            the text layer: what a book names things and
+    openstax.tex            where it lives online. The first is the course
+                            default; a second file is a second book, chosen
+                            per lecture with \usetext
+  .latexmkrc                puts both machinery folders on TEXINPUTS
+  .MIRRORDIR                optional PDF mirror destination
+  derivatives/              a topic (a course has several, same shape)
+    problems/               problem bank: one problem per file
+    lectures/               LectureNotes masters (+ .latexmkrc)
+    facts/                  fact bank: one tagged snippet per file
     images/
-  _assessment/         Assessment masters (+ .latexmkrc)
-  _syllabus/           CourseDocument masters (+ .latexmkrc)
+  _assessment/              Assessment masters (+ .latexmkrc)
+  _syllabus/                CourseDocument masters (+ .latexmkrc)
 \end{manexsource}
 
 Three document classes cover every document a course produces -- when you
@@ -48,8 +49,11 @@ each).
 Documents name their class plainly -- \cs{documentclass}\texttt
 {\{LectureNotes\}} -- and never spell out where it lives. The
 \file{.latexmkrc} in each \file{.tex}-holding directory makes that work: it
-walks up to the repo root and puts \file{.course-machinery//} on
-\env{TEXINPUTS} for that build. The copies are identical; creating a new
+walks up to the repo root and puts \file{.course-machinery//} and
+\file{.course-machinery-local/} on \env{TEXINPUTS} for that build --- the
+two tiers of machinery that are shared across files. Everything else a
+document loads sits beside it and is found in the cwd
+(section~\ref{sec:extending}). The copies are identical; creating a new
 topic folder means copying one file in.
 
 Cross-file inclusion uses the \file{import} package's relative paths, so one
@@ -58,7 +62,8 @@ source serves every consumer. A lecture and the quiz pull the \emph{same}
 beside it, \file{../derivatives/problems/} from the repo root -- and any
 images that file loads resolve against the \emph{file's own} directory.
 
-The one course-wide content file is \file{.textbook/textbook.tex}, the
+The one course-wide content file is
+\file{.course-machinery-local/textbook.tex}, the
 \emph{text layer}: everything that depends on which book the course is
 taught from -- the named result boxes it uses (APEX's ``Key Idea''), the
 noun lectures call an example, and the base URL the book lives at.

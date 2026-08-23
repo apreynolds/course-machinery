@@ -26,7 +26,7 @@ just the sections a course actually points at.
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{usetext}\texttt{\{apex\}} & in a master's preamble: this document is
-  an \emph{apex} document. Loads \file{.textbook/apex.tex}.\\
+  an \emph{apex} document. Loads \file{.course-machinery-local/apex.tex}.\\
 \cs{DeclareTextBase}\texttt{\{name\}\{URL\}} & where a book lives; every
   page is appended to it verbatim, so include the trailing slash.\\
 \cs{SetDefaultText}\texttt{\{name\}} & the book assumed when a lecture
@@ -100,13 +100,14 @@ independent; the filename carries one, this line the other.
 
 \subsection*{Loading the text layer}
 
-A course's text data lives in \file{.textbook/}, and \textbf{no master
-\cs{input}s it by path.} \file{.latexmkrc} puts that one folder on
+A course's text data lives in \file{.course-machinery-local/}, the course's
+tier-two machinery folder (section~\ref{sec:extending}), and \textbf{no
+master \cs{input}s it by path.} \file{.latexmkrc} puts that one folder on
 \env{TEXINPUTS}, so the file is found \emph{by name} from any depth. That
 is what lets a lecture sit anywhere in the tree: there is no \texttt{../..}
 in a master to keep true to the folder layout, and moving a file deeper or
-shallower breaks nothing. Only \file{.textbook/*.tex} is exposed this way,
-not the rest of the course.
+shallower breaks nothing. Only what is deposited in that folder is exposed
+this way, not the rest of the course.
 
 Which file loads depends on what the master says:
 
@@ -117,8 +118,10 @@ Which file loads depends on what the master says:
   \item \cs{usetext}\texttt{\{apex\}} --- loads \file{apex.tex} instead.
     For a course drawing chapters from more than one book.
   \item Neither, and no \file{textbook.tex} --- nothing loads, and nothing
-    breaks. A course with no online text needs no \file{.textbook/} folder
-    at all; \cs{booksection} still sets the head.
+    breaks. A course with no online text needs no text layer at all, and
+    may have no \file{.course-machinery-local/} folder either if nothing
+    else of its own is shared across files; \cs{booksection} still sets
+    the head.
 \end{itemize}
 
 \textbf{The presence of \file{textbook.tex} is what declares whether the
@@ -228,8 +231,8 @@ easy thing to get wrong. A lecture that says
 \cs{usetext}\texttt{\{openstax\}} never loads the other book's file, so
 that file's \cs{DeclareSection} entries are simply unavailable to it. Each
 text file therefore carries the sections \emph{its own} lectures point at.
-The demo repo shows the whole arrangement: \file{.textbook/textbook.tex}
-and \file{.textbook/openstax.tex} side by side, with a lecture built on
+The demo repo shows the whole arrangement: \file{.course-machinery-local/textbook.tex}
+and \file{.course-machinery-local/openstax.tex} side by side, with a lecture built on
 each.
 
 One thing still cannot be shared between two books in a single document:

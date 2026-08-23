@@ -174,6 +174,25 @@ Genuinely open, if this is ever built:
 handful of per-term facts that are not per-text). Sequenced deliberately after
 the text layer shrank to almost nothing, since the objection to merging per-text
 and per-offering data was that they change on different cadences. The open
-question is mechanical: it would be read by every master at three different
+question was mechanical: it would be read by every master at three different
 depths, so finding it on `TEXINPUTS` — the way `.latexmkrc` already resolves
-this directory and the text layer — is the obvious next question.
+this directory and the text layer — was the obvious next question.
+
+> **Answered, 2026-08-23, by the tier rule** (see the architecture chapter,
+> *Where course-specific things live*). A file goes on `TEXINPUTS` exactly when
+> its readers sit at depths it cannot predict; otherwise it lives beside the
+> documents that load it. So the setup file needs no new mechanism — it is
+> tier two if genuinely course-wide, tier three if not, and moving between
+> them is a `git mv` because nothing names it by path.
+>
+> **Worked example, math1003.** `courseinfo.sty` is exactly this file:
+> `\coursenum`, `\courseterm`, the withdrawal date. It landed in **tier
+> three**, beside the syllabus/schedule/roster documents, because those turned
+> out to be its only readers — the guess that every master would want it was
+> wrong. It carries a documented promotion path for the day a lecture title
+> page or a test header wants course identity. It is a `.sty` rather than data
+> only because `\DTMsavedate` needs `\usepackage` timing.
+>
+> The cadence objection that sequenced this item also resolved, and not as
+> expected: per-term facts and per-text facts were never the axis that
+> mattered. The axis is *how many directories read the file*.

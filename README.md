@@ -105,6 +105,13 @@ master never refers to the machinery by relative path, so nothing about the
 tree's shape is baked into a document. Nothing needs to be installed into your
 TeX tree.
 
+The same file puts `.course-machinery-local/` on the path beside it. That is
+where a course keeps machinery of its *own* that more than one directory has to
+find — the text layer above all. Anything only one directory's documents load
+goes beside those documents instead and needs no path entry at all. The manual's
+architecture chapter states the rule; it is the one question that decides where
+a new file goes.
+
 To build, run `build-pdfs` inside the directory you want to compile:
 
 ```sh

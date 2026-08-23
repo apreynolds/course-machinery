@@ -19,15 +19,15 @@
 %%%
 %%%     WHICH FAMILY a name belongs to is a per-TEXT call, made in the text layer,
 %%%     not here: "Key Idea" is a numbered result in APEX (declared with
-%%%     \NewTextResult in .textbook/textbook.tex) and a plain aside in a course
+%%%     \NewTextResult in the text layer) and a plain aside in a course
 %%%     whose text does not number it. The factory you declare it with IS the
 %%%     decision -- including whether it reaches a table of contents.
 %%%
 %%% This file ships the FACTORY plus a UNIVERSAL default vocabulary. Text-specific
 %%% names (Key Idea, Axiom, ...) are declared in the course's own TEXT LAYER
-%%% (.textbook/textbook.tex, auto-loaded by name via TextRef; no master \input's
-%%% it) -- NOT here (this is the shared submodule; a single text's vocabulary is
-%%% not shared).
+%%% (.course-machinery-local/textbook.tex, auto-loaded by name via TextRef; no
+%%% master \input's it) -- NOT here (this is the shared submodule; a single
+%%% text's vocabulary is not shared).
 %%%
 %%% CONTRACT (load order):
 %%%   - amsthm must ALREADY be loaded. In our classes newtxmath's [amsthm] option

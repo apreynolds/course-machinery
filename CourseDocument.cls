@@ -76,8 +76,8 @@
 \RequirePackage{Hyperlinks}
 
 % \textbookref -- links into the course text (a syllabus cites the book as much
-% as a lecture does). Mechanism only; the manifest is course data, in
-% .textbook/textbook.tex.
+% as a lecture does). Mechanism only; the manifest is course data, in the
+% course's own text layer (.course-machinery-local/textbook.tex).
 \RequirePackage{TextRef}
 
 % Instructor-only notes layer, shared with LectureNotes. AFTER Typefaces: this is

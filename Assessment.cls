@@ -76,9 +76,10 @@
 % Shared with LectureNotes -- both need copious writing room, unlike CourseDocument.
 \RequirePackage{Workspace}
 
-% \textbookref, and the auto-load of the course's text layer (.textbook/
-% textbook.tex, found by name; it calls \DeclareTextBase/\SetDefaultText/
-% \DeclareSection unguarded, which is safe from an assessment master too).
+% \textbookref, and the auto-load of the course's text layer
+% (.course-machinery-local/textbook.tex, found by name; it calls
+% \DeclareTextBase/\SetDefaultText/\DeclareSection unguarded, which is safe from
+% an assessment master too).
 % See TextRef.sty.
 \RequirePackage{TextRef}
 
