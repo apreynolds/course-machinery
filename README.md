@@ -98,12 +98,27 @@ Add this repository as a submodule at the top of the course repo:
 git submodule add https://github.com/apreynolds/course-machinery.git .course-machinery
 ```
 
-Then copy the demo's `.latexmkrc` into every directory that holds `.tex` files.
-It walks *up* from the build directory to the nearest `.course-machinery/` and
-puts it on `TEXINPUTS`, which is what lets the same file work at any depth — a
-master never refers to the machinery by relative path, so nothing about the
-tree's shape is baked into a document. Nothing needs to be installed into your
-TeX tree.
+Every directory you build in needs a `.latexmkrc`, because latexmk reads only
+the one in its startup directory and never walks up. **`build-pdfs` installs it
+for you** — it copies `latexmkrc-shared` from this repo into each source's own
+directory before compiling, so a new topic folder needs no manual step. Copy it
+in by hand only if you intend to build a directory without ever running the
+script there.
+
+The file walks *up* from the build directory to the nearest
+`.course-machinery/` and puts it on `TEXINPUTS`, which is what lets one
+identical copy work at any depth — a master never refers to the machinery by
+relative path, so nothing about the tree's shape is baked into a document.
+Nothing needs to be installed into your TeX tree.
+
+The copies are verbatim and refreshed whenever the master changes, so an edit to
+`latexmkrc-shared` propagates on the next build. A copy carries a `managed by
+build-pdfs` marker line; delete that line and the script will never touch that
+copy again, which is how a directory keeps a hand-tuned rc.
+
+*Upgrading an existing course:* copies predating this scheme have no marker line,
+so `build-pdfs` treats them as hand-tuned and leaves them alone. Delete them once
+and the next build installs the current file.
 
 The same file puts `.course-machinery-local/` on the path beside it. That is
 where a course keeps machinery of its *own* that more than one directory has to

@@ -24,6 +24,10 @@ output & nearest ancestor \file{.MIRRORDIR} (bare base path $+$ optional
   \file{SAMPLE-MIRRORDIR} is the template.\\
 aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
   key}$\rangle$-$\langle$\emph{job}$\rangle$.\\
+\file{.latexmkrc} & installed in each source's directory from
+  \file{latexmkrc-shared} before compiling, when missing or out of date.
+  A copy without the \texttt{managed by build-pdfs} marker line counts as
+  hand-tuned and is left alone.\\
 \end{tabularx}
 \end{center}
 

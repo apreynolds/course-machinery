@@ -59,7 +59,13 @@
 # clutter neither the repo nor the output directory.
 # The folder is keyed by the directory's repo-relative path (so two topics'
 # same-named subdirectories never share latexmk state).
-# Relies on the repo's .latexmkrc to put .course-machinery on TEXINPUTS.
+# TEXINPUTS comes from a .latexmkrc in the build directory, and this script
+# installs it: latexmk reads only the rc in its startup directory and never walks
+# up, so before compiling, build-pdfs drops a verbatim copy of
+# .course-machinery/latexmkrc-shared into the source's own directory whenever the
+# one there is missing or out of date. A new topic folder therefore needs no
+# manual step. A copy whose `managed by build-pdfs' marker line has been deleted
+# is treated as hand-tuned and never touched.
 
 # Bash 4+ is required (associative arrays, mapfile, ${var,,}). Written in 3.2-
 # compatible syntax and placed before any of those, so an old bash reaches this
@@ -80,6 +86,11 @@ set -uo pipefail
 # has not set the variable. NB two other consumers assume this root -- see
 # TODO.md -- so if you ever set XDG_CACHE_HOME, they need to follow.
 cache_root=${XDG_CACHE_HOME:-$HOME/.cache}
+
+# Where the machinery lives: this script sits at its top level, so its own path
+# is the answer. Resolved ONCE, here, and absolute -- build_file cd's into each
+# source's directory, after which a relative $0 would point nowhere.
+machinery_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 # Unwrap pdflatex's 79-column log lines so multi-line warnings keep their
 # "on input line N" tails intact for log parsers -- vim's quickfix reads these
@@ -262,6 +273,29 @@ ship_label() {
   fi
 }
 
+# Install the build directory's .latexmkrc from the machinery's master copy, so
+# latexmk finds the machinery on TEXINPUTS (see the header). Called from inside
+# build_file, after the cd, so `.latexmkrc' here means the SOURCE's directory.
+#
+# Three ways to do nothing, in order: an older submodule with no master to copy
+# (stay silent -- the directory's own copy, if any, still works); a copy whose
+# marker line has been deleted, which means someone tuned it by hand and owns it
+# now; and a copy that already matches. That last test is a content comparison
+# rather than an unconditional cp so mtimes stay put and `git status' stays quiet
+# -- $(...) strips trailing newlines from both sides, which is harmless here.
+# Deliberately not rsync: its default quick-check is size+mtime, and a submodule
+# checkout restamps mtimes, so identical files would copy anyway; -c would fix
+# that but Git for Windows ships no rsync (see NOTE-ON-WINDOWS.md).
+ensure_latexmkrc() {
+  local src=$machinery_dir/latexmkrc-shared
+  [[ -e $src ]] || return 0
+  if [[ -e .latexmkrc ]]; then
+    grep -q 'managed by build-pdfs' .latexmkrc || return 0
+    [[ "$(cat .latexmkrc)" == "$(cat "$src")" ]] && return 0
+  fi
+  cp -- "$src" .latexmkrc && echo "    .latexmkrc: installed"
+}
+
 # Aux-dir key for the current directory: its path RELATIVE TO THE REPO ROOT
 # (the nearest ancestor holding .course-machinery, found the way .latexmkrc
 # finds it), slashes flattened to '-'. The old key was the bare directory name,
@@ -330,8 +364,10 @@ build_file() {
 
   (
     # Compile in the source's own directory so the PDF lands next to the source
-    # (latexmk's out-dir defaults to cwd) and the .latexmkrc there is picked up.
+    # (latexmk's out-dir defaults to cwd) and the .latexmkrc there is picked up --
+    # which is also why ensure_latexmkrc runs here, once we are in that directory.
     cd "$dir" || exit
+    ensure_latexmkrc
     auxkey=$(aux_key)
     auxdir="$cache_root/latexmk/$auxkey-$jobname"
     mkdir -p "$auxdir" || exit

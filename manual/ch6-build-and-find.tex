@@ -19,7 +19,14 @@ $ build-pdfs test.tex     # just this one (FILE.tex -> FILE.pdf)
 
 The script runs latexmk from each file's own directory, so relative imports
 resolve and the directory's \file{.latexmkrc} puts the machinery on
-\env{TEXINPUTS}. Auxiliary files (\file{.aux}, \file{.log}, \dots) go to a
+\env{TEXINPUTS}. It installs that \file{.latexmkrc} on the way in: latexmk
+reads only the rc in its startup directory and never walks up, so before
+compiling, \file{build-pdfs} copies \file{latexmkrc-shared} from the machinery
+into the source's directory whenever the file there is missing or out of date.
+A new topic folder therefore needs no setup, and an edit to the master reaches
+every course on its next build. A copy whose \texttt{managed by build-pdfs}
+marker line has been deleted counts as hand-tuned and is never overwritten.
+Auxiliary files (\file{.aux}, \file{.log}, \dots) go to a
 per-directory folder under \file{~/.cache/latexmk/} -- they clutter neither
 the repo nor the output directory -- keyed by the directory's repo-relative
 path, so two topics' same-named \file{problems/} folders never share

@@ -12,11 +12,12 @@ course-demo/
     openstax.tex            where it lives online. The first is the course
                             default; a second file is a second book, chosen
                             per lecture with \usetext
-  .latexmkrc                puts both machinery folders on TEXINPUTS
   .MIRRORDIR                optional PDF mirror destination
   derivatives/              a topic (a course has several, same shape)
     problems/               problem bank: one problem per file
-    lectures/               LectureNotes masters (+ .latexmkrc)
+    lectures/               LectureNotes masters (+ .latexmkrc, which puts both
+                            machinery folders on TEXINPUTS; build-pdfs installs
+                            it, one identical copy per build directory)
     facts/                  fact bank: one tagged snippet per file
     images/
   _assessment/              Assessment masters (+ .latexmkrc)
@@ -53,8 +54,10 @@ walks up to the repo root and puts \file{.course-machinery//} and
 \file{.course-machinery-local/} on \env{TEXINPUTS} for that build --- the
 two tiers of machinery that are shared across files. Everything else a
 document loads sits beside it and is found in the cwd
-(section~\ref{sec:extending}). The copies are identical; creating a new
-topic folder means copying one file in.
+(section~\ref{sec:extending}). The copies are identical, and you never plant
+them yourself: latexmk reads only the rc in its startup directory and never
+walks up, so \file{build-pdfs} installs one in each source's directory before
+compiling. Creating a new topic folder takes no setup at all.
 
 Cross-file inclusion uses the \file{import} package's relative paths, so one
 source serves every consumer. A lecture and the quiz pull the \emph{same}
