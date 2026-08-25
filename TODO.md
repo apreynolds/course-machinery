@@ -86,6 +86,39 @@ for call sites that read as intent rather than paths. Worth knowing before
 building it: **correctness comes from `import`, not from the wrapper** — this is
 cosmetic, and a wrong wrapper can only make a working mechanism less legible.
 
+**A `passage` metadata kind** → *when the passage bank passes ~15 files, or you
+stop being able to recall what is in it.*
+`\importpassage` exists (prose-documents chapter); what it has no counterpart to
+is `\ProblemMeta`/`\FactMeta` and the search that reads them. Until then each
+passage carries a header comment naming its audience, requirements, provenance
+and natural depth, and that comment block *is* the index — which is sufficient
+at single digits and stops being so somewhere in the teens.
+
+Settled, so it need not be re-derived. `find-meta` was built to take a third
+kind: *"Everything that differs between a problem bank and a fact bank lives in
+exactly this case"* (`find-meta:79`). So the cost is one `case` arm, a
+`PassageMeta.sty` modelled on `FactMeta.sty`, and two shims of six lines each
+(`find-passages`, `pick-passages`) — no new concept. Schema:
+
+```
+noun="passage"; block_macro="PassageMeta"; emit_macro="importpassage"
+filter_specs=(audience:audience topic:topics)
+tsv_cols=(title audience topics requires)
+vocab_keys=(audience topics)
+with_keys=(level)
+```
+
+`title` and `label` fold into the block when it arrives, the way a fact's `name`
+does, and `\PassageTitle` reads them from there. `requires` is the list of course
+macros the passage expects (`\PointsPerQuestion` and friends) — the one key with
+no analogue in the other two banks, and the reason a passage can fail in a way a
+problem cannot.
+
+The payoff beyond search is `find-passages --import --from .`, which computes
+`../teaching/passages/` for you — the same authoring-time path help problems
+already get, and the answer to the only real ergonomic complaint about relative
+directories.
+
 ---
 
 ## Polish
@@ -164,9 +197,25 @@ declares its own.
 
 Genuinely open, if this is ever built:
 
-- **Heading levels.** Does a body start at `\section`? Standalone that competes
+- **Heading levels.** ~~Does a body start at `\section`? Standalone that competes
   with the title; in the guide it must nest under something. Probably the
-  wrapper's job, but unexamined.
+  wrapper's job, but unexamined.~~
+
+  > **Answered for prose, 2026-08-25, by `\importpassage`** (see the prose-documents
+  > chapter). The body is written at its **natural depth** and the *importing*
+  > document names where that lands — so it was the wrapper's job, as guessed.
+  > The shift is three `\let`s in a group, top-down so each captures the
+  > still-original meaning of the level below; the title command is then plain
+  > `\section` and needs no special case. What was not anticipated: the budget is
+  > **one level**, because `CourseDocument` styles three heading ranks and a
+  > second shift lands on `\paragraph`. Deeper is an error, not a degradation.
+  > That constraint is load-bearing rather than a limitation — it is what decides
+  > where a body gets cut.
+  >
+  > Carrying this to the collected guide needs one thing this does not have: a
+  > body that supplies **no** title at all, since the guide's wrapper may want to
+  > name the section itself. That is an option on the title command, not a new
+  > mechanism.
 - **The guide's class.** `CourseDocument`, or a book-ish option on
   `LectureNotes`? Untouched.
 

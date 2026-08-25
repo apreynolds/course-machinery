@@ -192,6 +192,116 @@
   {0pt}{4.5ex plus 1ex minus .2ex}{2ex plus .2ex}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PASSAGES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% A PASSAGE is a piece of prose that belongs to the AUTHOR rather than to the
+% course: why learning mathematics is worth the effort, how marking works, what
+% makes a solution readable. It is shared across COURSES, so it lives in its own
+% content repository (a `teaching/' submodule beside the topic submodules) and
+% is pulled in here by relative path.
+%
+% WHY THIS IS NOT A TIER. A passage bank is content, and content in this toolkit
+% has never been on a search path: \importproblem hands a literal relative
+% directory to \import, and the architecture chapter's rule is that a file goes
+% on TEXINPUTS only when its readers sit at depths it cannot predict. A passage's
+% readers are the prose documents of one course, in one directory. So nothing
+% here touches .latexmkrc, TEXINPUTS, or the three tiers -- see the architecture
+% chapter, "A passage bank is content, not a tier".
+%
+% THE LEVEL PROBLEM, which is the whole reason this is a command and not \input.
+% The same passage is a \section of one document and a \subsection of another,
+% and a passage that carries its own \subsection headings has to move WITH its
+% title. So the file is written at its NATURAL depth -- \PassageTitle for the
+% title, plain \subsection for anything inside it -- and the importing document
+% says where that natural depth lands:
+%
+%   \importpassage{../teaching/passages/}{why-learn-math.tex}                 % \section
+%   \importpassage[level=subsection]{../teaching/passages/}{why-learn-math.tex}
+%
+% The shift is three \let's in a group, done TOP-DOWN so each one captures the
+% still-original meaning of the level below it. \PassageTitle then needs no
+% special case at all: it is \section, which the \let has already pointed at the
+% right target. \label, \ref, starred forms and TOC entries all keep working
+% because these are the real sectioning commands, not imitations of them.
+%
+% ONE LEVEL OF HEADROOM, deliberately. The SECTIONS block above styles exactly
+% three levels and \paragraph is not among them -- it would fall back to
+% article's run-in bold, which is not a heading in this design. So a shift of
+% one is supported and anything deeper is an ERROR rather than a silent
+% degradation. That is enough for every passage that exists: the deepest is a
+% title plus one rank of subsections.
+%
+% Load-order note: the \let's run at USE time, long after titlesec and parskip
+% have patched the sectioning commands (parskip at \AtBeginDocument), so what
+% they copy is the fully-patched meaning. keyval arrives with graphicx above.
+%
+% WHERE THIS LIVES. In the class, because prose documents are its only client --
+% the house rule is to extract when a SECOND document type actually needs it,
+% not in advance. The day a lecture wants a passage, this block moves to a
+% Passages.sty and all three classes load it; nothing above depends on it, so
+% that move is a cut and paste. (Compare Exercises.sty's note on lifting the
+% fact block into a standalone Facts.sty.)
+\newif\ifPassage@shifted
+
+\define@key{passage}{level}{%
+  \Passage@shiftedfalse
+  \def\Passage@given{#1}%
+  \def\Passage@atsection{section}%
+  \def\Passage@atsubsection{subsection}%
+  \ifx\Passage@given\Passage@atsubsection
+    \Passage@shiftedtrue
+  \else
+    \ifx\Passage@given\Passage@atsection
+    \else
+      \ClassError{CourseDocument}{%
+        Unknown passage level `#1'%
+      }{%
+        \string\importpassage\space accepts level=section (the default) or
+        level=subsection.\MessageBreak
+        Deeper is refused on purpose: this class styles three heading levels,
+        and\MessageBreak a further shift would land on \string\paragraph,
+        which is not one of them.%
+      }%
+    \fi
+  \fi
+}
+
+% What \subsubsection becomes under a shift: a loud stop, not a \paragraph. The
+% argument signature matches a real sectioning command so the error fires
+% instead of the title leaking into the text as stray prose.
+\NewDocumentCommand{\Passage@toodeep}{s o m}{%
+  \ClassError{CourseDocument}{%
+    Passage heading pushed past \string\subsubsection
+  }{%
+    An imported passage used \string\subsubsection\space while being imported
+    at level=subsection,\MessageBreak
+    which would push it onto \string\paragraph. Either import this passage at
+    level=section,\MessageBreak or flatten a heading rank inside the passage
+    file.%
+  }%
+}
+
+% The title of a passage, written by the passage itself. The optional argument
+% is the \label, which belongs to the passage (it names the passage's own idea)
+% rather than to whichever document happens to be importing it.
+\NewDocumentCommand{\PassageTitle}{o m}{%
+  \section{#2}%
+  \IfValueT{#1}{\label{#1}}%
+}
+
+\NewDocumentCommand{\importpassage}{O{} m m}{%
+  \begingroup
+    \setkeys{passage}{level=section,#1}%
+    \ifPassage@shifted
+      \let\section\subsection
+      \let\subsection\subsubsection
+      \let\subsubsection\Passage@toodeep
+    \fi
+    \import{#2}{#3}%
+  \endgroup
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HEADERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Two named styles, neither activated -- deliberate. \maketitle runs

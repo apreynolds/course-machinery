@@ -91,3 +91,54 @@ instructor-notes layer, so a syllabus can hold staff-only annotations --
 office-hour strategy, grading-scheme rationale -- and ship an
 \file{-INSTRUCTOR} view like any other document
 (section~\ref{sec:build-and-find}).
+
+\subsection{Passages}\label{sec:ch5-passages}
+
+A \textbf{passage} is prose that belongs to the author rather than to the
+course: why the subject is worth the effort, how marking works, what makes a
+solution readable. Because it is shared across courses it lives in its own
+content repository, mounted beside the topic submodules and reached by
+relative path --- it is content, not a tier (see the architecture chapter).
+
+The reason this is a command rather than a bare \cs{input} is \textbf{heading
+level}. The same passage is a \cs{section} of one document and a
+\cs{subsection} of another, and a passage carrying headings of its own has to
+move with its title. So the file is written at its \emph{natural} depth ---
+\cs{PassageTitle} for its own title, plain \cs{subsection} for anything
+inside it --- and the importing document says where that lands:
+
+\begin{manexsource}
+% teaching/passages/why-learn-math.tex
+\PassageTitle[whylearnmath]{Why Learn Math?}
+Mathematics is beautiful, powerful, and useful.
+\end{manexsource}
+
+\begin{manexsource}
+\importpassage{../teaching/passages/}{why-learn-math.tex}
+\importpassage[level=subsection]{../teaching/passages/}{why-learn-math.tex}
+\end{manexsource}
+
+\noindent The optional argument of \cs{PassageTitle} is the passage's
+\cs{label}: it names the passage's own idea, so it belongs to the passage
+rather than to whichever document imports it.
+
+The shift is three \cs{let}s inside a group, run top-down so each captures the
+still-original meaning of the level below. \cs{PassageTitle} then needs no
+special case --- it is \cs{section}, already pointed at the right target ---
+and \cs{label}, \cs{ref}, starred forms and table-of-contents entries keep
+working because these are the real sectioning commands.
+
+\textbf{One level of headroom, and deeper is an error.} This class styles
+three heading levels and \cs{paragraph} is not among them, so \texttt{level}
+accepts \texttt{section} (the default) or \texttt{subsection} and refuses
+anything further rather than degrading silently. A passage may therefore carry
+one rank of headings below its title and no more. In practice that is the
+constraint that decides how a passage is cut: a body of prose with three
+ranks is two passages, not one.
+
+A passage needing a number the course owns names a macro --- say
+\cs{PointsPerQuestion} --- and lets the course define it in its own
+\file{courseinfo.sty}. There is no machinery for that on purpose: a course
+that imports a passage without defining what it needs gets an
+undefined-control-sequence error, which is the loud failure wanted. Writing
+\emph{around} a parameter travels further than introducing one.

@@ -191,6 +191,41 @@ widens what a bare name can resolve to. When a file's readership changes,
 it changes tier: that is a move, not a rewrite, since nothing anywhere
 names it by path.
 
+\subsubsection*{A passage bank is content, not a tier}
+
+The rule above answers a question that otherwise recurs every time something
+new turns out to be shared. The case that prompted writing it down: prose
+that belongs to the \emph{author} rather than to a course --- why the subject
+is worth the effort, how marking works, what TAs are being asked to do. It is
+shared across courses, so the reflex is to reach for a fourth search path.
+
+Don't. Ask the mechanical question instead, and notice that \emph{the banks
+are already the precedent}. A problem is shared across courses too, and
+\cs{importproblem} does not put \file{problems/} on \env{TEXINPUTS} --- it
+hands \cs{import} a literal relative directory. Content has never been a
+tier here. The tiers are for machinery, which is loaded by bare name; content
+is named by the document that wants it, and a passage's readers are one
+course's prose documents, sitting in one directory.
+
+So a passage bank is a \textbf{content submodule}, mounted at the course root
+beside the topic submodules and reached by relative path:
+
+\begin{manexsource}
+\importpassage{../teaching/passages/}{why-learn-math.tex}
+\end{manexsource}
+
+\noindent It differs from a topic repo only in not being a topic, and no
+mechanism cares about that. Nothing in \file{.latexmkrc} changes; see
+section~\ref{sec:ch5-passages} for what the class contributes, which is a
+heading level and nothing else.
+
+There is a cautionary precedent for the reflex. The per-offering setup file
+was designed on the assumption that every master would want it and it would
+therefore need \env{TEXINPUTS}. When it was finally built as
+\file{courseinfo.sty}, its readers turned out to be the prose documents of
+one directory --- the guess was wrong, and it landed a tier lower than
+predicted. Predicting a readership is the step to distrust.
+
 \subsubsection*{The text layer, tier two's first tenant}
 
 The shared machinery draws a deliberate line: vocabulary every text has
