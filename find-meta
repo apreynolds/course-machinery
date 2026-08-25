@@ -18,8 +18,8 @@
 #                  [--tsv] [--import [--with LIST] [--from DIR]] [PATH ...]
 #
 # Run `find-problems --help' (or find-facts, find-passages) for the flags of a
-# kind: they differ, since facts have no type/difficulty and passages have neither
-# plus an audience of their own. The mechanics below are the same for all three.
+# kind: they differ, since a fact has no type/difficulty and a passage has no
+# filters at all -- it is listed, not searched. The mechanics below are shared.
 #
 # Filters are ANDed; PAT is an extended regular expression matched
 # case-insensitively against each comma-separated item in turn -- so `--topic
@@ -105,17 +105,21 @@ case $kind in
     ;;
   passage)
     noun="passage"; block_macro="PassageMeta"; emit_macro="importpassage"
-    # ONE filter, and no --topic: a passage's filename is its title, so topics
-    # restated what the picker already fuzzy-matches -- and when the bank was
-    # tagged with them, --topic marking selected exactly the same eight files as
-    # --audience tas. A problem earns topics because its filename says nothing
-    # about what it tests; a passage does not.
-    filter_specs=(audience:audience)
-    tsv_cols=(title audience requires)
-    # requires is in the vocabulary for FactMeta-kind's reason rather than topics':
-    # it is FUNCTIONAL, so `MarkerCount' where the bank says `\MarkerCount' is a
-    # passage that will not build, not merely a split search.
-    vocab_keys=(audience requires)
+    # NO FILTERS AT ALL, and this is the only kind of which that is true. The
+    # passage bank is not searched, it is READ: a passage's filename is its title,
+    # the bank runs to dozens rather than hundreds, and the picker fuzzy-matches
+    # the title column already. Two search keys were tried and removed -- `topics'
+    # restated the title (`marking' covered eight of eleven files, and --topic
+    # marking selected exactly the files --audience tas did), and `audience' then
+    # restated the import graph, every passage being imported by exactly one
+    # document. What this kind is for is --import --from (which computes the
+    # ../teaching/passages/ for you), --tsv (the picker feed) and --untagged.
+    filter_specs=()
+    tsv_cols=(title requires)
+    # requires is in the vocabulary for FactMeta-kind's reason rather than a
+    # problem's topics': it is FUNCTIONAL, so `MarkerCount' where the bank says
+    # `\MarkerCount' is a passage that will not build, not merely a split search.
+    vocab_keys=(requires)
     # EMPTY, and the only kind of which that is true. The one thing worth injecting
     # into an \importpassage line would be level=, and level is a property of the
     # importing document (where the natural depth lands) rather than of the
@@ -129,8 +133,12 @@ esac
 
 # flag -> key map (for the option loop) and the filter store (key -> pattern,
 # only for keys actually asked about).
+# The ${a[@]+"${a[@]}"} form, here and below, is for a kind with NO filters (the
+# passage bank): a bare "${a[@]}" on an empty array is an unbound-variable error
+# under `set -u' on bash 4.0-4.3, which is the floor the check at the top of this
+# file advertises. Harmless on 4.4+, required to keep that promise honest.
 declare -A flag_key=()
-for _spec in "${filter_specs[@]}"; do
+for _spec in ${filter_specs[@]+"${filter_specs[@]}"}; do
   flag_key[${_spec%%:*}]=${_spec#*:}
 done
 declare -A filt=()
@@ -140,22 +148,41 @@ usage() {
   # and columns accurately (the three shims do not have the same filters, and a
   # passage takes no --with at all). This replaces find-problems' sed-reprint-the-
   # header trick, which cannot vary per kind.
-  local spec flag key cols c
-  echo "$prog — search the $noun bank by its \\$block_macro metadata"
+  local spec flag key cols c verb filterarg
+  # A bank with no filters is listed, not searched, and the summary line and the
+  # usage synopsis both have to say so -- otherwise --help advertises a [FILTER]
+  # slot that the option loop will reject.
+  if (( ${#filter_specs[@]} )); then
+    verb="search"; filterarg="[FILTER ...] "
+  else
+    verb="list";   filterarg=""
+  fi
+  echo "$prog — $verb the $noun bank by its \\$block_macro metadata"
   echo
-  echo "Usage: $prog [FILTER ...] [--untagged] [--vocab] [--tsv]"
+  echo "Usage: $prog ${filterarg}[--untagged] [--vocab] [--tsv]"
   echo "       ${prog//?/ } [--import [--with LIST] [--from DIR]] [PATH ...]"
   echo
   echo "Reads the \\$block_macro{...} block out of every .tex file under each PATH"
   echo "(default: the current directory, recursively) and reports the files that"
-  echo "match. With no filters, reports every file that has a block."
+  if (( ${#filter_specs[@]} )); then
+    echo "match. With no filters, reports every file that has a block."
+  else
+    echo "have one."
+  fi
   echo
-  echo "Filters (optional, AND-combined; PAT is a case-insensitive ERE matched"
-  echo "against each comma-separated item):"
-  for spec in "${filter_specs[@]}"; do
-    flag=${spec%%:*}; key=${spec#*:}
-    printf '  --%-14s match the %s\n' "$flag PAT" "$key"
-  done
+  if (( ${#filter_specs[@]} )); then
+    echo "Filters (optional, AND-combined; PAT is a case-insensitive ERE matched"
+    echo "against each comma-separated item):"
+    for spec in "${filter_specs[@]}"; do
+      flag=${spec%%:*}; key=${spec#*:}
+      printf '  --%-14s match the %s\n' "$flag PAT" "$key"
+    done
+  else
+    # Say why rather than leaving a gap: a reader who knows the other two banks
+    # will look for the filters here and needs to know they are absent by design.
+    echo "Filters: none. A ${noun} bank is read, not searched -- the file name is"
+    echo "the title, the bank is small, and the picker matches the title column."
+  fi
   echo
   echo "Modes:"
   echo "  --untagged  invert: list .tex files with NO \\$block_macro block."
@@ -479,7 +506,7 @@ case $mode in
   vocab)
     # Counts across every block found, per key. Filters are ignored: the point
     # is to see the whole vocabulary before adding to it.
-    for key in "${vocab_keys[@]}"; do
+    for key in ${vocab_keys[@]+"${vocab_keys[@]}"}; do
       echo "$key:"
       for f in "${matches[@]}"; do
         field "${meta_of[$f]}" "$key" | tr ',' '\n'

@@ -97,9 +97,9 @@ difficulty), and \texttt{-{}-tsv} columns are
 The passage bank (section~\ref{sec:ref-passagemeta}) --- prose shared across
 courses, living in the \file{teaching/} submodule --- is searched the same way
 again. \file{find-passages} and \file{pick-passages} read \cs{PassageMeta} blocks
-and emit \cs{importpassage} lines; the only filter is \texttt{-{}-audience}
-(a passage's filename is its title, so there is no \env{topics} to search), and
-\texttt{-{}-tsv} columns are (path, title, audience, requires). The Vim command
+and emit \cs{importpassage} lines. There are \emph{no} filters --- a passage's
+filename is its title and the bank is small, so it is listed rather than searched
+--- and \texttt{-{}-tsv} columns are (path, title, requires). The Vim command
 \texttt{:ImportPassage} (\texttt{<Space>ig}) mirrors the other two.
 
 Two ways this pair differs from the other four. It takes \emph{no}

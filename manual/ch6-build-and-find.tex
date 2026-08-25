@@ -123,8 +123,7 @@ $ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
                 [--tsv] [PATH ...]
 $ find-facts    [--topic PAT] [--source PAT] [--untagged] [--vocab]
                 [--import] [--tsv] [PATH ...]
-$ find-passages [--audience PAT] [--untagged] [--vocab]
-                [--import] [--tsv] [PATH ...]
+$ find-passages [--untagged] [--vocab] [--import] [--tsv] [PATH ...]
 \end{manexsource}
 
 Reads the \cs{ProblemMeta} (resp.\ \cs{FactMeta}, \cs{PassageMeta}) block off
@@ -133,9 +132,8 @@ recursively) and reports the matches -- without running LaTeX, which is the
 point (section~\ref{sec:problem-files}). With no filters, it lists every
 file that has a block. The kind fixes the block macro it reads, the
 \cs{importproblem}~/ \cs{importfact}~/ \cs{importpassage} lines it emits, and
-the filter set -- facts carry no \env{type} or \env{difficulty}, and a passage is
-searched by \env{audience} alone, so the three have four, two and one filters
-respectively. Everything below holds for all three.
+the filter set -- facts carry no \env{type} or \env{difficulty}, and a passage
+bank is not searched at all, so the three have four filters, two, and none. Everything below holds for all three.
 
 One difference is worth stating here rather than leaving to be discovered:
 \file{find-passages} accepts no \texttt{-{}-with}. A passage has no injectable

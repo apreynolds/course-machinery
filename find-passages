@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# find-passages — search the passage bank by its \PassageMeta metadata.
-# A thin shim over find-meta (the shared engine); `--help' lists the concrete
-# passage filters (--audience/--topic). A passage takes NO --with: level= belongs
-# to the importing document, not to the passage. See find-meta and PassageMeta.sty.
+# find-passages — list the passage bank, and write its import lines for you.
+# A thin shim over find-meta (the shared engine). A passage bank has NO filters
+# and takes NO --with -- it is listed, not searched, and level= belongs to the
+# importing document rather than to the passage. What this is for is --import
+# --from (the relative directory), --tsv (the picker feed) and --untagged.
+# See find-meta and PassageMeta.sty.
 #
 # The bank is a SIBLING SUBMODULE (teaching/passages/), not a directory inside the
 # course, so give it as an operand: `find-passages teaching/passages'. Run bare

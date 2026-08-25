@@ -4,15 +4,15 @@
 % WHY THIS EXISTS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % The passage bank is one passage per file, shared across courses and pulled into
-% prose documents with \importpassage. So "which passages do I have for TAs about
-% marking?" has to be answerable WITHOUT running LaTeX -- nothing has \input those
-% files yet when you are deciding what goes into a marking manual. Same premise as
-% ProblemMeta and FactMeta, and the same literal block read straight off disk:
+% prose documents with \importpassage. This block is what a script can read off
+% disk WITHOUT running LaTeX -- the same premise as ProblemMeta and FactMeta,
+% though it ends up serving a different purpose here (see NO SEARCH KEYS below):
+% what find-passages does with it is compute the relative directory for an import
+% line and list what a passage will need from the document taking it.
 %
 %   \PassageMeta{
 %     title    = {How We Mark},
 %     label    = {sec:howwemark},
-%     audience = {tas},
 %     requires = {tikz},
 %   }
 %
@@ -67,8 +67,24 @@
 % topics restated what the picker could already fuzzy-match; and in the bank as
 % tagged, `marking' covered eight of eleven files while eight other values covered
 % one file each -- and `--topic marking' selected exactly the same eight files as
-% `--audience tas'. One partition does not need two keys. Problems earn topics
+% `--audience' did. One partition does not need two keys. Problems earn topics
 % because a problem's filename says nothing about what it tests.
+%
+% AND NO `audience', which went last and took the last filter with it. It had no
+% build-time effect; its --audience filter duplicated what the picker already does
+% (fzf matches the displayed columns, so typing `students' narrows without it);
+% and it restated the import graph, since every passage is imported by exactly one
+% document and the single-valued tags were one-to-one with which. The multi-valued
+% ones were worse than redundant: mostly-right-impression and
+% serious-and-small-errors were tagged for students but appear only in the markers'
+% manual, so the tag recorded that ANOTHER document holds similar prose -- not a
+% fact about the file. Re-add it if a passage is ever imported by two documents;
+% that is the situation it was invented for and the situation that does not exist.
+%
+% What is left is a block with NO SEARCH KEYS AT ALL, which is the honest shape:
+% two values the LaTeX needs, and one warning. Finding things was never this
+% bank's problem -- computing ../teaching/passages/ was, and --import --from does
+% that.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % THE KEYS
@@ -80,13 +96,6 @@
 %           not to whichever document imports it. Optional -- omit it for a
 %           passage nothing refers to. Prefix `sec:', like every other sectioning
 %           label in the courses.
-% audience  who it is written for: students, tas, instructors. Comma separated,
-%           more than one allowed. Lowercase, because --vocab counts raw strings
-%           and `TAs' beside `tas' would split the very report meant to catch it.
-%           The only genuinely searchable key here, and it earns that because it
-%           is the one thing a passage's title does NOT tell you: what reads as a
-%           markers' manual may also be what students are told in their handout,
-%           and two passages in the bank are both.
 % requires  what the IMPORTING DOCUMENT must supply or the build fails: course
 %           macros (\MarkerCount) and packages (tikz) alike, because from the
 %           author's side those are one question -- what must be in place before
@@ -136,10 +145,9 @@
 \define@key{PassageMeta}{title}   {\def\PassageMeta@title{#1}}
 \define@key{PassageMeta}{label}   {\def\PassageMeta@label{#1}}
 
-% Accepted, validated, DISCARDED -- the sibling pattern. A mistyped key (`topic'
-% for `audiences') errors at compile time; the values are read off disk by
-% find-passages, never from here.
-\define@key{PassageMeta}{audience}{}
+% Accepted, validated, DISCARDED -- the sibling pattern, and down to a single key.
+% A mistyped `require' for `requires' errors at compile time; the value itself is
+% read off disk by find-passages, never from here.
 \define@key{PassageMeta}{requires}{}
 
 \newcommand{\PassageMeta}[1]{%
