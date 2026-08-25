@@ -8,10 +8,13 @@ reference layout:
 course-demo/
   .course-machinery/        the toolkit (classes, packages, scripts)
   .course-machinery-local/  machinery for THIS course, shared across files
-    textbook.tex            the text layer: what a book names things and
-    openstax.tex            where it lives online. The first is the course
-                            default; a second file is a second book, chosen
-                            per lecture with \usetext
+    books.tex               the book registry: every book the course names,
+                            with its title and URLs. Loaded into EVERY
+                            document, whole
+    textbook.tex            the text layer: what a book NAMES things -- the
+    openstax.tex            vocabulary, which is exclusive. The first is the
+                            course default; a second file is a second book,
+                            chosen per document with \usetext
   .MIRRORDIR                optional PDF mirror destination
   derivatives/              a topic (a course has several, same shape)
     problems/               problem bank: one problem per file
@@ -65,16 +68,22 @@ source serves every consumer. A lecture and the quiz pull the \emph{same}
 beside it, \file{../derivatives/problems/} from the repo root -- and any
 images that file loads resolve against the \emph{file's own} directory.
 
-The one course-wide content file is
-\file{.course-machinery-local/textbook.tex}, the
-\emph{text layer}: everything that depends on which book the course is
-taught from -- the named result boxes it uses (APEX's ``Key Idea''), the
-noun lectures call an example, and the base URL the book lives at.
-Masters do not \cs{input} it --- it is found by name and loaded
+The course-wide content files are two, and the split between them is the
+one thing worth learning early. \file{.course-machinery-local/textbook.tex}
+is the \emph{text layer}: what the book \emph{names} things --- the result
+boxes it uses (APEX's ``Key Idea''), the noun lectures call an example.
+That is \emph{exclusive}, since a document cannot use two vocabularies at
+once, so \cs{usetext} picks exactly one.
+\file{.course-machinery-local/books.tex} is the \emph{book registry}:
+each book's title, publisher and URLs. That is not exclusive at all --- a
+syllabus names every book the course uses --- so it is loaded into every
+document, whole.
+
+Masters \cs{input} neither --- both are found by name and loaded
 automatically, so a lecture may sit at any depth and a new master cannot
-forget it. Section~\ref{sec:extending} explains the one-question test for
-what belongs there, and why it is guarded. Which \emph{section} of the book a
-given lecture covers is declared in that lecture, not here
+forget them. Section~\ref{sec:extending} explains the one-question test for
+what belongs there, and why the text layer is guarded. Which \emph{section}
+of the book a given lecture covers is declared in that lecture, not here
 (section~\ref{sec:ref-textref}).
 
 \subsection{The five-minute loop}

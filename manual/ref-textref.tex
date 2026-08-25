@@ -5,7 +5,7 @@ Links from the notes into the course textbook. The package holds the
 given lecture covers are all course data. Loaded by all three classes,
 and inert until a course declares something.
 
-It works in two halves, and the first is the one that carries the weight.
+It works in three parts, and the first is the one that carries the weight.
 
 \textbf{Every lecture declares the section it is.} One line at the top of
 the file names the coordinate, and the class prints it as a running head
@@ -23,12 +23,28 @@ types a URL.
 \cs{textbookref} is for, and those resolve through a small manifest of
 just the sections a course actually points at.
 
+\textbf{And a book can simply be named.} A syllabus lists its texts; a
+handout says ``the algebra text has a fuller treatment''. Neither is
+pointing at a section, and both want the book's name and a link to where
+it lives. That is the \emph{book registry}, and because naming a book is
+not exclusive the way vocabulary is, it is loaded into every document
+whole --- see \emph{The book registry} below.
+
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{usetext}\texttt{\{apex\}} & in a master's preamble: this document is
   an \emph{apex} document. Loads \file{.course-machinery-local/apex.tex}.\\
+\cs{DeclareBook}\texttt{\{name\}\{\dots\}} & a registry entry: what a book
+  is called, who publishes it, where it lives. Keyval; see below.\\
+\cs{booktitle}\texttt{\{apex\}} & the book's title, set in italic and
+  linked to its home page. Starred: unlinked.\\
+\cs{bookname}\texttt{\{apex\}} & its short name, for running prose.
+  Starred: unlinked.\\
+\cs{bookpublisher}\texttt{\{apex\}} & the publisher. Never linked.\\
+\cs{bookurl}\texttt{\{apex\}} & the home URL itself, as printed text.\\
 \cs{DeclareTextBase}\texttt{\{name\}\{URL\}} & where a book lives; every
-  page is appended to it verbatim, so include the trailing slash.\\
+  page is appended to it verbatim, so include the trailing slash.
+  \cs{DeclareBook}'s \texttt{base} calls this.\\
 \cs{SetDefaultText}\texttt{\{name\}} & the book assumed when a lecture
   does not say. Default: unnamed.\\
 \cs{SetTextBase}\texttt{\{URL\}} & shorthand for a course with one book:
@@ -45,10 +61,14 @@ just the sections a course actually points at.
   in the book: title only, no coordinate, no link.\\
 \cs{DeclareSection}\texttt{\{5.2\}\{page\}} & one cross-reference entry:
   section number $\to$ its page. Last declaration wins.\\
+\cs{DeclareSection}\texttt{[name]\{3.2\}\{page\}} & the same, for a
+  \emph{named} book rather than the document's own.\\
 \cs{textbookref}\texttt{\{5.2\}\{Table 5.2.3\}} & prints
   ``Table 5.2.3'', linked to \S5.2.\\
 \cs{textbookref*}\texttt{\{5.2.6\}\{Example\}} & starred: appends the key,
   so this prints ``Example~5.2.6''.\\
+\cs{textbookref}\texttt{[name]\{3.2\}\dots} & resolved in a named book,
+  against that book's base. Star comes first: \cs{textbookref*}\texttt{[name]}.\\
 \end{tabularx}
 \end{center}
 
@@ -109,7 +129,9 @@ in a master to keep true to the folder layout, and moving a file deeper or
 shallower breaks nothing. Only what is deposited in that folder is exposed
 this way, not the rest of the course.
 
-Which file loads depends on what the master says:
+Two things load from there, and they load differently.
+\file{books.tex}, the registry, is loaded \textbf{always and whole}, into
+every document. The \emph{text layer} is the one a master picks:
 
 \begin{itemize}
   \item \textbf{Nothing} --- \file{textbook.tex} is loaded if it exists.
@@ -124,6 +146,12 @@ Which file loads depends on what the master says:
     the head.
 \end{itemize}
 
+\file{books.tex} is optional on the same terms: absent, nothing loads and
+nothing breaks. It is loaded from \emph{both} the \cs{usetext} call and
+the end-of-preamble hook, guarded so the second is a no-op --- which is
+what lets \cs{booktitle} and \cs{booksection} be used in a preamble as
+well as a body, without an ordering rule to remember.
+
 \textbf{The presence of \file{textbook.tex} is what declares whether the
 course has a default book}, so there is no separate switch. A course with
 two books simply omits it, which makes naming the book in each lecture
@@ -134,14 +162,70 @@ have a default anyway, \file{textbook.tex} containing nothing but
 \cs{usetext}\texttt{\{apex\}} gives one that a lecture can still override.
 
 \textbf{Why a document names its book, rather than each reference.} Two
-kinds of fact live in a text layer. The base URL is resolved per call, so
-\cs{booksection}\texttt{[text=\dots]} can link into a second book from
-anywhere. But the notes noun and the \cs{NewTextResult} vocabulary are
-document-wide --- a document cannot call worked items ``Example'' and
+kinds of fact attach to a textbook, and only one of them is exclusive.
+A book's \emph{identity} --- its title, its publisher, where it lives,
+which page a section sits on --- is not: \cs{booksection}\texttt{[text=\dots]}
+has always resolved a base per call, and a syllabus needs to name three
+books at once. But the notes noun and the \cs{NewTextResult} vocabulary
+are document-wide --- a document cannot call worked items ``Example'' and
 ``Exercise'' at once, nor declare one result environment twice. So the
-document, not the reference, is the thing that has to choose. That
-granularity is also what makes the duplicate-vocabulary error unreachable:
-two books may both name a result, because they are never loaded together.
+document, not the reference, is the thing that has to choose, and
+\cs{usetext} chooses \emph{only} that. That granularity is also what makes
+the duplicate-vocabulary error unreachable: two books may both name a
+result, because they are never loaded together.
+
+Identity, being the half that is not exclusive, lives in the registry
+instead.
+
+\subsection*{The book registry}
+
+\begin{manexsource}
+\DeclareBook{algtrig}{%
+  short     = Algebra \& Trigonometry,
+  title     = Algebra and Trigonometry 2e,
+  publisher = OpenStax,
+  home      = https://openstax.org/details/books/algebra-and-trigonometry-2e,
+  base      = https://openstax.org/books/algebra-and-trigonometry-2e/,
+}
+\end{manexsource}
+
+\file{.course-machinery-local/books.tex} holds one such block per book,
+and every document gets all of them. Only \texttt{base} is
+machinery-facing --- it is what \cs{booksection} and \cs{textbookref}
+append pages to, and it simply calls \cs{DeclareTextBase}. The other four
+exist to be printed:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{short} & what to call it in running prose (``APEX'').\\
+\texttt{title} & the book's actual title.\\
+\texttt{publisher} & who publishes it, where that is worth saying.\\
+\texttt{home} & the landing page a reader is sent to. Defaults to
+  \texttt{base}, which is right whenever a book's web edition is also its
+  front door; give both when the publisher keeps a separate catalogue
+  page.\\
+\texttt{base} & what pages are appended to. Trailing slash included.\\
+\end{tabularx}
+\end{center}
+
+\texttt{short} and \texttt{title} each default to the other, and to the
+book's \emph{key} if neither is given --- so a bare entry prints
+\texttt{algtrig} rather than nothing, which is a visible placeholder
+instead of a silent gap.
+
+\textbf{The registry is what gives a third book somewhere to live.} A
+course often points at a text it never teaches from --- the prerequisite
+algebra book behind a calculus course. That book has identity and no
+vocabulary at all, so no document is ever ``an \emph{algtrig}
+document'' and no \cs{usetext} would ever load a file for it. Before the
+registry, every reference to such a book was a hand-typed \cs{href} with
+the publisher's domain baked into it, which is the exact rot this package
+exists to prevent.
+
+\textbf{Keyval caveat.} A value containing a bare comma splits, and the
+error names the fragment: \texttt{`Volume 1' undefined in families
+`declarebook'}. Brace it --- \texttt{title = \{Calculus, Volume 1\}}.
+\texttt{\#} and \texttt{\%} still need escaping, as they do in a slug.
 
 \subsection*{Three decisions that shape it}
 
@@ -226,14 +310,30 @@ Because each lecture carries its own coordinate, two books whose section
 numbers collide --- and they will, every book has a \S1.1 --- cannot be
 confused for one another. The book is part of what the lecture declares.
 
-\textbf{Cross-references belong to the text, not the course.} This is the
-easy thing to get wrong. A lecture that says
-\cs{usetext}\texttt{\{openstax\}} never loads the other book's file, so
-that file's \cs{DeclareSection} entries are simply unavailable to it. Each
-text file therefore carries the sections \emph{its own} lectures point at.
-The demo repo shows the whole arrangement: \file{.course-machinery-local/textbook.tex}
-and \file{.course-machinery-local/openstax.tex} side by side, with a lecture built on
-each.
+\textbf{An unqualified cross-reference belongs to the text; a qualified
+one belongs to the course.} This is the easy thing to get wrong. A lecture
+that says \cs{usetext}\texttt{\{openstax\}} never loads the other book's
+file, so that file's plain \cs{DeclareSection} entries are simply
+unavailable to it --- an unqualified declaration means ``a section of the
+book \emph{this document} is built on'', which is the only thing a file
+loaded by \cs{usetext} can honestly say. Each text file therefore carries
+the sections \emph{its own} lectures point at.
+
+Naming the book lifts exactly that restriction:
+
+\begin{manexsource}
+\DeclareSection[algtrig]{3.2}{pages/3-2-domain-and-range}
+...then in any lecture, whatever it is built on:
+\textbookref[algtrig]{3.2}{\S3.2, Domain and Range}
+\end{manexsource}
+
+Those go in \file{books.tex}, beside the \cs{DeclareBook} they qualify,
+because the documents that need them are built on some other book. The two
+namespaces \textbf{do not cross}: \cs{DeclareSection}\texttt{\{1.3\}} in
+\file{apex.tex} is not reachable as
+\cs{textbookref}\texttt{[apex]\{1.3\}}, since resolving the empty name as
+``apex'' would be a guess about a file any document may have loaded. A
+section wanted both ways is declared twice.
 
 One thing still cannot be shared between two books in a single document:
 \emph{vocabulary}. The box factory

@@ -207,7 +207,22 @@ echo the book the students are reading -- yes. Where \S2.1 of the text
 lives on the web -- yes. Your identity colour, your hint wording, your
 layout knobs -- no: those are your voice, and they stay in the machinery.
 The text-driven set is small and bounded, which is what makes the split
-worth drawing:
+worth drawing.
+
+\textbf{A second question splits what survives}, and it is what separates
+the two files that now live here: \emph{is it exclusive --- can a document
+only have one of it?} A vocabulary is: you cannot call worked items
+``Example'' and ``Checkpoint'' at once, nor declare one result environment
+twice. A book's title and URL are not, and a syllabus proves it by naming
+three books while being built on none. So the exclusive half stays in the
+text layer, which \cs{usetext} picks one of, and the rest moves to the
+\textbf{book registry}, \file{.course-machinery-local/books.tex}, which is
+loaded into every document whole (section~\ref{sec:ref-textref}). The
+registry is also the only place a book the course \emph{never teaches
+from} can live --- no document is an ``algtrig document'', so no
+\cs{usetext} would ever reach a file for it.
+
+What is left in a text layer is therefore this:
 
 \begin{manexsource}
 \ifdefined\NewTextResult
@@ -215,10 +230,16 @@ worth drawing:
 \fi
 % \renewcommand{\NotesProblemLabelWord}{Exercise}
 
-\DeclareTextBase{apex}{https://opentext.uleth.ca/apex-calculus/}
 \SetDefaultText{apex}
 
 \DeclareSection{1.3}{sec_limit_analytically.html}   % cross-references only
+\end{manexsource}
+
+\noindent and the registry beside it holds the other half:
+
+\begin{manexsource}
+\DeclareBook{apex}{short=APEX, title=APEX Calculus,
+                   base=https://opentext.uleth.ca/apex-calculus/}
 \end{manexsource}
 
 No master \cs{input}s it. \file{.latexmkrc} puts
@@ -238,10 +259,10 @@ guard -- all three classes load TextRef.
 \textbf{What is deliberately not here: the section map.} Each lecture
 declares its own coordinate with \cs{booksection}, so a section's page
 lives in the file it describes rather than in a list that has to be kept
-in step with the lectures. What remains here is the \emph{base} those
-pages hang off, plus the handful of sections the course
-\emph{cross-references} -- points at without being. That is why the list
-above is one line rather than ninety.
+in step with the lectures. What remains is the \emph{base} those pages
+hang off -- in the registry, with the book it describes -- plus the
+handful of sections the course \emph{cross-references}: points at without
+being. That is why the lists above are one line each rather than ninety.
 
 A course whose text is not online, or which teaches from no text, needs
 none of section 3 at all: \cs{booksection} takes its page as an
@@ -249,14 +270,20 @@ none of section 3 at all: \cs{booksection} takes its page as an
 their heading. The file then holds only the vocabulary.
 
 This also settles the case of a course drawn from two books, an opening
-review chapter out of one text and the rest out of another: keep a file
-per book (\file{textbook.tex} and \file{openstax.tex} in the demo), and
-each lecture names the book it means with \cs{usetext}. Two books whose
-section numbers collide -- and they will, every book has a \S1.1 -- cannot
-be confused, because the book is part of what the lecture declares. Note
-that the cross-reference list goes in each \emph{text} file: a lecture
-built on one book never loads the other's
-(section~\ref{sec:ref-textref}).
+review chapter out of one text and the rest out of another: keep a text
+layer per book (\file{textbook.tex} and \file{openstax.tex} in the demo),
+declare both in the registry, and let each lecture name the book it means
+with \cs{usetext}. Two books whose section numbers collide -- and they
+will, every book has a \S1.1 -- cannot be confused, because the book is
+part of what the lecture declares.
+
+Cross-references follow the same seam. An unqualified
+\cs{DeclareSection} goes in a \emph{text} file and means ``a section of
+this document's book'', so a lecture built on one book never sees the
+other's. A \emph{qualified} one --
+\cs{DeclareSection}\texttt{[algtrig]\{3.2\}\{\dots\}} -- goes in the
+registry, because the documents that cite it are built on some other book
+entirely (section~\ref{sec:ref-textref}).
 
 \textbf{Why a folder.} It is the boundary of what the build can see. The
 whole mechanism rests on \file{.course-machinery-local/} being on
@@ -265,7 +292,8 @@ keeps that exposure narrow: only what is deposited there becomes findable
 by bare name, so nothing else in the course can be picked up by accident.
 That narrowness is why the tier is a folder at all rather than a habit ---
 and it is why the folder is named for its \emph{role} rather than for the
-text layer that was once its only occupant.
+text layer that was once its only occupant. The registry moving in beside
+it, and \file{courseinfo.sty} beside that, is the name being earned.
 
 To restyle course-wide, prefer the named extension points -- the
 \env{cb/*} tcolorbox styles and \env{cb*} head styles

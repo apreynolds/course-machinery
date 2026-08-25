@@ -7,9 +7,9 @@
 % 5.2.1", "see 2.5.4". Hand-typing a deep link every time gives you a hundred
 % URLs scattered through the sources, each rotting on its own schedule.
 %
-% So this package supplies the MECHANISM and nothing else, in two halves.
+% So this package supplies the MECHANISM and nothing else, in three parts.
 %
-% THE PRIMARY HALF -- every lecture declares the section it IS:
+% THE PRIMARY PART -- every lecture declares the section it IS:
 %
 %   \DeclareTextBase{apex}{https://example.org/the-text/}  % once, course-wide
 %   ...at the top of the lecture:
@@ -20,7 +20,7 @@
 % author remembered to cite. One line per file, and the slug sits in the file it
 % describes rather than in a manifest that has to be kept in step with it.
 %
-% THE SECONDARY HALF -- pointers to some OTHER section, usually a prerequisite:
+% THE SECONDARY PART -- pointers to some OTHER section, usually a prerequisite:
 %
 %   \DeclareSection{1.3}{sec_limits_analytically.html}   % only what you cite
 %   ...in the body:  \textbookref{1.3}{\S1.3}
@@ -29,8 +29,18 @@
 % sparse, so the manifest only needs the handful of sections a course actually
 % cross-references -- not the whole book.
 %
-% THE DATA LIVES OUTSIDE THIS FILE: slugs in the lectures, bases (and any
-% cross-reference manifest) in the course's own setup. This file must stay free
+% THE THIRD PART -- naming a book in prose, rather than pointing into it:
+%
+%   \DeclareBook{apex}{short=APEX, title=APEX Calculus, base=https://.../}
+%   ...in a syllabus:  the course text is \booktitle{apex}
+%
+% A syllabus lists its books; a handout says "the algebra text has a fuller
+% treatment". Both want the book's NAME, linked to where it lives, and neither
+% is pointing at a section. See THE BOOK REGISTRY below for why this is a
+% separate part rather than more of the text layer.
+%
+% THE DATA LIVES OUTSIDE THIS FILE: slugs in the lectures, bases, titles and any
+% cross-reference manifest in the course's own setup. This file must stay free
 % of any particular textbook -- no base URL, no section names, no publisher. That
 % is the same mechanism-in-machinery / data-in-the-course split as the box
 % factory in CourseBoxes.sty vs. the course's "Key Idea" declaration.
@@ -93,18 +103,29 @@
 %   \usetext{apex}     -- this document is an APEX document; loads apex.tex.
 %
 % WHY A DOCUMENT NAMES ITS BOOK, rather than each reference naming it. Two kinds
-% of fact live in a text layer, and they need different granularity:
+% of fact attach to a textbook, and only one of them is exclusive:
 %
-%   - the base URL, which \booksection resolves PER CALL -- so one document can
-%     link into two books (\booksection[text=openstax]{...});
-%   - the notes noun and the \NewTextResult vocabulary, which are DOCUMENT-WIDE.
-%     A document cannot call worked items "Example" and "Exercise" at once, and
-%     cannot declare the same result environment twice (that is a hard error).
+%   - IDENTITY -- what the book is called, where it lives, which page a section
+%     sits on. None of this is exclusive. \booksection has always resolved the
+%     base PER CALL (\booksection[text=openstax]{...}), and a syllabus needs to
+%     name three books at once. Identity lives in THE BOOK REGISTRY, below,
+%     which is loaded into EVERY document, whole.
+%   - VOCABULARY -- the notes noun and the \NewTextResult declarations, which
+%     are DOCUMENT-WIDE and genuinely exclusive. A document cannot call worked
+%     items "Example" and "Exercise" at once, and cannot declare the same result
+%     environment twice (that is a hard error).
 %
-% The second kind is why \booksection's text= is not sufficient on its own. And
-% the granularity is natural: a lecture is one document, taught out of one book.
-% It also makes the duplicate-vocabulary error unreachable -- two books can both
-% name a result, because they are never loaded together.
+% \usetext picks the second kind and only the second kind. The granularity is
+% natural: a lecture is one document, taught out of one book. It also makes the
+% duplicate-vocabulary error unreachable -- two books can both name a result,
+% because they are never loaded together.
+%
+% KEEP THE TWO APART when writing a course's files. A text layer that declares
+% its own base still works -- \DeclareTextBase is unchanged and order-independent
+% -- but it puts a fact that every document could have used behind a door only
+% one document opens, and the third book (one you only ever POINT at, never
+% teach from) then has nowhere to live at all: no document is "an algtrig
+% document", so no \usetext will ever load its file.
 %
 % THE DEFAULT. If a master says nothing, textbook.tex is loaded when it exists.
 % So a one-book course writes no \usetext anywhere; and a course drawing on two
@@ -115,11 +136,33 @@
 % A course can have both if it wants: a textbook.tex holding nothing but
 % \usetext{apex} gives a default that an individual lecture can still override.
 %
-% Deferred to \AtEndPreamble because the master's preamble must have had its
-% chance to call \usetext first -- the class finishes long before the preamble
-% does. Still before \begin{document}, which \NewTextResult requires.
+% The FALLBACK is deferred to \AtEndPreamble because the master's preamble must
+% have had its chance to call \usetext first -- the class finishes long before
+% the preamble does. Still before \begin{document}, which \NewTextResult
+% requires.
+%
+% THE REGISTRY IS LOADED FROM BOTH PLACES, and that is deliberate. If it only
+% ran at \AtEndPreamble, a \booksection or \booktitle in a PREAMBLE would find
+% no bases -- an ordering trap of exactly the kind \SetTextBase's already
+% carries. Calling the loader first thing in \usetext instead means a document
+% has the registry from the moment it names its book, and a document that names
+% none (a syllabus) still has it before \begin{document}. The bool makes the
+% second call a no-op.
 \newbool{TextRef@textchosen}
+\newbool{TextRef@booksloaded}
+
+% books.tex, if the course has one. Found BY NAME on TEXINPUTS, exactly as the
+% text layers are; silent when absent, because a course with one book and no
+% prose that names it needs no registry at all.
+\newcommand{\TextRef@loadbooks}{%
+  \ifbool{TextRef@booksloaded}{}{%
+    \booltrue{TextRef@booksloaded}%
+    \IfFileExists{books.tex}{\input{books.tex}}{}%
+  }%
+}
+
 \newcommand{\usetext}[1]{%
+  \TextRef@loadbooks
   \booltrue{TextRef@textchosen}%
   \IfFileExists{#1.tex}%
     {\input{#1.tex}}%
@@ -129,6 +172,7 @@
        path by .latexmkrc; references\MessageBreak will print as plain text}}%
 }
 \AtEndPreamble{%
+  \TextRef@loadbooks
   \ifbool{TextRef@textchosen}{}{%
     \IfFileExists{textbook.tex}{\input{textbook.tex}}{}%
   }%
@@ -183,13 +227,32 @@
     {\renewcommand{\TextRef@base}{}}%
 }
 
-% \DeclareSection{5.2}{sec_the_definite_integral.html}
+% \DeclareSection{5.2}{sec_the_definite_integral.html}          % this book
+% \DeclareSection[algtrig]{3.2}{pages/3-2-domain-and-range}     % a named book
 %
 % Stored as a macro per key rather than a list: lookup is then a single \ifcsdef
 % with no searching, and a redeclared section simply wins (last one read), which
 % is the useful behaviour when a course-local file overrides a shared one.
 % Global (\csgdef) so a declaration inside a group still sticks.
-\newcommand{\DeclareSection}[2]{\csgdef{TextRef@sec@#1}{#2}}
+%
+% THE OPTIONAL BOOK NAMES A NAMESPACE, and omitting it names the empty one --
+% which is "the book THIS DOCUMENT is built on", the only meaning available to a
+% declaration sitting in a text layer that only one document loads. That is the
+% original behaviour, unchanged, and the reason every existing \DeclareSection
+% line keeps working and keeps meaning what it meant.
+%
+% Naming a book is for the OTHER case, which a text layer cannot express: a
+% section of a book this document is not built on -- typically the prerequisite
+% text a course points students at but never teaches from. Those declarations
+% belong in the registry file beside the \DeclareBook they qualify.
+%
+% THE TWO NAMESPACES DO NOT CROSS, deliberately. \DeclareSection{1.3}{...} in
+% apex.tex is NOT reachable as \textbookref[apex]{1.3}{...}, because the file it
+% sits in is loaded by documents that may be built on any book -- the empty name
+% means "whatever this document chose", and resolving it as "apex" would be a
+% guess. A section you want reachable both ways is declared twice, or declared
+% once in the registry with its book named.
+\NewDocumentCommand{\DeclareSection}{O{} m m}{\csgdef{TextRef@sec@#1@#2}{#3}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LOOKUP (with one level of truncation)
@@ -208,13 +271,14 @@
 \def\TextRef@firsttwo#1.#2.#3\TextRef@nil{#1.#2}
 
 % Result of a lookup: the slug, or empty for "unresolved".
+% #1 is the book namespace (empty for "this document's book"), #2 the key.
 \newcommand{\TextRef@slug}{}
-\newcommand{\TextRef@resolve}[1]{%
-  \ifcsdef{TextRef@sec@#1}%
-    {\letcs\TextRef@slug{TextRef@sec@#1}}%
-    {\edef\TextRef@key{\TextRef@firsttwo#1..\TextRef@nil}%
-     \ifcsdef{TextRef@sec@\TextRef@key}%
-       {\letcs\TextRef@slug{TextRef@sec@\TextRef@key}}%
+\newcommand{\TextRef@resolve}[2]{%
+  \ifcsdef{TextRef@sec@#1@#2}%
+    {\letcs\TextRef@slug{TextRef@sec@#1@#2}}%
+    {\edef\TextRef@key{\TextRef@firsttwo#2..\TextRef@nil}%
+     \ifcsdef{TextRef@sec@#1@\TextRef@key}%
+       {\letcs\TextRef@slug{TextRef@sec@#1@\TextRef@key}}%
        {\renewcommand{\TextRef@slug}{}}}%
 }
 
@@ -241,12 +305,33 @@
                                 {\gappto\TextRef@misslist{, #1}}%
 }
 
-% An undeclared SECTION: \textbookref could not resolve its key.
-\newcommand{\TextRef@miss}[1]{%
-  \ifcsdef{TextRef@missed@#1}{}{%
-    \csgdef{TextRef@missed@#1}{}%
-    \PackageInfo{TextRef}{No section declared for `#1'; printed as plain text}%
-    \TextRef@record{#1}%
+% An undeclared SECTION: \textbookref could not resolve its key. #1 is the book
+% namespace (empty for the document's own book), #2 the key. The book is part of
+% the dedup flag AND of the wording -- "3.2" and "3.2 in `algtrig'" are two
+% different misses with two different fixes, and a course that cross-references
+% two books would otherwise be told about one of them only.
+\newcommand{\TextRef@miss}[2]{%
+  \ifcsdef{TextRef@missed@#1@#2}{}{%
+    \csgdef{TextRef@missed@#1@#2}{}%
+    \ifstrempty{#1}%
+      {\PackageInfo{TextRef}{No section declared for `#2'; printed as plain
+         text}%
+       \TextRef@record{#2}}%
+      {\PackageInfo{TextRef}{No section declared for `#2' in book `#1';
+         printed as plain text}%
+       \TextRef@record{#2 in `#1'}}%
+  }%
+}
+
+% An undeclared BOOK: \bookname / \booktitle was given a name the registry does
+% not carry. Its own flag namespace, so a book name and a section key can never
+% collide as dedup keys.
+\newcommand{\TextRef@bookmiss}[1]{%
+  \ifcsdef{TextRef@missedbook@#1}{}{%
+    \csgdef{TextRef@missedbook@#1}{}%
+    \PackageInfo{TextRef}{No book declared as `#1'; its key is printed as plain
+      text}%
+    \TextRef@record{book `#1'}%
   }%
 }
 
@@ -277,9 +362,177 @@
 \AtEndDocument{%
   \ifdefempty{\TextRef@misslist}{}{%
     \PackageWarningNoLine{TextRef}{Textbook references printed WITHOUT links
-      (no matching \string\DeclareSection\space or
-      \string\DeclareTextBase):\MessageBreak \TextRef@misslist}%
+      (no matching \string\DeclareSection, \string\DeclareTextBase\space or
+      \string\DeclareBook):\MessageBreak \TextRef@misslist}%
   }%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THE BOOK REGISTRY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% A course's books, declared once and available to EVERY document, whole:
+%
+%   \DeclareBook{apex}{%
+%     short = APEX,
+%     title = APEX Calculus,
+%     base  = https://opentext.uleth.ca/apex-calculus/,
+%   }
+%   ...then anywhere:  the course text is \booktitle{apex}
+%
+% WHY THIS IS NOT PART OF THE TEXT LAYER. \usetext loads exactly one text layer,
+% because vocabulary is exclusive (see LOADING THE COURSE'S TEXT LAYER above).
+% Identity is not, and three ordinary documents prove it:
+%
+%   - a SYLLABUS names every book the course uses, so it can load none of them;
+%   - a HANDOUT points at a prerequisite text the course never teaches from, so
+%     no \usetext will ever name it;
+%   - a LECTURE built on one book still wants to say "the algebra text has a
+%     fuller treatment" about another.
+%
+% Putting a base URL inside a text layer answers only the case where the book
+% you are naming happens to be the book you are taught from. The registry is
+% loaded unconditionally, so the other three cases stop being special.
+%
+% WHAT GOES IN A BOOK ENTRY. The same membership test as the text layer: would
+% you look at the book to decide the value? Its title, its publisher, where it
+% lives -- yes. How you like titles set -- no, that is \BookTitleStyle below.
+%
+%   short      what to call it in running prose      ("APEX")
+%   title      the book's actual title               ("APEX Calculus")
+%   publisher  who publishes it, when worth saying   ("OpenStax")
+%   home       the landing page a reader is sent to
+%   base       what \booksection and \textbookref append slugs to
+%
+% ONLY `base' IS MACHINERY-FACING; the other four exist to be printed. `home'
+% defaults to `base', which is right whenever a book's web edition IS its front
+% door; give both when the publisher has a separate catalogue page. `short' and
+% `title' each default to the other, and to the BOOK KEY if neither is given --
+% so a bare entry prints "apex" rather than nothing, which is visibly a
+% placeholder instead of a silent gap.
+%
+% ONE DECLARATION PER LINE still applies to the \DeclareSection entries that
+% follow a book, for the grep reason given at the head of this file. The
+% \DeclareBook block itself is keyval across several lines because it is one
+% declaration with five fields, not five declarations.
+%
+% KEYVAL CAVEAT: a value containing a bare comma would split. No URL does, and a
+% title that needs one can be braced. `#' and `%' still need escaping, as the
+% slug note under \textbookref explains.
+
+% Titles are italic here because that is house style, not a fact about any book
+% -- the same reason \BookSectionSeparator is a knob rather than a literal.
+\providecommand{\BookTitleStyle}{\emph}
+
+\define@key{declarebook}{short}{\def\DeclareBook@short{#1}}
+\define@key{declarebook}{title}{\def\DeclareBook@title{#1}}
+\define@key{declarebook}{publisher}{\def\DeclareBook@publisher{#1}}
+\define@key{declarebook}{home}{\def\DeclareBook@home{#1}}
+\define@key{declarebook}{base}{\def\DeclareBook@base{#1}}
+
+% Store a field VERBATIM under a csname. Global, so a \DeclareBook inside a
+% group still sticks -- the same rule \DeclareTextBase and \DeclareSection
+% follow. \unexpanded because these values are TEXT, not URLs: a title
+% containing \& or an accent must survive the \xdef untouched.
+\newcommand{\TextRef@store}[2]{%
+  \expandafter\xdef\csname #1\endcsname{\expandafter\unexpanded\expandafter{#2}}%
+}
+
+\newcommand{\DeclareBook}[2]{%
+  \def\DeclareBook@short{}%
+  \def\DeclareBook@title{}%
+  \def\DeclareBook@publisher{}%
+  \def\DeclareBook@home{}%
+  \def\DeclareBook@base{}%
+  \setkeys{declarebook}{#2}%
+  \ifdefempty{\DeclareBook@home}{\let\DeclareBook@home\DeclareBook@base}{}%
+  \ifdefempty{\DeclareBook@short}{\let\DeclareBook@short\DeclareBook@title}{}%
+  \ifdefempty{\DeclareBook@title}{\let\DeclareBook@title\DeclareBook@short}{}%
+  % Neither name given: fall back to the key, so the gap is visible in the PDF.
+  \ifdefempty{\DeclareBook@short}{\def\DeclareBook@short{#1}%
+                                  \def\DeclareBook@title{#1}}{}%
+  \TextRef@store{TextRef@book@short@#1}{\DeclareBook@short}%
+  \TextRef@store{TextRef@book@title@#1}{\DeclareBook@title}%
+  \TextRef@store{TextRef@book@publisher@#1}{\DeclareBook@publisher}%
+  \TextRef@store{TextRef@book@home@#1}{\DeclareBook@home}%
+  % The base goes through the ORIGINAL primitive, so \booksection and
+  % \textbookref resolution is untouched by any of this and a text layer that
+  % still declares its own base keeps working exactly as before.
+  %
+  % EXPANDED FIRST, and this is not optional. \DeclareTextBase stores its second
+  % argument as given, so handing it the MACRO \DeclareBook@base would store the
+  % macro -- and since one scratch macro serves every \DeclareBook, all books
+  % would then resolve to whichever was declared last. The failure is silent:
+  % every document still compiles, no key misses, and the links are simply
+  % pointed at the wrong book. \edef because a URL holds nothing fragile; the
+  % text fields go through \TextRef@store instead, which must NOT expand.
+  \ifdefempty{\DeclareBook@base}{}{%
+    \edef\DeclareBook@dispatch{\noexpand\DeclareTextBase{#1}{\DeclareBook@base}}%
+    \DeclareBook@dispatch
+  }%
+}
+
+% One field of one book, or -- for a book the registry does not carry -- the KEY
+% itself, recorded as a miss. Same degradation rule as everything else here:
+% always print something, never a broken link or a silent gap, and put the
+% failure in the one end-of-run warning.
+\newcommand{\TextRef@bookfield}[2]{%
+  \ifcsdef{TextRef@book@#1@#2}%
+    {\csuse{TextRef@book@#1@#2}}%
+    {\TextRef@bookmiss{#2}#2}%
+}
+
+% Wrap text in a link to the book's home page, when there is one to build and
+% hyperref is present. Deferred to use time for the reason \BookSection@head
+% gives: Hyperlinks.sty loads hyperref from \AtEndPreamble, so \href may not
+% exist yet while a preamble is being read.
+\newcommand{\TextRef@booklink}[2]{%
+  \edef\TextRef@bhome{\csuse{TextRef@book@home@#1}}%
+  \ifdefempty{\TextRef@bhome}%
+    {#2}%
+    {\ifdefined\href
+       \expandafter\href\expandafter{\TextRef@bhome}{#2}%
+     \else
+       #2%
+     \fi}%
+}
+
+% \booktitle{apex}   -> APEX Calculus, italic, linked to the book's home page
+% \booktitle*{apex}  -> the same, unlinked
+% \bookname{apex}    -> APEX, linked
+% \bookname*{apex}   -> APEX, plain
+%
+% LINKED BY DEFAULT, because a course whose books are online wants the reader
+% one click away and the alternative is retyping the URL. The starred form is
+% for the second and third mention in a paragraph, where repeating the link
+% reads as noise rather than as help.
+\NewDocumentCommand{\booktitle}{s m}{%
+  \IfBooleanTF{#1}%
+    {\BookTitleStyle{\TextRef@bookfield{title}{#2}}}%
+    {\TextRef@booklink{#2}{\BookTitleStyle{\TextRef@bookfield{title}{#2}}}}%
+}
+\NewDocumentCommand{\bookname}{s m}{%
+  \IfBooleanTF{#1}%
+    {\TextRef@bookfield{short}{#2}}%
+    {\TextRef@booklink{#2}{\TextRef@bookfield{short}{#2}}}%
+}
+
+% Never linked: it is a word, not a destination, and the book beside it already
+% carries the link.
+\newcommand{\bookpublisher}[1]{\TextRef@bookfield{publisher}{#1}}
+
+% The URL as printed text, for a document that must show it -- a syllabus that
+% will also be read on paper, say. \url when it is available (it does catcode
+% surgery and will not expand macros, so the value is \edef'd out first, exactly
+% as \href's argument is below).
+\newcommand{\bookurl}[1]{%
+  \edef\TextRef@bu{\csuse{TextRef@book@home@#1}}%
+  \ifdefempty{\TextRef@bu}%
+    {\TextRef@bookmiss{#1}#1}%
+    {\ifdefined\url
+       \expandafter\url\expandafter{\TextRef@bu}%
+     \else
+       \TextRef@bu
+     \fi}%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -409,30 +662,42 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \textbookref
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \textbookref{5.2}{Table 5.2.3}   -> "Table 5.2.3", linked to section 5.2
-% \textbookref*{5.2.3}{Table}      -> "Table 5.2.3", linked to section 5.2
+% \textbookref{5.2}{Table 5.2.3}       -> "Table 5.2.3", linked to section 5.2
+% \textbookref*{5.2.3}{Table}          -> "Table 5.2.3", linked to section 5.2
+% \textbookref[algtrig]{3.2}{\S3.2}    -> linked into ANOTHER book entirely
 %
 % The starred form is the typing shortcut for the overwhelmingly common shape
 % "Word Number": it appends the key you already typed (unbreakable ~, since a
 % label must never split from its number). Use the plain form whenever the
 % printed text is not simply label-then-key ("the start of \S5.2", "the
-% definition of flux").
+% definition of flux"). Star first, then the book: \textbookref*[algtrig]{...}.
 %
 % This is the reference \booksection does NOT cover: a pointer to some OTHER
 % section, typically a prerequisite ("if limit laws feel distant, re-read 1.3").
 % Those still resolve through the \DeclareSection manifest, which therefore only
 % ever needs the handful of sections a course actually cross-references.
-\NewDocumentCommand{\textbookref}{s m m}{%
-  \IfBooleanTF{#1}{\def\TextRef@text{#3~#2}}{\def\TextRef@text{#3}}%
-  \TextRef@resolve{#2}%
+%
+% NAMING A BOOK resolves the key in that book's namespace and hangs the slug off
+% THAT book's base, which is what lets a course point at a text it does not
+% teach from -- the prerequisite algebra book behind a calculus course. Omitted,
+% everything behaves exactly as it always has: the empty namespace, resolved
+% against the document's own default text. The two do not mix, and the reason is
+% under \DeclareSection.
+\NewDocumentCommand{\textbookref}{s O{} m m}{%
+  \IfBooleanTF{#1}{\def\TextRef@text{#4~#3}}{\def\TextRef@text{#4}}%
+  % Whose base: the book named, or -- named none -- the document's own.
+  \ifstrempty{#2}%
+    {\let\TextRef@refbook\TextRef@defaulttext}%
+    {\def\TextRef@refbook{#2}}%
+  \TextRef@resolve{#2}{#3}%
   \ifdefempty{\TextRef@slug}%
-    {\TextRef@miss{#2}\TextRef@text}%
-    {\TextRef@resolvebase{\TextRef@defaulttext}%
+    {\TextRef@miss{#2}{#3}\TextRef@text}%
+    {\TextRef@resolvebase{\TextRef@refbook}%
      \ifdefempty{\TextRef@base}%
        % The section resolved but the text it hangs off did not, so there is no
        % URL to build. Report it: a manifest full of good sections and no base
        % would otherwise degrade the whole document in silence.
-       {\TextRef@basemiss{\TextRef@defaulttext}\TextRef@text}%
+       {\TextRef@basemiss{\TextRef@refbook}\TextRef@text}%
        {\ifdefined\href
           % \href does catcode surgery on its first argument and will NOT expand
           % macros there, so the URL is assembled by \edef first and handed over
