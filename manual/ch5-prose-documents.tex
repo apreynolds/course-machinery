@@ -109,7 +109,12 @@ inside it --- and the importing document says where that lands:
 
 \begin{manexsource}
 % teaching/passages/why-learn-math.tex
-\PassageTitle[whylearnmath]{Why Learn Math?}
+\PassageMeta{
+  title    = {Why Learn Math?},
+  label    = {sec:whylearnmath},
+  audience = {students},
+}
+\PassageTitle
 Mathematics is beautiful, powerful, and useful.
 \end{manexsource}
 
@@ -118,9 +123,15 @@ Mathematics is beautiful, powerful, and useful.
 \importpassage[level=subsection]{../teaching/passages/}{why-learn-math.tex}
 \end{manexsource}
 
-\noindent The optional argument of \cs{PassageTitle} is the passage's
-\cs{label}: it names the passage's own idea, so it belongs to the passage
-rather than to whichever document imports it.
+\noindent \cs{PassageTitle} takes \emph{no arguments}. Its title and its
+\cs{label} both come from the \cs{PassageMeta} block above it --- the same block
+\file{find-passages} reads off disk (section~\ref{sec:ref-passagemeta}). The
+label names the passage's own idea, so it belongs to the passage rather than to
+whichever document imports it.
+
+Unlike \cs{ProblemMeta} and \cs{FactMeta}, which are validated and thrown away,
+this block is read at build time, so it is not optional: a passage with no
+\env{title} is an error rather than an empty heading.
 
 The shift is three \cs{let}s inside a group, run top-down so each captures the
 still-original meaning of the level below. \cs{PassageTitle} then needs no

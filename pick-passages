@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# pick-passages — fzf picker over the passage bank; emits \importpassage lines.
+# A thin shim over pick-meta (the shared picker). Forwards find-passages' filters
+# and PATH operands; `--from DIR' makes emitted paths relative to DIR. See
+# pick-meta and find-passages.
+#
+# Emitted lines never carry [opts]: a passage has no injectable keys. If a passage
+# needs level=subsection here, add it by hand -- and check the depth column first,
+# because a passage carrying subsections cannot be shifted.
+exec "$(dirname -- "$0")/pick-meta" --kind passage --as pick-passages "$@"

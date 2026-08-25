@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
-# find-meta — search a metadata bank (problems or facts) by its \<Kind>Meta block
+# find-meta — search a metadata bank (problems, facts or passages) by its
+# \<Kind>Meta block
 #
-# The shared engine behind find-problems and find-facts. A "kind" (chosen with
-# --kind) fixes three things: the block macro it reads (\ProblemMeta / \FactMeta),
-# the \import wrapper it emits (\importproblem / \importfact), and the key schema
-# (which filters exist, which columns --tsv prints). Everything else -- reading a
-# block off disk, matching, emitting -- is shared and lives here, in one place.
+# The shared engine behind find-problems, find-facts and find-passages. A "kind"
+# (chosen with --kind) fixes three things: the block macro it reads (\ProblemMeta
+# / \FactMeta / \PassageMeta), the \import wrapper it emits (\importproblem /
+# \importfact / \importpassage), and the key schema (which filters exist, which
+# columns --tsv prints). Everything else -- reading a block off disk, matching,
+# emitting -- is shared and lives here, in one place.
 #
 # This file is not meant to be called directly: invoke the per-kind shims
-# find-problems / find-facts, which each `exec' this with the right --kind. See
-# ProblemMeta.sty / FactMeta.sty for the block format this parses.
+# find-problems / find-facts / find-passages, which each `exec' this with the
+# right --kind. See ProblemMeta.sty / FactMeta.sty / PassageMeta.sty for the
+# block format this parses.
 #
 # Usage: find-meta --kind KIND [--as NAME] [FILTER ...] [--untagged] [--vocab]
 #                  [--tsv] [--import [--with LIST] [--from DIR]] [PATH ...]
 #
-# Run `find-problems --help' or `find-facts --help' for the concrete flags of a
-# kind (they differ: facts have no type/difficulty). The mechanics below are the
-# same for both.
+# Run `find-problems --help' (or find-facts, find-passages) for the flags of a
+# kind: they differ, since facts have no type/difficulty and passages have neither
+# plus an audience of their own. The mechanics below are the same for all three.
 #
 # Filters are ANDed; PAT is an extended regular expression matched
 # case-insensitively against each comma-separated item in turn -- so `--topic
@@ -69,13 +72,15 @@ for ((_i = 0; _i < ${#_a[@]}; _i++)); do
 done
 prog=${as:-find-meta}
 
-# Everything that differs between a problem bank and a fact bank lives in exactly
-# this case. filter_specs are `flag:key' pairs -- each becomes a --flag PATTERN
-# filter on that metadata key (the flag is singular by habit: --topic -> topics).
-# tsv_cols / vocab_keys are metadata keys in report order. block/emit are the
-# LaTeX macros. with_keys are the keys --with may inject as \import<kind> options,
-# in the canonical order they are emitted -- per-kind, because a fact's kind/name
-# select and title the environment it is wrapped in and a problem has no analogue.
+# Everything that differs between one bank and another lives in exactly this case.
+# filter_specs are `flag:key' pairs -- each becomes a --flag PATTERN filter on that
+# metadata key (the flag is singular by habit: --topic -> topics). tsv_cols /
+# vocab_keys are metadata keys in report order. block/emit are the LaTeX macros.
+# with_keys are the keys --with may inject as \import<kind> options, in the
+# canonical order they are emitted -- per-kind, because a fact's kind/name select
+# and title the environment it is wrapped in and a problem has no analogue. A kind
+# may leave with_keys EMPTY (a passage does), which --with then refuses outright
+# rather than narrowing.
 case $kind in
   problem)
     noun="problem"; block_macro="ProblemMeta"; emit_macro="importproblem"
@@ -98,8 +103,28 @@ case $kind in
     vocab_keys=(topics kind)
     with_keys=(kind name number)
     ;;
-  '') echo "$prog: --kind is required (problem|fact)" >&2; exit 2 ;;
-  *)  echo "$prog: unknown --kind: $kind (want problem|fact)" >&2; exit 2 ;;
+  passage)
+    noun="passage"; block_macro="PassageMeta"; emit_macro="importpassage"
+    # ONE filter, and no --topic: a passage's filename is its title, so topics
+    # restated what the picker already fuzzy-matches -- and when the bank was
+    # tagged with them, --topic marking selected exactly the same eight files as
+    # --audience tas. A problem earns topics because its filename says nothing
+    # about what it tests; a passage does not.
+    filter_specs=(audience:audience)
+    tsv_cols=(title audience requires)
+    # requires is in the vocabulary for FactMeta-kind's reason rather than topics':
+    # it is FUNCTIONAL, so `MarkerCount' where the bank says `\MarkerCount' is a
+    # passage that will not build, not merely a split search.
+    vocab_keys=(audience requires)
+    # EMPTY, and the only kind of which that is true. The one thing worth injecting
+    # into an \importpassage line would be level=, and level is a property of the
+    # importing document (where the natural depth lands) rather than of the
+    # passage. The passage records `depth' instead, which is a constraint to read,
+    # not an option to paste. See the guard on --with below.
+    with_keys=()
+    ;;
+  '') echo "$prog: --kind is required (problem|fact|passage)" >&2; exit 2 ;;
+  *)  echo "$prog: unknown --kind: $kind (want problem|fact|passage)" >&2; exit 2 ;;
 esac
 
 # flag -> key map (for the option loop) and the filter store (key -> pattern,
@@ -112,9 +137,9 @@ declare -A filt=()
 
 usage() {
   # Help is generated from the active schema so each kind reports its own flags
-  # and columns accurately (find-problems and find-facts do not have the same
-  # filters). This replaces find-problems' sed-reprint-the-header trick, which
-  # cannot vary per kind.
+  # and columns accurately (the three shims do not have the same filters, and a
+  # passage takes no --with at all). This replaces find-problems' sed-reprint-the-
+  # header trick, which cannot vary per kind.
   local spec flag key cols c
   echo "$prog — search the $noun bank by its \\$block_macro metadata"
   echo
@@ -136,7 +161,11 @@ usage() {
   echo "  --untagged  invert: list .tex files with NO \\$block_macro block."
   echo "  --vocab     ignore filters; print the ${vocab_keys[*]} vocabulary with counts."
   echo "  --import    print matches as paste-ready \\$emit_macro lines."
-  echo "    --with LIST   subset of {$(IFS=,; echo "${with_keys[*]}")}: inject those as options where set."
+  if (( ${#with_keys[@]} )); then
+    echo "    --with LIST   subset of {$(IFS=,; echo "${with_keys[*]}")}: inject those as options where set."
+  else
+    echo "    --with        not accepted: a $noun has no injectable keys."
+  fi
   echo "    --from DIR    rewrite each directory argument relative to DIR."
   cols="path"; for c in "${tsv_cols[@]}"; do cols+="<TAB>$c"; done
   echo "  --tsv       one row per match: $cols"
@@ -188,6 +217,19 @@ fi
 # with_keys set above) -- deliberately closed, so there is no per-key flag creep
 # and a typo is refused rather than silently ignored. Collect the request as a set
 # for the emitter below.
+
+# A kind may have NO injectable keys (the passage bank), in which case --with is
+# not a narrower request but a meaningless one -- say so, rather than falling into
+# the loop below and reporting "accepts only  for a passage".
+if [[ -n $with_request && ${#with_keys[@]} -eq 0 ]]; then
+  printf '%s: a %s has no injectable keys, so --with is not accepted\n' \
+    "$prog" "$noun" >&2
+  echo "       a passage takes level= at the import site: where its natural depth" >&2
+  echo "       lands belongs to the importing document, not to the passage. What" >&2
+  echo "       the passage does know is its depth -- see the --tsv column." >&2
+  exit 2
+fi
+
 declare -A want=()
 if [[ -n $with_request ]]; then
   IFS=, read -ra _wk <<< "$with_request"
@@ -314,8 +356,8 @@ csv_matches() {
 # -print0 / read -d '' so paths with spaces survive. Aux and build output never
 # live beside the sources here, but two directories hold .tex that are NOT bank
 # entries and must be pruned: .git (obvious), and .course-machinery -- the
-# tooling submodule, whose manual/ documents \ProblemMeta / \FactMeta by SHOWING
-# example blocks, which would otherwise be scraped as phantom problems/facts.
+# tooling submodule, whose manual/ documents \ProblemMeta / \FactMeta / \PassageMeta
+# by SHOWING example blocks, which would otherwise be scraped as phantoms.
 # Real banks live in course-content dirs (problems/, facts/), never in there. An
 # explicit operand INSIDE .course-machinery still works (the prune only fires on
 # a directory of that name met while descending).
@@ -466,8 +508,11 @@ case $mode in
       # A file that lacks a requested key is silently skipped for that key. Any
       # `#' has to be re-escaped to `\#': read_meta un-escaped it on the way in
       # (\# -> #), but `\%' it left intact, so % needs no re-escaping here.
+      # The `else' branch below is the ONLY branch for a kind with no injectable
+      # keys (the passage bank), not merely the fallback it used to be -- so it
+      # stays even though nothing here can add an option for such a kind.
       opts=""
-      for key in "${with_keys[@]}"; do
+      for key in ${with_keys[@]+"${with_keys[@]}"}; do
         [[ -n ${want[$key]:-} ]] || continue
         v=$(field "${meta_of[$f]}" "$key")
         [[ -n $v ]] || continue

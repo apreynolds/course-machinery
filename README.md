@@ -54,6 +54,7 @@ which one:
 | `Exercises.sty` | Problems, solutions, hints, multiple choice, matching, parts, points |
 | `ProblemMeta.sty` | Greppable metadata blocks on problem files |
 | `FactMeta.sty` | The same, for the reusable-fact bank |
+| `PassageMeta.sty` | The same for the passage bank, and the one that is read at build time: `\PassageTitle` takes its title and label from it |
 | `CourseBoxes.sty` | Theorem/definition boxes and pedagogical asides |
 | `InstructorNotes.sty` | Staff-only annotations, shown in the instructor copy |
 | `Workspace.sty` | Reserved answer space, and the zero-height overlay contract |
@@ -67,11 +68,14 @@ which one:
   one requests through a `%! views:` magic comment, and optionally mirror the
   PDFs to a destination named in a `.MIRRORDIR` file (`SAMPLE-MIRRORDIR` is the
   annotated template).
-- `find-problems` / `find-facts` — search a bank by its metadata blocks, without
-  running LaTeX; `--import` emits paste-ready import lines.
-- `pick-problems` / `pick-facts` — the same search through an `fzf` picker.
+- `find-problems` / `find-facts` / `find-passages` — search a bank by its
+  metadata blocks, without running LaTeX; `--import` emits paste-ready import
+  lines. (A passage takes no `--with`: `level=` belongs to the importing
+  document, not to the passage.)
+- `pick-problems` / `pick-facts` / `pick-passages` — the same search through an
+  `fzf` picker.
 
-`find-meta` and `pick-meta` are the shared engines behind those four; the
+`find-meta` and `pick-meta` are the shared engines behind those six; the
 per-bank commands are thin shims over them.
 
 ## Requirements

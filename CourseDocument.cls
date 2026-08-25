@@ -231,6 +231,19 @@
 % degradation. That is enough for every passage that exists: the deepest is a
 % title plus one rank of subsections.
 %
+% WHICH WAY A PASSAGE CAN BE SHIFTED is not guesswork: its \PassageMeta block
+% records `depth', either {title} (flat prose, imports at either level) or
+% {subsections} (carries a rank of its own, so level=section only). Read it before
+% shifting -- `find-passages --tsv' prints it as a column, and the picker shows it.
+% Deliberately NOT spelled with level's own two words: depth is a property of the
+% passage and level of the document importing it, and one vocabulary for two axes
+% is how two things end up under one name.
+%
+% METADATA. Since 2026-08-25 a passage carries a \PassageMeta{} block, read off
+% disk by find-passages and, uniquely among the three Meta packages, read at build
+% time too: \PassageTitle takes its title and label from it. See PassageMeta.sty
+% for why this one stores when its siblings discard.
+%
 % Load-order note: the \let's run at USE time, long after titlesec and parskip
 % have patched the sectioning commands (parskip at \AtBeginDocument), so what
 % they copy is the fully-patched meaning. keyval arrives with graphicx above.
@@ -241,6 +254,21 @@
 % Passages.sty and all three classes load it; nothing above depends on it, so
 % that move is a cut and paste. (Compare Exercises.sty's note on lifting the
 % fact block into a standalone Facts.sty.)
+% Loaded HERE rather than beside \RequirePackage{import} at the top, so that it
+% travels with this block on the day a lecture wants a passage and the whole thing
+% moves to a Passages.sty (see the note above). PassageMeta owns \PassageMeta@title
+% and \PassageMeta@label; this class is their only reader. \providecommand so that
+% a document which somehow lacks the package hits the ClassError in \PassageTitle
+% below -- a sentence naming the problem -- rather than an undefined control
+% sequence pointing at a macro nobody has heard of.
+\RequirePackage{PassageMeta}
+% etoolbox for \ifdefempty, the test \PassageTitle needs. Loaded explicitly rather
+% than leaned on transitively (titlesec and tabularray both pull it in), the way
+% enumitem and tabularray are -- and it travels with this block if it ever moves.
+\RequirePackage{etoolbox}
+\providecommand{\PassageMeta@title}{}
+\providecommand{\PassageMeta@label}{}
+
 \newif\ifPassage@shifted
 
 \define@key{passage}{level}{%
@@ -281,12 +309,45 @@
   }%
 }
 
-% The title of a passage, written by the passage itself. The optional argument
-% is the \label, which belongs to the passage (it names the passage's own idea)
-% rather than to whichever document happens to be importing it.
-\NewDocumentCommand{\PassageTitle}{o m}{%
-  \section{#2}%
-  \IfValueT{#1}{\label{#1}}%
+% The title of a passage, written by the passage itself. It TAKES NO ARGUMENTS:
+% both the title and the label come from the \PassageMeta block at the top of the
+% same file, which is also what find-passages reads off disk. They used to be
+% arguments here, and moving them into the block on 2026-08-25 was the point of
+% adding PassageMeta -- otherwise the title would be written twice in one file,
+% four lines apart, which is how `desc' and `name' drifted apart.
+%
+% ORDERING RULE: \PassageMeta must come before \PassageTitle in the file. It does
+% naturally -- the block heads the file the way \ProblemMeta heads a problem --
+% and getting it wrong is caught, not silently mistitled, by the error below.
+%
+% The label is optional (a passage nothing refers to needs none); the title is
+% not. A missing title means the block is absent, malformed, or below this call,
+% and in every one of those cases a silent empty \section{} is the wrong answer:
+% this is the one metadata package the toolkit cannot build without, so it says so
+% in the voice \Passage@toodeep uses just above.
+\NewDocumentCommand{\PassageTitle}{}{%
+  \ifdefempty{\PassageMeta@title}{%
+    \ClassError{CourseDocument}{%
+      \string\PassageTitle\space with no title in \string\PassageMeta
+    }{%
+      Every passage needs \string\PassageMeta{title={...}} ABOVE its
+      \string\PassageTitle.\MessageBreak
+      Either this file has no \string\PassageMeta\space block, or the block
+      sets no title,\MessageBreak or it appears below this line. Unlike
+      ProblemMeta and FactMeta, the passage\MessageBreak block is not optional:
+      it is where the title and label live.%
+    }%
+  }{%
+    % \expandafter so \section receives the TITLE TEXT, not the macro holding it.
+    % Without it hyperref records \@currentlabelname as the unexpanded
+    % \PassageMeta@title, writes that into the .aux, and every \secref to a passage
+    % resolves against whatever the LAST imported passage happened to leave in it
+    % -- so all of them come out with the same wrong name. The number and page
+    % fields are unaffected, which is what makes the bug quiet: only \nameref-style
+    % references show it, and only after a second run.
+    \expandafter\section\expandafter{\PassageMeta@title}%
+  }%
+  \ifdefempty{\PassageMeta@label}{}{\label{\PassageMeta@label}}%
 }
 
 \NewDocumentCommand{\importpassage}{O{} m m}{%

@@ -46,9 +46,10 @@ Classes pick from the features; every class stands on the base
 exercise stack; TextRef -- and the text layer it auto-loads -- reaches all
 three). The scripts sit beside the LaTeX entirely: \file{build-pdfs} drives
 latexmk and injects layer flags; \file{find-meta} reads bank files off disk
-behind its per-kind shims \file{find-problems} / \file{find-facts}; and
+behind its per-kind shims \file{find-problems} / \file{find-facts} /
+\file{find-passages}; and
 \file{pick-meta} threads those searches through fzf behind
-\file{pick-problems} / \file{pick-facts}
+\file{pick-problems} / \file{pick-facts} / \file{pick-passages}
 (section~\ref{sec:build-and-find}).
 
 The honest description of the packages' relationship: \emph{not
@@ -361,9 +362,10 @@ corner of the toolkit, worth a skim before debugging anything odd:
     internals at load time; after a titlesec/amsthm upgrade a failed
     patch prints only \texttt{Couldn't patch ...} in the log. Grep for
     it: \texttt{grep "Couldn't patch" *.log}.
-  \item \textbf{A reflowed \cs{ProblemMeta} or \cs{FactMeta} block still
-    compiles} -- and silently vanishes from \file{find-problems} /
-    \file{find-facts} (section~\ref{sec:problemmeta}).
+  \item \textbf{A reflowed \cs{ProblemMeta}, \cs{FactMeta} or
+    \cs{PassageMeta} block still compiles} -- and silently vanishes from
+    \file{find-problems} / \file{find-facts} / \file{find-passages}
+    (section~\ref{sec:problemmeta}).
   \item \textbf{\texttt{[5, hint]} errors} -- the lone-integer points
     shorthand works only alone; write \texttt{[points=5, hint]}.
   \item \textbf{Points are integers}; \texttt{points=2.5} errors at the

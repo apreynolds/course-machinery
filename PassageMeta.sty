@@ -1,0 +1,149 @@
+\ProvidesPackage{PassageMeta}[2026/08/25 Greppable passage metadata (stores title/label)]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% WHY THIS EXISTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The passage bank is one passage per file, shared across courses and pulled into
+% prose documents with \importpassage. So "which passages do I have for TAs about
+% marking?" has to be answerable WITHOUT running LaTeX -- nothing has \input those
+% files yet when you are deciding what goes into a marking manual. Same premise as
+% ProblemMeta and FactMeta, and the same literal block read straight off disk:
+%
+%   \PassageMeta{
+%     title    = {How We Mark},
+%     label    = {sec:howwemark},
+%     audience = {tas},
+%     requires = {tikz},
+%   }
+%
+% Until 2026-08-25 the header comment at the top of each passage WAS the index --
+% sufficient at single digits, and TODO.md predicted it would stop being so
+% somewhere in the teens. It stopped at eleven, when the bank got a picker.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HOW THIS DIFFERS FROM ITS TWO SIBLINGS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THIS ONE STORES, and it is the only one that does. ProblemMeta and FactMeta
+% discard every value: the handlers are empty and the block exists so that a
+% mistyped key errors at compile time. Here `title' and `label' have REAL
+% handlers, because a passage differs from a fact in WHERE ITS NAME IS CONSUMED.
+%
+% A fact's `name' is consumed at the IMPORT SITE -- \importfact[name=...] titles
+% the box -- so find-facts injects it from the block into the call site and
+% FactMeta itself never needs the value. A passage's title is consumed INSIDE THE
+% PASSAGE FILE, by \PassageTitle, a few lines below this block. There is no import
+% site to inject it into. So either this package stores it, or the same string is
+% written twice in one file, four lines apart -- and one job under two spellings
+% is exactly the drift that cost `desc'/`name' a rename on 2026-08-13.
+%
+% Store-only was never a principle anyway, only a consequence: ProblemMeta says so
+% itself, recording that it USED to print metadata in the margin and how to bring
+% that back. This is the first block where something needs the values again.
+%
+% THE PRICE IS REMOVABILITY, and it is worth naming. FactMeta can be deleted and
+% every fact still builds. Delete this one and every passage loses its heading. So
+% \PassageTitle does not degrade quietly: with no title it raises a ClassError
+% naming the file, in the same voice as the too-deep-heading error beside it.
+% This is the one metadata package the toolkit cannot do without.
+%
+% NO `level' KEY, deliberately, though an early sketch of this schema had one.
+% `level' says where a passage's natural depth LANDS in the document importing it,
+% which makes it a property of that document and not of the passage -- so it
+% cannot be metadata, and \importpassage keeps taking it at the call site.
+% Consequence: a passage has NO injectable keys at all, so find-passages takes no
+% --with. It is the only kind of which that is true.
+%
+% NO `depth' KEY EITHER, and that one was tried and removed. The idea was to
+% record how far a passage reaches below its own title, so you could tell before
+% shifting whether level=subsection was legal. It records nothing: a shift maps
+% section->subsection and subsection->subsubsection, the class styles three ranks,
+% so a title plus one rank of subsections still fits -- verified by importing the
+% deepest passage in the bank at level=subsection and getting clean 1.1.1's. The
+% limit only bites a passage carrying \subsubsection itself, which none does, and
+% CourseDocument already refuses that at build time with a message naming the fix.
+% A key duplicating a check the compiler performs is a second reader of one fact.
+%
+% NO `topics' EITHER. A passage's filename is its title (why-learn-math.tex), so
+% topics restated what the picker could already fuzzy-match; and in the bank as
+% tagged, `marking' covered eight of eleven files while eight other values covered
+% one file each -- and `--topic marking' selected exactly the same eight files as
+% `--audience tas'. One partition does not need two keys. Problems earn topics
+% because a problem's filename says nothing about what it tests.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THE KEYS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% title     the passage's own title, typeset by \PassageTitle. Required: a
+%           passage with no title has no heading, and that is an error.
+% label     the \label \PassageTitle attaches, so \secref can reach the passage.
+%           It names the passage's own idea and therefore belongs to the passage,
+%           not to whichever document imports it. Optional -- omit it for a
+%           passage nothing refers to. Prefix `sec:', like every other sectioning
+%           label in the courses.
+% audience  who it is written for: students, tas, instructors. Comma separated,
+%           more than one allowed. Lowercase, because --vocab counts raw strings
+%           and `TAs' beside `tas' would split the very report meant to catch it.
+%           The only genuinely searchable key here, and it earns that because it
+%           is the one thing a passage's title does NOT tell you: what reads as a
+%           markers' manual may also be what students are told in their handout,
+%           and two passages in the bank are both.
+% requires  what the IMPORTING DOCUMENT must supply or the build fails: course
+%           macros (\MarkerCount) and packages (tikz) alike, because from the
+%           author's side those are one question -- what must be in place before
+%           this passage will compile? -- even though the fixes differ (a
+%           courseinfo definition vs a \usepackage). The leading backslash is the
+%           discriminator, and is why --vocab can tell the two species apart.
+%           The one key with no analogue in the other two banks, and the reason a
+%           passage can fail in a way a problem cannot. Absent means self-contained;
+%           write nothing rather than `requires = {}'.
+%
+% Keep ONE KEY PER LINE, values braced. find-passages parses the block textually,
+% line by line; reflowing it onto a single line still compiles fine but makes the
+% passage invisible to the script. That is the one way to get the two readers out
+% of step, so it is worth the discipline.
+%
+% NB `#' is special to LaTeX, so a value containing one must write it \#.
+% find-passages knows this and reports it back without the backslash. A macro name
+% in `requires' needs no such care: the handler never expands it, so \MarkerCount
+% is stored and dropped even in a document that has never defined it.
+
+\RequirePackage{keyval}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THE TWO STORED VALUES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Read by \PassageTitle in CourseDocument.cls -- the only reader. The setter owns
+% the name, so they are PassageMeta@ and the class only looks at them; the class
+% \providecommand's them too, so a document that somehow lacks this package gets
+% the ClassError rather than an undefined control sequence.
+%
+% PLAIN \def, NOT \gdef, and that is load-bearing. \importpassage wraps its
+% \import in \begingroup...\endgroup, and this block is read inside that group, so
+% a local definition dies with the import that set it. Per-import isolation comes
+% free and a \gdef would defeat it -- the second passage in a document would
+% inherit the first one's title wherever its own block omitted one.
+%
+% Deferred writes are safe under that scoping: \section and \label both route
+% through \protected@write, which \edef's its argument at the point of the call --
+% inside the group, while the value still exists -- and only defers the \write
+% itself. The .toc and .aux therefore see the text, not a dead macro.
+\newcommand{\PassageMeta@title}{}
+\newcommand{\PassageMeta@label}{}
+
+% Cleared at the top of every block rather than trusting the caller's group, so a
+% passage \input directly (no \importpassage, hence no group) still cannot inherit
+% a previous one's title.
+\define@key{PassageMeta}{title}   {\def\PassageMeta@title{#1}}
+\define@key{PassageMeta}{label}   {\def\PassageMeta@label{#1}}
+
+% Accepted, validated, DISCARDED -- the sibling pattern. A mistyped key (`topic'
+% for `audiences') errors at compile time; the values are read off disk by
+% find-passages, never from here.
+\define@key{PassageMeta}{audience}{}
+\define@key{PassageMeta}{requires}{}
+
+\newcommand{\PassageMeta}[1]{%
+  \def\PassageMeta@title{}%
+  \def\PassageMeta@label{}%
+  \setkeys{PassageMeta}{#1}\ignorespaces
+}

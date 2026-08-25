@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# find-passages — search the passage bank by its \PassageMeta metadata.
+# A thin shim over find-meta (the shared engine); `--help' lists the concrete
+# passage filters (--audience/--topic). A passage takes NO --with: level= belongs
+# to the importing document, not to the passage. See find-meta and PassageMeta.sty.
+#
+# The bank is a SIBLING SUBMODULE (teaching/passages/), not a directory inside the
+# course, so give it as an operand: `find-passages teaching/passages'. Run bare
+# from a course root it would walk the whole course and report every untagged
+# problem and assessment as well.
+exec "$(dirname -- "$0")/find-meta" --kind passage --as find-passages "$@"

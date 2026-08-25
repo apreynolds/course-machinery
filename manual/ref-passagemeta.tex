@@ -1,0 +1,126 @@
+\section{PassageMeta.sty}\label{sec:ref-passagemeta}
+
+Greppable \emph{passage} metadata --- the third and youngest of the Meta
+packages, and the one that breaks two of the other two's rules. A passage is
+prose that belongs to the author rather than to a course (see
+section~\ref{sec:prose-documents}); PassageMeta lets you find one by what it
+says, and who it is for, without running \LaTeX. One command:
+
+\begin{manexsource}
+\PassageMeta{
+  title    = {How We Mark},
+  label    = {sec:howwemark},
+  audience = {tas},
+  requires = {tikz},
+}
+\PassageTitle
+\end{manexsource}
+
+Keys: \env{title}, \env{label}, \env{audience}, \env{requires}. Four, where a
+problem has six --- a passage has \emph{no} \env{source} or \env{number} (it is
+not drawn from a textbook and it is not numbered), nothing extrinsic like points,
+and deliberately no \env{topics}: see below.
+
+\subsection*{The two rules it breaks}
+
+\textbf{It stores.} ProblemMeta and FactMeta are store-only: every handler is
+empty, the values discarded, the block present so that a mistyped key errors at
+compile time. Here \env{title} and \env{label} have real handlers, because a
+passage differs from a fact in \emph{where its name is consumed}. A fact's
+\env{name} is consumed at the import site --- \cs{importfact}\texttt{[name=...]}
+titles the box --- so \file{find-facts} injects it from the block into the call
+site and FactMeta never needs the value itself. A passage's title is consumed
+\emph{inside the passage file}, by \cs{PassageTitle}, a few lines below the
+block. There is no import site to inject it into. So either the package stores
+it, or the same string is written twice in one file --- and one job under two
+spellings is what cost \env{desc} and \env{name} a rename
+(section~\ref{sec:ref-problemmeta}).
+
+\textbf{It is not removable.} Delete FactMeta and every fact still builds.
+Delete this one and every passage loses its heading, so the failure is made loud
+rather than quiet: \cs{PassageTitle} with no title raises a class error naming
+what is missing. This is the one metadata package the toolkit cannot do without.
+
+\subsection*{Nothing is injectable}
+
+\texttt{find-passages} accepts no \texttt{-{}-with} at all, and it is the only
+kind of which that is true. The one option an \cs{importpassage} line takes is
+\env{level}, and \env{level} says where the passage's natural depth \emph{lands
+in the document importing it} --- a property of that document, not of the
+passage. Emitted lines are therefore always bare.
+
+A \env{depth} key was tried here and removed, which is worth recording so it is
+not re-derived. The idea was to note how far a passage reaches below its own
+title, so you could tell before importing whether
+\env{level}\texttt{=subsection} was legal. It gates nothing: the shift maps
+\cs{section} to \cs{subsection} and \cs{subsection} to \cs{subsubsection}, the
+class styles three ranks, so a title plus one rank of subsections still fits ---
+importing the deepest passage in the bank at \env{level}\texttt{=subsection}
+gives clean \texttt{1.1.1}'s. The limit bites only a passage carrying
+\cs{subsubsection} itself, which none does, and \file{CourseDocument} already
+refuses that at build time with a message naming the fix
+(section~\ref{sec:ref-coursedocument}). Metadata duplicating a check the
+compiler performs is a second reader of one fact.
+
+\subsection*{No topics, either}
+
+The problem and fact banks are searched by \env{topics}; the passage bank is not,
+and the reason is a difference in how the two kinds of file are named. A problem
+lives in \file{bacteria-doubling.tex}, whose name says nothing about what it
+tests, so \env{topics} is the only way to ask what is in the bank. A passage
+lives in \file{why-learn-math.tex}, whose name \emph{is} its title --- and the
+title is a key here, which the picker fuzzy-matches. \env{topics} restated it.
+
+The bank was tagged with topics before this was settled, and the tagging is what
+settled it: \env{marking} covered eight of the eleven files while eight other
+values covered one file each, and \texttt{-{}-topic marking} selected exactly the
+same eight files as \texttt{-{}-audience tas}. A vocabulary whose commonest value
+is three-quarters of the bank, and whose partition another key already makes, is
+not a search axis. The passage bank is also expected to run to dozens of files
+rather than hundreds, which is the scale at which reading the list beats
+filtering it.
+
+\subsection*{requires}
+
+The one key with no analogue in the other two banks, and the reason a passage can
+fail in a way a problem cannot: it lists what the \emph{importing document} must
+supply. Course macros and packages both, because from the author's side they are
+one question --- what must be in place before this passage compiles? --- even
+though the fixes differ. The leading backslash tells them apart:
+
+\begin{manexsource}
+requires = {\MarkerCount}            % a macro the course must define
+requires = {tikz}                    % a package the document must load
+requires = {\MarkerCount, \PointsPerQuestion}
+\end{manexsource}
+
+\noindent Absent means self-contained; write nothing rather than
+\env{requires}\texttt{ = \{\}}. There is no machinery behind it on purpose: a
+course that imports a passage without supplying what it needs gets an
+undefined-control-sequence error, which is the loud failure wanted. The key is in
+\texttt{-{}-vocab} for the reason FactMeta's \env{kind} is, rather than the
+reason a problem's \env{topics} is: it is functional, so \texttt{MarkerCount}
+where the bank says \cs{MarkerCount} is a passage that will not build, not merely
+a split search.
+
+\subsection*{The rest}
+
+\env{audience} is \env{students}, \env{tas} or \env{instructors}, comma-separated
+and lowercase --- lowercase because \texttt{-{}-vocab} counts raw strings, so
+\texttt{TAs} beside \texttt{tas} would split the very report meant to catch that.
+It is intrinsic to the passage, not to the document importing it --- and it is the
+one key here that survives the test \env{topics} failed, because it is the one
+thing the title does \emph{not} tell you. Two passages in the bank are
+\env{tas, students}: the marking manual explains the standard to markers, and
+students are told the same thing in their own handout. Nothing in
+\file{serious-and-small-errors.tex} announces that; you have to read the prose to
+find the sentence saying so. \env{label}
+carries the \texttt{sec:} prefix every other sectioning label in the courses uses,
+and is optional: omit it for a passage nothing refers to.
+
+On the \LaTeX{} side \env{audience} and \env{requires} are \emph{validated but
+discarded}, exactly as in the siblings; only \env{title} and \env{label} survive
+the block. The real reader of all four is \file{find-passages}, which parses the
+block textually off disk --- hence the same two disciplines (one key per line
+with braced values, and \texttt{\#} written \texttt{\char`\\\#}) as the other two.
+A macro name in \env{requires} needs no such care: the handler never expands it.

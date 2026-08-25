@@ -92,9 +92,29 @@ difficulty), and \texttt{-{}-tsv} columns are
 (path, name, kind, topics, source, number). The Vim command \texttt{:ImportFact}
 (\texttt{<Space>if}) mirrors \texttt{:ImportProblem}.
 
-Under the hood all four commands are thin shims over one shared engine,
-\file{find-meta} (\file{find-problems}/\file{find-facts}) and \file{pick-meta}
-(\file{pick-problems}/\file{pick-facts}): a \texttt{-{}-kind} selects the block
+\subsection*{find-passages and pick-passages (the passage-bank twins)}
+
+The passage bank (section~\ref{sec:ref-passagemeta}) --- prose shared across
+courses, living in the \file{teaching/} submodule --- is searched the same way
+again. \file{find-passages} and \file{pick-passages} read \cs{PassageMeta} blocks
+and emit \cs{importpassage} lines; the only filter is \texttt{-{}-audience}
+(a passage's filename is its title, so there is no \env{topics} to search), and
+\texttt{-{}-tsv} columns are (path, title, audience, requires). The Vim command
+\texttt{:ImportPassage} (\texttt{<Space>ig}) mirrors the other two.
+
+Two ways this pair differs from the other four. It takes \emph{no}
+\texttt{-{}-with}: a passage has no injectable keys, since the only option
+\cs{importpassage} accepts is \env{level} and that belongs to the importing
+document. And because the bank is a sibling submodule rather than a directory of
+the course, give it as an operand (\texttt{find-passages teaching/passages});
+run bare from a course root it would walk the course as well and report every
+untagged file in it.
+
+Under the hood all six commands are thin shims over one shared engine,
+\file{find-meta} (\file{find-problems}/\file{find-facts}/\file{find-passages})
+and \file{pick-meta}
+(\file{pick-problems}/\file{pick-facts}/\file{pick-passages}): a
+\texttt{-{}-kind} selects the block
 macro, the emitted wrapper and the key schema; the reading, matching and
 emitting are written once. Run any shim with \texttt{-{}-help} for its concrete
 flags.

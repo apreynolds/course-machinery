@@ -86,38 +86,18 @@ for call sites that read as intent rather than paths. Worth knowing before
 building it: **correctness comes from `import`, not from the wrapper** — this is
 cosmetic, and a wrong wrapper can only make a working mechanism less legible.
 
-**A `passage` metadata kind** → *when the passage bank passes ~15 files, or you
-stop being able to recall what is in it.*
-`\importpassage` exists (prose-documents chapter); what it has no counterpart to
-is `\ProblemMeta`/`\FactMeta` and the search that reads them. Until then each
-passage carries a header comment naming its audience, requirements, provenance
-and natural depth, and that comment block *is* the index — which is sufficient
-at single digits and stops being so somewhere in the teens.
-
-Settled, so it need not be re-derived. `find-meta` was built to take a third
-kind: *"Everything that differs between a problem bank and a fact bank lives in
-exactly this case"* (`find-meta:79`). So the cost is one `case` arm, a
-`PassageMeta.sty` modelled on `FactMeta.sty`, and two shims of six lines each
-(`find-passages`, `pick-passages`) — no new concept. Schema:
-
-```
-noun="passage"; block_macro="PassageMeta"; emit_macro="importpassage"
-filter_specs=(audience:audience topic:topics)
-tsv_cols=(title audience topics requires)
-vocab_keys=(audience topics)
-with_keys=(level)
-```
-
-`title` and `label` fold into the block when it arrives, the way a fact's `name`
-does, and `\PassageTitle` reads them from there. `requires` is the list of course
-macros the passage expects (`\PointsPerQuestion` and friends) — the one key with
-no analogue in the other two banks, and the reason a passage can fail in a way a
-problem cannot.
-
-The payoff beyond search is `find-passages --import --from .`, which computes
-`../teaching/passages/` for you — the same authoring-time path help problems
-already get, and the answer to the only real ergonomic complaint about relative
-directories.
+**A cross-reference key for passages (`companions`)** → *when a SECOND passage
+pair develops a cross-reference.*
+`how-we-mark` refers out to `sec:impression` and `sec:otherpointvalues`, so those
+three travel together, and today that is a `% REFERS OUT` comment in the one file
+that needs it. One file out of eleven does not earn a key, and the failure is
+already loud — drop one and LaTeX reports an undefined reference at build time,
+which is the failure wanted. If it ever earns one, the key is
+`companions = {mostly-right-impression, other-point-values}` (basenames, no
+`.tex`), and it does *not* belong in `tsv_cols`. Deliberately not folded into
+`requires`: that key is "what the document must supply", which is a different
+relation, and mixing them would cost the `\`-sigil that tells a macro from a
+package.
 
 ---
 

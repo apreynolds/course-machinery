@@ -52,8 +52,13 @@ prog=${as:-pick-meta}
 case $kind in
   problem) noun="problem"; inject_keys="number,name" ;;
   fact)    noun="fact";    inject_keys="kind,name,number" ;;
-  '') echo "$prog: --kind is required (problem|fact)" >&2; exit 2 ;;
-  *)  echo "$prog: unknown --kind: $kind (want problem|fact)" >&2; exit 2 ;;
+  # EMPTY, tracking find-meta's empty with_keys for a passage: the only option an
+  # \importpassage line takes is level=, and that is the importing document's
+  # business, not the passage's. Emitted lines are therefore always bare, and the
+  # --with pair below must be omitted entirely rather than passed empty.
+  passage) noun="passage"; inject_keys="" ;;
+  '') echo "$prog: --kind is required (problem|fact|passage)" >&2; exit 2 ;;
+  *)  echo "$prog: unknown --kind: $kind (want problem|fact|passage)" >&2; exit 2 ;;
 esac
 
 usage() {
@@ -148,7 +153,12 @@ selection=$(
 # find-meta, never duplicated here.
 mapfile -t files < <(printf '%s\n' "$selection" | cut -f1)
 
-import_args=(--import --with "$inject_keys")
+# --with is OMITTED, not passed empty, when a kind injects nothing: find-meta
+# parses its value with ${2:?...}, which rejects the empty string as well as a
+# missing one -- so `--with ""' would abort the pick AFTER the user had already
+# chosen, which is the worst possible moment.
+import_args=(--import)
+[[ -n $inject_keys ]] && import_args+=(--with "$inject_keys")
 [[ -n $from ]] && import_args+=(--from "$from")
 
 "${engine[@]}" "${import_args[@]}" "${files[@]}"
