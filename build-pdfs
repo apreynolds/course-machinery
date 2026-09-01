@@ -81,6 +81,17 @@ fi
 
 set -uo pipefail
 
+# LATEXMK-AUX-CONTRACT -- the ~/.cache/latexmk aux-dir scheme is derived
+# independently in FIVE places. `rg LATEXMK-AUX-CONTRACT' lists them all:
+#   1. ~/.config/vim/custom/vimtex.vim        s:TexCacheRoot / s:TexAuxKey
+#   2. this file                              cache_root / aux_key
+#   3. songs-machinery/build-pdfs             basename-only variant
+#   4. ~/.config/scripts/bin/pr-latexmk       verbatim copy of (2)
+#   5. scripts/bin/machine-sync/latexmk-clear prunes the directory
+# Change one, change all -- divergence is silent (an unreadable log reads as
+# "no errors", not "wrong path"). (3) and (5) hardcode $HOME/.cache and would
+# need updating first if XDG_CACHE_HOME were ever set.
+#
 # Where auxiliary files live. Honours XDG_CACHE_HOME; without it, the default is
 # the same ~/.cache path this has always used, so nothing moves for anyone who
 # has not set the variable. NB two other consumers assume this root -- see
@@ -296,6 +307,10 @@ ensure_latexmkrc() {
   cp -- "$src" .latexmkrc && echo "    .latexmkrc: installed"
 }
 
+# LATEXMK-AUX-CONTRACT -- this function is the ORIGINAL; pr-latexmk holds a
+# verbatim copy and vimtex.vim's s:TexAuxKey mirrors it in vimscript. Improve it
+# here, then re-copy; see the roster by cache_root above.
+#
 # Aux-dir key for the current directory: its path RELATIVE TO THE REPO ROOT
 # (the nearest ancestor holding .course-machinery, found the way .latexmkrc
 # finds it), slashes flattened to '-'. The old key was the bare directory name,
