@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{Titling}[2026/07/15 Shared title block for course documents]
+\ProvidesPackage{TitleBlock}[2026/07/15 Shared title block for course documents]
 
 % \subtitle + \maketitle, shared by LectureNotes.cls and CourseDocument.cls.
 % The structure -- title / subtitle / "Updated <date>" -- lives here, once;
@@ -80,7 +80,7 @@
 % class that wanted a head has loaded it.
 \newcommand{\CourseHeadRule}{0.4pt}
 
-% \BookSectionHead is TextRef's; \providecommand because Titling loads first and
+% \BookSectionHead is TextRef's; \providecommand because TitleBlock loads first and
 % a class may use this head without TextRef ever being asked for a coordinate,
 % in which case the head is empty and the rule sits over nothing.
 \providecommand{\BookSectionHead}{}

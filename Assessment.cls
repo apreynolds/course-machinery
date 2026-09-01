@@ -125,7 +125,7 @@
 
 % Blank line between paragraphs instead of an indent. Default skip; assessments
 % are structured questions rather than continuous prose, so the indent signal
-% has little to do here. No Titling -- an assessment opens with a NAME/ID box.
+% has little to do here. No TitleBlock -- an assessment opens with a NAME/ID box.
 \RequirePackage{parskip}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

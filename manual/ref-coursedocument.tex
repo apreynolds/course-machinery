@@ -2,7 +2,7 @@
 
 The prose class: syllabus, TA information, policies -- and this manual.
 Article-based. Loads Typefaces \texttt{[osf]} by default (the only class
-with old-style body figures; \texttt{[lining]} opts out), Titling,
+with old-style body figures; \texttt{[lining]} opts out), TitleBlock,
 Hyperlinks, InstructorNotes, \file{enumitem} (tunable lists --- a policy
 document is more list than prose) and \file{tabularray} (the same reasoning
 for tables: grade scales, rosters, a term schedule); no
@@ -34,7 +34,7 @@ mahogany -- and it is the colour that prints: headings, the title block
 and internal links all carry it unmodified, so restyling a course
 document is a one-line \cs{colorlet}. \env{HeadingColor} and
 \env{TitleColour} are aliases of it rather than shades of it; they exist
-only because titlesec, Titling and hyperref each want a colour \emph{name}
+only because titlesec, TitleBlock and hyperref each want a colour \emph{name}
 to expand at use. The identity is deliberately not green: green means
 \emph{solutions / not for students} across the toolkit
 (\env{SolutionColor}), and a student-facing document must not read as
@@ -71,5 +71,5 @@ the gotchas in section~\ref{sec:gotchas}). The measure follows the
 toolkit-wide rule (\texttt{textwidth} $= 2.6\times$\cs{alphabet},
 section~\ref{sec:ref-typefaces}); margins balance 1:1 one-sided and 2:3
 two-sided, with a generous marginpar column for instructor notes. The
-Titling hooks are set to colour the title and stamp it \emph{at (time)} --
+TitleBlock hooks are set to colour the title and stamp it \emph{at (time)} --
 these documents revise mid-term, and the stamp identifies the printing.

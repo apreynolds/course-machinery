@@ -350,7 +350,7 @@ This package writes nothing at compile time for anything else to read
 back, and deliberately so. The \emph{sources} are the record, in three
 places: the \cs{booksection} line in each lecture; the base and
 cross-reference lines in the course's text layer; and every \cs{demo}
-call (section~\ref{sec:ref-titling}). Same discipline as ProblemMeta and
+call (section~\ref{sec:ref-titleblock}). Same discipline as ProblemMeta and
 FactMeta --- ``what does this course contain?'' must be answerable
 without running \LaTeX.
 
@@ -371,11 +371,11 @@ linked if a URL resolved and hyperref is present), and the raw pieces
 \cs{BookSectionNumber}, \cs{BookSectionTitle}, \cs{BookSectionText} and
 \cs{BookSectionSlug}. A class that wants the running head reads
 \cs{BookSectionHead} at shipout --- LectureNotes puts it in
-\cs{CourseRunningHead} (Titling) and keys its \cs{headrule} off its
+\cs{CourseRunningHead} (TitleBlock) and keys its \cs{headrule} off its
 emptiness, so a lecture that declares nothing gets no head and no rule
 --- and a class that wants no head simply never reads it: the same
 mechanism/presentation split as everywhere else
 (section~\ref{sec:hooks}). \cs{BookSectionHead} is
-\cs{providecommand}-stubbed empty in Titling, so reading it never
+\cs{providecommand}-stubbed empty in TitleBlock, so reading it never
 requires this package to be loaded. The one knob between the pieces is
 \cs{BookSectionSeparator} (section~\ref{sec:ref-knobs}).

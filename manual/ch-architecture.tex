@@ -30,7 +30,7 @@ it is shaped the way it is.
   % Row 4: the base (TextRef sits here: all three classes load it)
   \node[band] at (-0.6, 0.1) {base};
   \node[box] at (1.8, 0.1) {Typefaces};
-  \node[box] at (4.0, 0.1) {Titling};
+  \node[box] at (4.0, 0.1) {TitleBlock};
   \node[box] at (6.2, 0.1) {Hyperlinks};
   \node[box] at (8.3, 0.1) {TextRef};
   % Alongside: the scripts
@@ -42,7 +42,7 @@ it is shaped the way it is.
 \end{center}
 
 Classes pick from the features; every class stands on the base
-(Assessment skips Titling and CourseBoxes; CourseDocument skips the
+(Assessment skips TitleBlock and CourseBoxes; CourseDocument skips the
 exercise stack; TextRef -- and the text layer it auto-loads -- reaches all
 three). The scripts sit beside the LaTeX entirely: \file{build-pdfs} drives
 latexmk and injects layer flags; \file{find-meta} reads bank files off disk
@@ -112,7 +112,7 @@ no restyle can corrupt it. The instances:
     \cs{TitleStamp}, \cs{LinkColor} and \cs{UrlColor} have plain defaults
     in the base packages and are coloured only by CourseDocument.
     \cs{TitleColor} is a \emph{style} hook, not a colour name, precisely
-    so Titling needs no xcolor.
+    so TitleBlock needs no xcolor.
   \item \textbf{\cs{WSZeroHeight}.} Exercises and InstructorNotes route
     their boxes through Workspace's overlay seam -- but each carries an
     \cs{AtBeginDocument} \cs{providecommand} identity fallback, so

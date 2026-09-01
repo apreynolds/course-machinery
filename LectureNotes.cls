@@ -70,7 +70,7 @@
 % contract: amsmath/newtxmath must already be loaded; MathStuff adds mathtools.
 \RequirePackage{MathStuff}
 
-\RequirePackage{Titling}
+\RequirePackage{TitleBlock}
 \RequirePackage{Hyperlinks}
 
 % \textbookref -- links into the course text. Mechanism only: the base URL and the

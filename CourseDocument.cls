@@ -72,7 +72,7 @@
 \else
   \RequirePackage[osf]{Typefaces}
 \fi
-\RequirePackage{Titling}
+\RequirePackage{TitleBlock}
 \RequirePackage{Hyperlinks}
 
 % \textbookref -- links into the course text (a syllabus cites the book as much
@@ -83,7 +83,7 @@
 % Instructor-only notes layer, shared with LectureNotes. AFTER Typefaces: this is
 % where tcolorbox now legitimately enters this class (below the font block, per the
 % "Fonts" load order). The instructor-copy signal is its page-edge frame -- no
-% \TitleMarker override needed (see the Titling hooks below).
+% \TitleMarker override needed (see the TitleBlock hooks below).
 \RequirePackage{InstructorNotes}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -121,7 +121,7 @@
 %
 % HeadingColor and TitleColour are plain ALIASES, not shades. They exist because
 % the machinery reaches for a colour by NAME, not because anything is derived:
-% titlesec expands \color{HeadingColor} at each heading, Titling expands
+% titlesec expands \color{HeadingColor} at each heading, TitleBlock expands
 % \color{TitleColour} at \maketitle, and \LinkColor below hands the name
 % `HeadingColor' to \hypersetup. Nothing transforms them.
 %
@@ -144,7 +144,7 @@
 \colorlet{HeadingColor}{CourseIdentity}
 \colorlet{TitleColour}{HeadingColor}
 
-% Titling hooks: this is the class that colours, and the one that stamps a time.
+% TitleBlock hooks: this is the class that colours, and the one that stamps a time.
 \renewcommand{\TitleColor}{\color{TitleColour}}
 \renewcommand{\TitleStamp}{\space at \DTMcurrenttime}
 % No \TitleMarker override: the instructor-copy signal is the page-edge frame

@@ -1,9 +1,9 @@
-\section{Titling.sty and Hyperlinks.sty}\label{sec:ref-titling}
+\section{TitleBlock.sty and Hyperlinks.sty}\label{sec:ref-titleblock}
 
 Two small base packages, both built on the same hook pattern: plain
 defaults here, a class overrides with \cs{renewcommand}.
 
-\subsection*{Titling}
+\subsection*{TitleBlock}
 
 The shared title block for LectureNotes and CourseDocument -- title,
 subtitle, ``Updated $\langle$date$\rangle$'' -- structure written once,
@@ -40,7 +40,7 @@ neither this file nor datetime2.
   \cs{maketitle}.\\
 \cs{TitleColor} & a \emph{style} hook (e.g.\
   \cs{color}\texttt{\{HeadingColor\}}), deliberately not a colour name --
-  it keeps Titling free of any xcolor dependency. Default: empty.\\
+  it keeps TitleBlock free of any xcolor dependency. Default: empty.\\
 \cs{TitleStamp} & follows the date (CourseDocument sets ``at
   $\langle$time$\rangle$''). Default: empty.\\
 \cs{TitleMarker} & follows the stamp; currently a free hook -- the

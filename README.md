@@ -60,7 +60,7 @@ which one:
 | `Workspace.sty` | Reserved answer space, and the zero-height overlay contract |
 | `TextRef.sty` | Ties a document to *its* textbook — section links, named results |
 | `MathStuff.sty` | Shared mathematical notation |
-| `Typefaces.sty`, `Titling.sty`, `Hyperlinks.sty` | Fonts, titles and headings, links |
+| `Typefaces.sty`, `TitleBlock.sty`, `Hyperlinks.sty` | Fonts, titles and headings, links |
 
 **Scripts:**
 
