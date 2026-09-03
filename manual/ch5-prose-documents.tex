@@ -122,6 +122,8 @@ Mathematics is beautiful, powerful, and useful.
 \importpassage[level=subsection]{../teaching/passages/}{why-learn-math.tex}
 \end{manexsource}
 
+\noindent There is one other option, \env{note}, described below.
+
 \noindent \cs{PassageTitle} takes \emph{no arguments}. Its title and its
 \cs{label} both come from the \cs{PassageMeta} block above it --- the same block
 \file{find-passages} reads off disk (section~\ref{sec:ref-passagemeta}). The
@@ -145,6 +147,40 @@ anything further rather than degrading silently. A passage may therefore carry
 one rank of headings below its title and no more. In practice that is the
 constraint that decides how a passage is cut: a body of prose with three
 ranks is two passages, not one.
+
+\textbf{The editor's note.} A passage is written in one voice and imported by
+several documents, and sometimes the second document needs to say something
+about the first document's prose. \file{how-work-is-marked.tex} is written for
+students and appears in \file{advice-for-students}; when
+\file{notes-for-instructors} takes the same passage, its declarative student
+voice wants a gloss, and that gloss would be nonsense in the syllabus it is
+describing. So the note is given at the import:
+
+\begin{manexsource}
+\importpassage[note={Note: this section is included in the student syllabus;
+                     we can discuss and refine as needed.}]%
+  {../teaching/passages/}{how-work-is-marked.tex}
+\end{manexsource}
+
+\noindent It prints as an italic parenthetical between the passage's heading and
+its first paragraph, in that document and nowhere else. The machinery supplies
+the italics and the parentheses and nothing else --- no fixed \texttt{Note:}
+prefix --- because a note that does not want to open with the word is as likely
+as one that does.
+
+\textbf{Why this is not a \cs{PassageMeta} key}, which is the question it
+invites. It is the \env{level} argument again: a note saying ``this is in the
+student syllabus'' is true from the instructor document's side and meaningless
+from the syllabus's own, so it describes the \emph{importer}, and a key in the
+block would print it in every document that takes the passage
+(section~\ref{sec:ref-passagemeta}). Nothing about the passage bank changes ---
+no passage file gains a key, \file{find-passages} still emits bare import lines,
+and a passage still has nothing injectable.
+
+One failure mode comes with it, since the key is set at the call site and
+consumed a file away: a passage that never calls \cs{PassageTitle} has nowhere
+to print the note. That is a class warning naming the file rather than a silent
+loss.
 
 A passage needing a number the course owns names a macro --- say
 \cs{PointsPerQuestion} --- and lets the course define it in its own

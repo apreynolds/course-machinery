@@ -50,8 +50,20 @@
 % `level' says where a passage's natural depth LANDS in the document importing it,
 % which makes it a property of that document and not of the passage -- so it
 % cannot be metadata, and \importpassage keeps taking it at the call site.
-% Consequence: a passage has NO injectable keys at all, so find-passages takes no
-% --with. It is the only kind of which that is true.
+%
+% NO `note' KEY, added 2026-09-03 and resting on exactly that argument. An
+% editor's note -- "this section is in the student syllabus; we can discuss and
+% refine" -- is a gloss one document wants on another document's prose. It is true
+% from the instructor document's side and meaningless from the syllabus's own, so
+% it describes the IMPORTER, and a key here would print it in every document that
+% takes the passage. It is \importpassage[note=...], and CourseDocument.cls says
+% the rest beside \Passage@note.
+%
+% Consequence, and it survives the second call-site key intact: a passage has NO
+% injectable keys at all, so find-passages takes no --with. It is the only kind of
+% which that is true. The test is not where a key is written but whether the
+% passage file could know its value -- and a passage knows neither which document
+% is about to take it nor what that document wants said about it.
 %
 % NO `depth' KEY EITHER, and that one was tried and removed. The idea was to
 % record how far a passage reaches below its own title, so you could tell before
@@ -78,8 +90,14 @@
 % ones were worse than redundant: mostly-right-impression and
 % serious-and-small-errors were tagged for students but appear only in the markers'
 % manual, so the tag recorded that ANOTHER document holds similar prose -- not a
-% fact about the file. Re-add it if a passage is ever imported by two documents;
-% that is the situation it was invented for and the situation that does not exist.
+% fact about the file. The note said to re-add it if a passage were ever imported
+% by two documents -- "the situation it was invented for and the situation that
+% does not exist". It exists: eleven of the fourteen passages are now imported two
+% or three times. That is left recorded rather than acted on, because the case for
+% dropping `audience' never rested on the import graph alone -- the filter still
+% duplicates the picker and the key still has no build-time effect -- and because
+% what a two-document passage actually wanted turned out to be per-import prose,
+% which is `note' at the call site above, not a tag here.
 %
 % What is left is a block with NO SEARCH KEYS AT ALL, which is the honest shape:
 % two values the LaTeX needs, and one warning. Finding things was never this

@@ -137,9 +137,10 @@ bank is not searched at all, so the three have four filters, two, and none. Ever
 
 One difference is worth stating here rather than leaving to be discovered:
 \file{find-passages} accepts no \texttt{-{}-with}. A passage has no injectable
-keys, because the only option \cs{importpassage} takes is \env{level}, and where
-a passage's natural depth lands belongs to the importing document rather than to
-the passage (section~\ref{sec:ref-passagemeta}). Emitted passage lines are
+keys, because both options \cs{importpassage} takes belong to the importing
+document rather than to the passage: \env{level}, where the passage's natural
+depth lands, and \env{note}, a gloss printed under its heading in that document
+alone (section~\ref{sec:ref-passagemeta}). Emitted passage lines are
 therefore always bare. The passage bank also sits in a sibling submodule rather
 than a directory of the course, so give it as an operand ---
 \texttt{find-passages teaching/passages} --- or a bare run from the course root
