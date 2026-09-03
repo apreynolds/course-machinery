@@ -244,6 +244,16 @@
 % time too: \PassageTitle takes its title and label from it. See PassageMeta.sty
 % for why this one stores when its siblings discard.
 %
+% THE EDITOR'S NOTE is the second call-site key, and the only other one:
+%
+%   \importpassage[note={Note: this section is in the student syllabus; we can
+%                        discuss and refine as needed.}]%
+%     {../teaching/passages/}{how-work-is-marked.tex}
+%
+% It prints an italic parenthetical under the passage's heading, in the document
+% doing the importing and nowhere else. See the block beside \Passage@note below
+% for why it cannot be metadata.
+%
 % Load-order note: the \let's run at USE time, long after titlesec and parskip
 % have patched the sectioning commands (parskip at \AtBeginDocument), so what
 % they copy is the fully-patched meaning. keyval arrives with graphicx above.
@@ -271,6 +281,41 @@
 
 \newif\ifPassage@shifted
 
+% THE EDITOR'S NOTE, and why it is a CALL-SITE key rather than a PassageMeta one.
+% A passage is written in one voice and imported by several documents:
+% how-work-is-marked.tex is student-facing prose in advice-for-students and a thing
+% the instructors want glossed in notes-for-instructors. The gloss -- "this section
+% is in the student syllabus; we can discuss and refine it" -- is true from the
+% second document's side and meaningless from the first's. So it is a property of
+% the IMPORTING DOCUMENT, exactly as `level' is, and PassageMeta.sty's argument for
+% keeping `level' out of the block applies to this word for word. Put it in the
+% block instead and every document importing that passage prints the same note.
+%
+% (PassageMeta.sty's aside that "every passage is imported by exactly one document"
+% stopped being true some time ago -- eleven of fourteen are imported two or three
+% times -- and that is exactly what makes a per-import note necessary.)
+%
+% NOTHING HERE BECOMES INJECTABLE, which is worth saying because it is the
+% invariant a reader will worry about. find-passages still emits bare
+% \importpassage lines and still takes no --with; `note' is hand-written at the
+% call site the way `level' is. The passage bank is untouched by this feature.
+%
+% Plain \def, not \gdef, for PassageMeta.sty's reason: the value must die with the
+% \importpassage group that set it, or the next passage in the document inherits a
+% note nobody wrote for it.
+\newcommand{\Passage@note}{}
+
+% Did the passage just imported actually call \PassageTitle? A note is SET at the
+% call site and PRINTED inside the passage, so a file lacking \PassageTitle
+% swallows it in silence -- and nothing else here notices a missing title. This
+% flag turns that into a warning naming the file.
+%
+% A plain (local) \newif suffices, and that is not luck: import.sty closes its own
+% \begingroup inside a \protected@edef BEFORE \@import runs, so the \input happens
+% at \importpassage's group level and a flag set inside the passage file is still
+% standing when the guard below reads it.
+\newif\ifPassage@titled
+
 \define@key{passage}{level}{%
   \Passage@shiftedfalse
   \def\Passage@given{#1}%
@@ -293,6 +338,13 @@
     \fi
   \fi
 }
+
+% The note's text. No fixed `Note:' prefix and no vocabulary behind it: the author
+% writes the whole sentence and this supplies only the italics and the parentheses,
+% because a note that does not want to open with the word `Note' is as likely as
+% one that does. Unvalidated for the same reason -- it is prose, not a key with a
+% closed set of legal values, so there is nothing here to be wrong about.
+\define@key{passage}{note}{\def\Passage@note{#1}}
 
 % What \subsubsection becomes under a shift: a loud stop, not a \paragraph. The
 % argument signature matches a real sectioning command so the error fires
@@ -326,6 +378,10 @@
 % this is the one metadata package the toolkit cannot build without, so it says so
 % in the voice \Passage@toodeep uses just above.
 \NewDocumentCommand{\PassageTitle}{}{%
+  % Recorded before anything can go wrong, so that a passage which reaches this
+  % line at all counts as titled -- the guard in \importpassage is asking "was the
+  % note ever offered a place to print?", and the error branch below is a place.
+  \Passage@titledtrue
   \ifdefempty{\PassageMeta@title}{%
     \ClassError{CourseDocument}{%
       \string\PassageTitle\space with no title in \string\PassageMeta
@@ -348,10 +404,29 @@
     \expandafter\section\expandafter{\PassageMeta@title}%
   }%
   \ifdefempty{\PassageMeta@label}{}{\label{\PassageMeta@label}}%
+  % The editor's note from the call site, if the importing document gave one.
+  % AFTER the \label, so nothing comes between \section and the label it binds;
+  % BEFORE the body, so it reads as a gloss on the heading rather than an aside in
+  % the prose.
+  %
+  % No \expandafter here, unlike the title above, and the asymmetry is the point:
+  % this text goes to the page and nowhere else -- no .aux, no .toc, no \nameref --
+  % so there is no deferred write for an unexpanded macro to poison.
+  %
+  % Braces around \itshape keep the italics off the passage body. \par closes the
+  % paragraph so parskip separates it from what follows; \parindent is 0pt in this
+  % class, so it needs no \noindent.
+  \ifdefempty{\Passage@note}{}{{\itshape(\Passage@note)}\par}%
 }
 
 \NewDocumentCommand{\importpassage}{O{} m m}{%
   \begingroup
+    % Cleared explicitly although \begingroup already isolates them, exactly as
+    % \PassageMeta clears its own values rather than trusting the caller's group:
+    % belt and braces, so a later refactor that drops the group cannot quietly
+    % resurrect the leak.
+    \def\Passage@note{}%
+    \Passage@titledfalse
     \setkeys{passage}{level=section,#1}%
     \ifPassage@shifted
       \let\section\subsection
@@ -359,6 +434,18 @@
       \let\subsubsection\Passage@toodeep
     \fi
     \import{#2}{#3}%
+    % A note given but never printed is a silent loss -- the one failure mode this
+    % feature introduces, since the key is set here and consumed a file away. A
+    % warning rather than an error: the document is still correct, just missing a
+    % sentence its author asked for.
+    \ifdefempty{\Passage@note}{}{%
+      \ifPassage@titled\else
+        \ClassWarning{CourseDocument}{%
+          note= was given for `#3' but that passage never calls
+          \string\PassageTitle,\MessageBreak so the note was dropped%
+        }%
+      \fi
+    }%
   \endgroup
 }
 
