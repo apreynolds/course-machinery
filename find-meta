@@ -536,11 +536,15 @@ csv_matches() {
 # -print0 / read -d '' so paths with spaces survive. Aux and build output never
 # live beside the sources here, but two directories hold .tex that are NOT bank
 # entries and must be pruned: .git (obvious), and .course-machinery -- the
-# tooling submodule, whose manual/ documents \ProblemMeta / \FactMeta / \PassageMeta
-# by SHOWING example blocks, which would otherwise be scraped as phantoms.
-# Real banks live in course-content dirs (problems/, facts/), never in there. An
-# explicit operand INSIDE .course-machinery still works (the prune only fires on
-# a directory of that name met while descending).
+# tooling submodule, whose manual/ documents \ProblemMeta and \FactMeta by
+# SHOWING example blocks, which would otherwise be scraped as phantoms.
+# Real banks live in course-content dirs (problems/, facts/, passages/), never in
+# there. An explicit operand INSIDE .course-machinery still works (the prune only
+# fires on a directory of that name met while descending).
+#
+# The prune matters MORE for a blockless kind, not less: a phantom there needed a
+# convincing example block to be scraped, but every .tex under a passage PATH is
+# an entry, so an unpruned manual/ would list its own chapters as passages.
 files=()
 while IFS= read -r -d '' f; do
   files+=("$f")
