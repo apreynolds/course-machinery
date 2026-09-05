@@ -49,14 +49,17 @@ prog=${as:-pick-meta}
 # select and title the box its import is wrapped in, so a picked fact that did not
 # carry them would paste an import line missing the very thing that makes it
 # render as a theorem rather than a bare snippet.
+# emit_desc is what --help calls the thing that comes out. It cannot be built
+# from $noun any more: two kinds emit an \import<kind> wrapper and the third
+# emits a heading plus a plain \import.
 case $kind in
-  problem) noun="problem"; inject_keys="number,name" ;;
-  fact)    noun="fact";    inject_keys="kind,name,number" ;;
-  # EMPTY, tracking find-meta's empty with_keys for a passage: the only option an
-  # \importpassage line takes is level=, and that is the importing document's
-  # business, not the passage's. Emitted lines are therefore always bare, and the
+  problem) noun="problem"; inject_keys="number,name";       emit_desc="\\importproblem" ;;
+  fact)    noun="fact";    inject_keys="kind,name,number";  emit_desc="\\importfact" ;;
+  # EMPTY, tracking find-meta's empty with_keys for a passage: a passage carries
+  # no metadata block at all, so there is nothing to inject. What comes out is a
+  # \section/\label built from the file name, a blank, then a plain \import. The
   # --with pair below must be omitted entirely rather than passed empty.
-  passage) noun="passage"; inject_keys="" ;;
+  passage) noun="passage"; inject_keys="";                  emit_desc="\\section + \\import" ;;
   '') echo "$prog: --kind is required (problem|fact|passage)" >&2; exit 2 ;;
   *)  echo "$prog: unknown --kind: $kind (want problem|fact|passage)" >&2; exit 2 ;;
 esac
@@ -65,13 +68,13 @@ usage() {
   # Generated from the active kind, the way find-meta's usage is: the header
   # of THIS file documents the engine ("not meant to be called directly"),
   # which is exactly the wrong thing for `pick-problems --help' to print.
-  echo "$prog — fzf picker over the $noun bank; emits \\import$noun lines"
+  echo "$prog — fzf picker over the $noun bank; emits $emit_desc lines"
   echo
   echo "Usage: $prog [--from DIR] [FILTER ...] [PATH ...]"
   echo
   echo "An interactive front-end to find-${noun}s: feeds its --tsv listing into fzf"
   echo "(multi-select, metadata shown, the .tex previewed), then turns the chosen"
-  echo "entries into paste-ready \\import$noun lines via --import. The import block"
+  echo "entries into paste-ready $emit_desc lines via --import. The import block"
   echo "is printed to stdout -- pipe it, or paste it into a document."
   echo
   echo "  --from DIR    make the emitted directory arguments relative to DIR (the"
@@ -135,8 +138,29 @@ done
 # preview reads ({1}) and what we hand back to --import; search covers the shown
 # metadata. fzf exits non-zero on cancel or no-match, so we do not `set -e' and
 # just treat an empty result as "nothing to do".
+# A PASSAGE PICK NEEDS A PATH, and it has to be caught HERE rather than left to
+# find-meta. find-meta would refuse correctly, but its message would go to stderr
+# behind an fzf that had already opened over it with an empty list -- the user
+# picks nothing, gets exit 0, and never sees why. So duplicate the authoritative
+# guard, deliberately, to fail before the pipeline instead of into it.
+#
+# `filter_specs' is empty for this kind, and --kind/--as/--from are all consumed
+# above, so every surviving element of feed_args is a PATH operand and the test is
+# just its length.
+if [[ -z $inject_keys && $kind == passage && ${#feed_args[@]} -eq 0 ]]; then
+  printf '%s: a PATH is required -- name the %s bank itself\n' "$prog" "$noun" >&2
+  echo "       e.g. \`$prog teaching/passages'. A $noun bank has no metadata" >&2
+  echo "       block, so the directory IS the bank; run from a course root and" >&2
+  echo "       every lecture and assessment would be offered as a $noun." >&2
+  exit 2
+fi
+
 selection=$(
-  "${engine[@]}" --tsv "${feed_args[@]}" \
+  # feed_args may legitimately be empty for a problem or fact (a bare run
+  # defaults to `.'), and a bare "${a[@]}" on an empty array is an unbound-
+  # variable error under `set -u' on bash 4.0-4.3, which is the floor this
+  # script advertises. Guarded the way find-meta guards the same shape.
+  "${engine[@]}" --tsv ${feed_args[@]+"${feed_args[@]}"} \
     | fzf --multi \
           --delimiter='\t' --with-nth=2.. \
           --preview='bat --color=always --language=tex --style=numbers {1}' \
