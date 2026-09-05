@@ -43,6 +43,42 @@
 % here, before parskip, matching where LectureNotes and Assessment put it.
 \RequirePackage{enumitem}
 
+% Indent sequence, rebased. article.cls:322-330 ships 2.5/2.2/1.87/1.7em, which
+% is not a scale but a table of label widths -- each level sized to hold its own
+% default label ((m) at level 2, vii. at level 3, M. at level 4); the ratios
+% 0.88/0.85/0.909 are a consequence, not a rule. On this class's ~66-character
+% measure (textwidth=2.6\alphabet, below) that level-1 step is wide for documents
+% that are mostly lists, so the run is rebased on 1.8em and those ratios carried
+% down.
+%
+% 1.8em is the floor that still clears a two-digit label: labelwidth =
+% leftmargin - labelsep = 1.3em, and "10." is ~1.3em. Nothing in the course runs
+% past 6 items today; the headroom is deliberate.
+%
+% NOT a \setlist. These are the class's own length registers -- the mechanism
+% article.cls itself uses -- so the deliberate "none of the three classes calls
+% \setlist" position stands unchanged.
+\setlength\leftmargini  {1.8em}
+\setlength\leftmarginii {1.58em}
+\setlength\leftmarginiii{1.35em}
+\setlength\leftmarginiv {1.22em}
+% \leftmarginv/vi keep article's 1em -- already below the new level iv.
+
+% Keep level 1's \labelwidth in step with \leftmargini. \@listi (size11.clo:216)
+% sets \leftmargin and nothing else; \@listii-\@listvi each re-derive \labelwidth
+% from their own \leftmarginN at list time, but level 1's is computed once during
+% \LoadClass (article.cls:339-340) and would otherwise keep the 2em derived from
+% the old 2.5em.
+%
+% Measured, not assumed: with enumitem loaded this changes nothing for a
+% RIGHT-aligned label -- the default, and every list in this course -- because
+% right alignment pins the label's right edge at leftmargin-labelsep, so an
+% oversized label box is invisible. It shows only on an `align=left' list, where
+% the stale box opens a gap between label and text. Kept because it restores the
+% invariant article.cls itself maintains, not because it fixes a bug we have.
+\setlength\labelwidth{\leftmargini}
+\addtolength\labelwidth{-\labelsep}
+
 % Tables, on the same reasoning: a syllabus is more list AND TABLE than prose --
 % a grade scale, an instructor/section roster, a TA/room roster, a term schedule
 % -- so the class carries the table package rather than each document loading it.
