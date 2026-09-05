@@ -94,27 +94,34 @@ difficulty), and \texttt{-{}-tsv} columns are
 
 \subsection*{find-passages and pick-passages (the passage-bank twins)}
 
-The passage bank (section~\ref{sec:ref-passagemeta}) --- prose shared across
-courses, living in the \file{teaching/} submodule --- is searched the same way
-again. \file{find-passages} and \file{pick-passages} read \cs{PassageMeta} blocks
-and emit \cs{importpassage} lines. There are \emph{no} filters --- a passage's
-filename is its title and the bank is small, so it is listed rather than searched
---- and \texttt{-{}-tsv} columns are (path, title, requires). The Vim command
-\texttt{:ImportPassage} (\texttt{<Space>ig}) mirrors the other two.
+The passage bank (section~\ref{sec:ch5-passages}) --- prose shared across
+courses, living in the \file{teaching/} submodule --- is the one bank with
+\emph{no metadata block}. The directory is the bank: every \file{.tex} in it is
+a passage, and its title and label are derived from its file name rather than
+read out of the file. \texttt{-{}-tsv} columns are therefore (path, title), and
+what \texttt{-{}-import} emits is a \cs{section} and \cs{label} line, a blank,
+then a plain \cs{import}. The Vim command \texttt{:ImportPassage}
+(\texttt{<Space>ig}) mirrors the other two.
 
-Two ways this pair differs from the other four. It takes \emph{no}
-\texttt{-{}-with}: a passage has no injectable keys, since the two options
-\cs{importpassage} accepts --- \env{level} and \env{note} --- both belong to the
-importing document. And because the bank is a sibling submodule rather than a directory of
-the course, give it as an operand (\texttt{find-passages teaching/passages});
-run bare from a course root it would walk the course as well and report every
-untagged file in it.
+That one difference accounts for every other. There is nothing to search, so
+there are no filters; nothing to inject, so no \texttt{-{}-with}; no membership
+to invert, so no \texttt{-{}-untagged}; and no tags, so no \texttt{-{}-vocab}.
+All four are refused with a message rather than accepted uselessly.
+
+It is also the one command that \emph{requires} an operand. The bank is a
+sibling submodule rather than a directory of the course, so name it
+(\texttt{find-passages teaching/passages}). Run bare from a course root, with
+no block to tell a passage from any other \file{.tex}, it would report every
+lecture and assessment as a passage --- so it refuses instead of defaulting to
+the current directory the way the other four do.
 
 Under the hood all six commands are thin shims over one shared engine,
 \file{find-meta} (\file{find-problems}/\file{find-facts}/\file{find-passages})
 and \file{pick-meta}
 (\file{pick-problems}/\file{pick-facts}/\file{pick-passages}): a
 \texttt{-{}-kind} selects the block
-macro, the emitted wrapper and the key schema; the reading, matching and
-emitting are written once. Run any shim with \texttt{-{}-help} for its concrete
+macro (empty for a passage, which has none), the emitted import command and the
+key schema; the reading, matching and emitting are written once. A blockless
+kind takes its own exit straight after the directory walk, so it never reaches
+either of the two block parsers. Run any shim with \texttt{-{}-help} for its concrete
 flags.

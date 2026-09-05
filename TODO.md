@@ -94,10 +94,13 @@ that needs it. One file out of eleven does not earn a key, and the failure is
 already loud — drop one and LaTeX reports an undefined reference at build time,
 which is the failure wanted. If it ever earns one, the key is
 `companions = {mostly-right-impression, other-point-values}` (basenames, no
-`.tex`), and it does *not* belong in `tsv_cols`. Deliberately not folded into
-`requires`: that key is "what the document must supply", which is a different
-relation, and mixing them would cost the `\`-sigil that tells a macro from a
-package.
+`.tex`), and it does *not* belong in `tsv_cols`.
+
+Note as of 2026-09-04 that this now costs more than it did: the passage bank has
+**no metadata block at all**, so a `companions` key means reintroducing one, for
+one relation, in one file. That raises the bar rather than lowering it — the
+`% REFERS OUT` comment stays until a second pair appears, and even then a comment
+may still be the right answer.
 
 ---
 
@@ -181,21 +184,26 @@ Genuinely open, if this is ever built:
   with the title; in the guide it must nest under something. Probably the
   wrapper's job, but unexamined.~~
 
-  > **Answered for prose, 2026-08-25, by `\importpassage`** (see the prose-documents
-  > chapter). The body is written at its **natural depth** and the *importing*
-  > document names where that lands — so it was the wrapper's job, as guessed.
-  > The shift is three `\let`s in a group, top-down so each captures the
-  > still-original meaning of the level below; the title command is then plain
-  > `\section` and needs no special case. What was not anticipated: the budget is
-  > **one level**, because `CourseDocument` styles three heading ranks and a
-  > second shift lands on `\paragraph`. Deeper is an error, not a degradation.
-  > That constraint is load-bearing rather than a limitation — it is what decides
-  > where a body gets cut.
+  > **Answered for prose, 2026-09-04 — and the answer is that it is not the
+  > wrapper's job.** It was, briefly: `\importpassage` shifted levels with three
+  > `\let`s in a group so a body written at its natural depth could land where
+  > the importing document said, and `\PassageTitle` took the title from a
+  > `\PassageMeta` block. That machinery was retired after a fortnight. The
+  > passage now carries **no title at all** and starts at `\subsection`; the
+  > importing document writes the `\section` itself, one line above the
+  > `\import`.
   >
-  > Carrying this to the collected guide needs one thing this does not have: a
-  > body that supplies **no** title at all, since the guide's wrapper may want to
-  > name the section itself. That is an option on the title command, not a new
-  > mechanism.
+  > What that bought is worth recording, because the question will recur for the
+  > collected guide. A title, a label, a depth and an editor's note are all facts
+  > about the **importer**, not the passage — `how-work-is-marked.tex` is
+  > "How Student Work is Marked" in the student handout and "Guidelines for
+  > Marking" in the TA instructions. Every one of them was a key invented to
+  > carry across a file boundary something the far side already knew. Writing the
+  > heading at the call site puts them where they are known, and the machinery
+  > goes to zero.
+  >
+  > So the guide's wrapper wants a body that supplies no title — which is what a
+  > passage now is, unconditionally, with no option needed.
 - **The guide's class.** `CourseDocument`, or a book-ish option on
   `LectureNotes`? Untouched.
 

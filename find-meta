@@ -1,25 +1,32 @@
 #!/usr/bin/env bash
-# find-meta — search a metadata bank (problems, facts or passages) by its
-# \<Kind>Meta block
+# find-meta — search a bank of .tex files (problems, facts or passages) and write
+# its import lines
 #
 # The shared engine behind find-problems, find-facts and find-passages. A "kind"
 # (chosen with --kind) fixes three things: the block macro it reads (\ProblemMeta
-# / \FactMeta / \PassageMeta), the \import wrapper it emits (\importproblem /
-# \importfact / \importpassage), and the key schema (which filters exist, which
-# columns --tsv prints). Everything else -- reading a block off disk, matching,
-# emitting -- is shared and lives here, in one place.
+# / \FactMeta), the import command it emits (\importproblem / \importfact /
+# \import), and the key schema (which filters exist, which columns --tsv prints).
+# Everything else -- reading a block off disk, matching, emitting -- is shared and
+# lives here, in one place.
+#
+# TWO SHAPES OF BANK, and the difference runs deeper than the schema. A problem or
+# fact TAGS ITSELF with a metadata block, and this script reads it. A passage does
+# not: the directory is the bank, every .tex in it is an entry, and its title and
+# label are computed from its file name. That kind is marked by an empty
+# block_macro and takes its own path through the walk, never reaching either of
+# the two block parsers -- see "A BANK WITH NO BLOCK" below.
 #
 # This file is not meant to be called directly: invoke the per-kind shims
 # find-problems / find-facts / find-passages, which each `exec' this with the
-# right --kind. See ProblemMeta.sty / FactMeta.sty / PassageMeta.sty for the
-# block format this parses.
+# right --kind. See ProblemMeta.sty / FactMeta.sty for the block format this
+# parses.
 #
 # Usage: find-meta --kind KIND [--as NAME] [FILTER ...] [--untagged] [--vocab]
 #                  [--tsv] [--import [--with LIST] [--from DIR]] [PATH ...]
 #
 # Run `find-problems --help' (or find-facts, find-passages) for the flags of a
 # kind: they differ, since a fact has no type/difficulty and a passage has no
-# filters at all -- it is listed, not searched. The mechanics below are shared.
+# block, hence no filters, no --untagged and no --vocab -- and requires a PATH.
 #
 # Filters are ANDed; PAT is an extended regular expression matched
 # case-insensitively against each comma-separated item in turn -- so `--topic
@@ -104,27 +111,29 @@ case $kind in
     with_keys=(kind name number)
     ;;
   passage)
-    noun="passage"; block_macro="PassageMeta"; emit_macro="importpassage"
-    # NO FILTERS AT ALL, and this is the only kind of which that is true. The
-    # passage bank is not searched, it is READ: a passage's filename is its title,
-    # the bank runs to dozens rather than hundreds, and the picker fuzzy-matches
-    # the title column already. Two search keys were tried and removed -- `topics'
-    # restated the title (`marking' covered eight of eleven files, and --topic
-    # marking selected exactly the files --audience tas did), and `audience' then
-    # restated the import graph, every passage being imported by exactly one
-    # document. What this kind is for is --import --from (which computes the
-    # ../teaching/passages/ for you), --tsv (the picker feed) and --untagged.
+    # NO BLOCK AT ALL, and this is the only kind of which that is true. Every
+    # .tex under a PATH operand IS a passage: the directory is the bank, and a
+    # passage's TITLE AND LABEL ARE COMPUTED FROM ITS FILE NAME rather than read
+    # out of it. An empty block_macro is the sentinel that says so, and it is a
+    # DISPATCH PREDICATE only -- checked at four named places (this usage text,
+    # the two rejections below, and the walk's exit) and never handed to awk.
+    #
+    # The block went on 2026-09-04 with \importpassage, whose \PassageTitle was
+    # its only build-time reader. Every key it ever held had restated something:
+    # `topics' the file name, `audience' the import graph, `depth' a check the
+    # compiler already performs -- and finally `title' the file name again. What
+    # a passage bank needed was never a search; it was ../teaching/passages/
+    # computed for you, which is --import --from, and a picker feed, which is
+    # --tsv.
+    noun="passage"; block_macro=""; emit_macro="import"
     filter_specs=()
-    tsv_cols=(title requires)
-    # requires is in the vocabulary for FactMeta-kind's reason rather than a
-    # problem's topics': it is FUNCTIONAL, so `MarkerCount' where the bank says
-    # `\MarkerCount' is a passage that will not build, not merely a split search.
-    vocab_keys=(requires)
-    # EMPTY, and the only kind of which that is true. The one thing worth injecting
-    # into an \importpassage line would be level=, and level is a property of the
-    # importing document (where the natural depth lands) rather than of the
-    # passage. The passage records `depth' instead, which is a constraint to read,
-    # not an option to paste. See the guard on --with below.
+    # Read by --help alone now: the passage walk prints its one derived column
+    # itself, having no block to select columns out of.
+    tsv_cols=(title)
+    # Empty because --vocab is refused for this kind: no block, no vocabulary.
+    vocab_keys=()
+    # Still empty, but for a new reason -- not "level= belongs to the importing
+    # document" but "there is no metadata here to inject". See the guard below.
     with_keys=()
     ;;
   '') echo "$prog: --kind is required (problem|fact|passage)" >&2; exit 2 ;;
@@ -149,6 +158,43 @@ usage() {
   # passage takes no --with at all). This replaces find-problems' sed-reprint-the-
   # header trick, which cannot vary per kind.
   local spec flag key cols c verb filterarg
+
+  # A BANK WITH NO BLOCK gets its own help and returns, rather than threading a
+  # fifth set of conditionals through the body below. Four of the five chunks
+  # would need one anyway -- the summary line, the synopsis, the "reads the
+  # block" paragraph (both halves of which are false here) and Modes -- and the
+  # early return leaves problem's and fact's help byte-identical, which is the
+  # same reason the walk dispatches early rather than parameterising the awk.
+  if [[ -z $block_macro ]]; then
+    echo "$prog — list the $noun bank, and write its import lines for you"
+    echo
+    echo "Usage: $prog [--tsv] [--import [--from DIR]] PATH ..."
+    echo
+    echo "Lists every .tex file under each PATH: a ${noun} bank has no metadata"
+    echo "block, so the DIRECTORY IS THE BANK and each file in it is an entry."
+    echo "PATH is REQUIRED for that reason -- give the bank itself"
+    echo "(\`$prog teaching/passages'), never a course root, or every lecture and"
+    echo "assessment in the course is reported as a ${noun}."
+    echo
+    echo "A ${noun}'s title and label come from its FILE NAME:"
+    echo "  webwork-tips.tex  ->  \\section{Webwork Tips}\\label{sec:webwork_tips}"
+    echo "Hyphens become spaces, words are capitalised except a short list of"
+    echo "particles (of, in, is, for, the, ...), and an already-capitalised word"
+    echo "is left alone (how-work-is-marked-TA -> ... Marked TA). It is a starting"
+    echo "point to paste and edit, not a title to be trusted."
+    echo
+    echo "Modes:"
+    echo "  --import    print each match as a paste-ready heading and \\$emit_macro:"
+    echo "              a \\section/\\label line, a blank, then the \\$emit_macro,"
+    echo "              with a blank line between entries."
+    echo "    --from DIR    rewrite each directory argument relative to DIR."
+    echo "  --tsv       one row per match: path<TAB>title"
+    echo
+    echo "Not accepted (all meaningless without a block): --untagged, --vocab,"
+    echo "--with, and every filter."
+    return
+  fi
+
   # A bank with no filters is listed, not searched, and the summary line and the
   # usage synopsis both have to say so -- otherwise --help advertises a [FILTER]
   # slot that the option loop will reject.
@@ -251,10 +297,31 @@ fi
 if [[ -n $with_request && ${#with_keys[@]} -eq 0 ]]; then
   printf '%s: a %s has no injectable keys, so --with is not accepted\n' \
     "$prog" "$noun" >&2
-  echo "       a passage takes level= at the import site: where its natural depth" >&2
-  echo "       lands belongs to the importing document, not to the passage. What" >&2
-  echo "       the passage does know is its depth -- see the --tsv column." >&2
+  echo "       a $noun carries no metadata at all -- its title and label are" >&2
+  echo "       computed from its file name -- so there is nothing to inject into" >&2
+  echo "       the emitted line. Edit the heading after pasting." >&2
   exit 2
+fi
+
+# The other two flags a BLOCKLESS kind cannot honour. Refused here rather than in
+# the option loop above, which parses; this block judges -- the same split the
+# --with rejection and the --with/--from-need-import check already observe. Two
+# separate messages because they are meaningless for two different reasons, and
+# --untagged in particular is the trap: it was genuinely useful for this bank
+# until the block went, so a reader will reach for it out of habit.
+if [[ -z $block_macro ]]; then
+  case $mode in
+    untagged)
+      printf '%s: --untagged is not accepted for the %s bank\n' "$prog" "$noun" >&2
+      echo "       it inverts a membership that no longer exists: with no metadata" >&2
+      echo "       block, no file can lack one, and every .tex under PATH is a" >&2
+      echo "       $noun. A plain run already lists them all." >&2
+      exit 2 ;;
+    vocab)
+      printf '%s: --vocab is not accepted for the %s bank\n' "$prog" "$noun" >&2
+      echo "       it prints the vocabulary of a tag set, and a $noun has no tags." >&2
+      exit 2 ;;
+  esac
 fi
 
 declare -A want=()
@@ -282,7 +349,27 @@ if [[ -n $from_dir && ! -d $from_dir ]]; then
   exit 2
 fi
 
-[[ ${#paths[@]} -eq 0 ]] && paths=(".")
+# A BLOCKLESS KIND REQUIRES AN OPERAND, and this is the guard that makes the
+# find-passages header comment's advice enforceable rather than advisory. With a
+# block, a bare run defaulting to `.' is merely noisy: files without a block drop
+# out, so a course root reports the bank and nothing else. Without one there is
+# no such filter -- every .tex under `.' would be reported as a passage, and
+# --import would emit a \section for every lecture and assessment in the course.
+# So refuse, rather than default.
+#
+# Must sit here: before the existence loop below, and before `find "${paths[@]}"',
+# where an empty array is itself an unbound-variable error under `set -u'.
+if [[ ${#paths[@]} -eq 0 ]]; then
+  if [[ -z $block_macro ]]; then
+    printf '%s: a PATH is required -- name the %s bank itself\n' "$prog" "$noun" >&2
+    echo "       e.g. \`$prog teaching/passages'. The bank is a sibling submodule," >&2
+    echo "       not a directory of the course, and there is no metadata block to" >&2
+    echo "       tell its files from any other .tex -- so a bare run from a course" >&2
+    echo "       root would report every lecture and assessment as a $noun." >&2
+    exit 2
+  fi
+  paths=(".")
+fi
 
 # Operands may be directories (walked recursively) or individual .tex files --
 # the picker's accept action passes specific selected files. `find' handles a
@@ -347,6 +434,60 @@ field() {
   printf '%s\n' "$dump" | awk -F'\t' -v k="$key" '$1 == k { print $2; exit }'
 }
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# DERIVING A TITLE AND LABEL (for a bank with no block)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# The counterpart to read_meta above, and the contrast is the point: one kind
+# READS its metadata off disk, the other COMPUTES it from the file name and never
+# opens the file at all.
+#
+# That is also why the passage bank needs no --tsv fast path. The fast path below
+# exists because read_meta forks awk plus a field() per key for every file; these
+# two fork nothing -- they are pure parameter expansion. With one implementation
+# there is nothing for a second to mirror, so the byte-identical-output policy the
+# fast path is written under simply does not arise for this kind.
+#
+# Bank file names are hyphen-separated and lowercase by convention. A `_', `#',
+# `$' or `&' in one would land raw inside \section{} and break the build; the
+# convention is the guard, not an escaping pass.
+
+# why-learn-math.tex -> Why Learn Math
+passage_title() {
+  local base=${1##*/} word out="" words=()
+  base=${base%.tex}
+  # read -ra rather than an unquoted expansion: splitting on the hyphens must not
+  # also glob, and a bank file name is not guaranteed free of `*' or `?'.
+  IFS=' ' read -ra words <<< "${base//-/ }"
+  for word in ${words[@]+"${words[@]}"}; do
+    # ${word^} capitalises the FIRST CHARACTER ONLY -- deliberately not
+    # ${word,,} then ${word^}, which would turn the bank's how-work-is-marked-TA
+    # into `... Ta'. An already-capitalised word is left as its author wrote it.
+    case ${word,,} in
+      of|in|is|for|the|a|an|and|to|on|at|with)
+        # A particle stays lowercase unless it opens the title (`the-art-of-x'
+        # -> `The Art of X'). No last-word exception: one sentence of rule is
+        # worth more here than strict title-case, since every emitted heading is
+        # read and edited before it is kept.
+        [[ -z $out ]] && out=${word^} || out+=" ${word,,}" ;;
+      *)
+        out+="${out:+ }${word^}" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
+# why-learn-math.tex -> sec:why_learn_math. Exact where the title is only a
+# starting point: this is the shape every sectioning label in the courses already
+# has, and it matched six of the eight live call sites unchanged when the bank
+# moved off \importpassage. Lowercased, so how-work-is-marked-TA.tex gives
+# sec:how_work_is_marked_ta rather than shouting mid-label.
+passage_label() {
+  local base=${1##*/}
+  base=${base%.tex}
+  base=${base//-/_}
+  printf 'sec:%s' "${base,,}"
+}
+
 # Print TARGET as a path relative to BASE (both absolutised first). Used by
 # --from to make emitted \import<kind> directory arguments relative to the
 # importing document. macOS's BSD realpath has no --relative-to, so lean on perl
@@ -356,6 +497,18 @@ relpath() {
   perl -MFile::Spec -MCwd -e \
     'print File::Spec->abs2rel(Cwd::abs_path($ARGV[0]), Cwd::abs_path($ARGV[1]))' \
     "$1" "$2"
+}
+
+# The directory argument of an emitted import line, for the .tex file $1: its own
+# directory, made relative to --from when that was given. Extracted so the two
+# emitters -- the block kinds' and the blockless bank's -- cannot drift on the one
+# piece of arithmetic a paste-ready line actually depends on.
+import_dir() {
+  if [[ -n $from_dir ]]; then
+    relpath "$(dirname "$1")" "$from_dir"
+  else
+    dirname "$1"
+  fi
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -383,16 +536,73 @@ csv_matches() {
 # -print0 / read -d '' so paths with spaces survive. Aux and build output never
 # live beside the sources here, but two directories hold .tex that are NOT bank
 # entries and must be pruned: .git (obvious), and .course-machinery -- the
-# tooling submodule, whose manual/ documents \ProblemMeta / \FactMeta / \PassageMeta
-# by SHOWING example blocks, which would otherwise be scraped as phantoms.
-# Real banks live in course-content dirs (problems/, facts/), never in there. An
-# explicit operand INSIDE .course-machinery still works (the prune only fires on
-# a directory of that name met while descending).
+# tooling submodule, whose manual/ documents \ProblemMeta and \FactMeta by
+# SHOWING example blocks, which would otherwise be scraped as phantoms.
+# Real banks live in course-content dirs (problems/, facts/, passages/), never in
+# there. An explicit operand INSIDE .course-machinery still works (the prune only
+# fires on a directory of that name met while descending).
+#
+# The prune matters MORE for a blockless kind, not less: a phantom there needed a
+# convincing example block to be scraped, but every .tex under a passage PATH is
+# an entry, so an unpruned manual/ would list its own chapters as passages.
 files=()
 while IFS= read -r -d '' f; do
   files+=("$f")
 done < <(find "${paths[@]}" \( -name .git -o -name .course-machinery \) -prune \
            -o -type f -name '*.tex' -print0 | sort -z)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# A BANK WITH NO BLOCK
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Dispatched here, between the walk and the two parsers, so it inherits the
+# walk's pruning and its sorted order for free and reaches NEITHER parser. That
+# placement is the whole design: both parsers below are dense awk built around a
+# block macro, and both are load-bearing for problem and fact -- the fast path is
+# written to be byte-identical to the generic loop, an invariant that costs
+# something to re-argue. A kind with no block has nothing to gain from either
+# (no block to open, no keys to collect, no filters to apply), so it takes its
+# own exit rather than threading a sentinel through code the other two run.
+#
+# --untagged and --vocab cannot arrive here; they were refused at parse time.
+if [[ -z $block_macro ]]; then
+  case $mode in
+    tsv)
+      # Two columns, matching the --with-nth=2.. the pickers feed this into.
+      for f in ${files[@]+"${files[@]}"}; do
+        printf '%s\t%s\n' "$f" "$(passage_title "$f")"
+      done
+      ;;
+
+    import)
+      # Three lines per entry, because the importing document owns the heading
+      # now: a \section/\label built from the file name, a blank, then the
+      # import. THE BLANK LINE BETWEEN ENTRIES IS EMITTED HERE, not by the
+      # caller -- pick-meta pipes this straight to stdout and vim's <Space>ig
+      # appends it verbatim, so the tool is the only place that can put it in
+      # exactly once.
+      _first=1
+      for f in ${files[@]+"${files[@]}"}; do
+        (( _first )) || echo
+        _first=0
+        printf '\\section{%s}\\label{%s}\n\n\\%s{%s/}{%s}\n' \
+          "$(passage_title "$f")" "$(passage_label "$f")" \
+          "$emit_macro" "$(import_dir "$f")" "$(basename "$f")"
+      done
+      ;;
+
+    *)
+      # The human listing. Same indented key: value shape the block kinds use,
+      # so a bare run still reads like its two siblings.
+      for f in ${files[@]+"${files[@]}"}; do
+        echo "$f"
+        echo "    title: $(passage_title "$f")"
+        echo "    label: $(passage_label "$f")"
+      done
+      printf '%d %s(s).\n' "${#files[@]}" "$noun" >&2
+      ;;
+  esac
+  exit
+fi
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # FAST PATH: --tsv
@@ -525,19 +735,15 @@ case $mode in
     # adjust); --from does the ../ for you.
     for f in "${matches[@]}"; do
       file=$(basename "$f")
-      if [[ -n $from_dir ]]; then
-        dir=$(relpath "$(dirname "$f")" "$from_dir")
-      else
-        dir=$(dirname "$f")
-      fi
+      dir=$(import_dir "$f")
 
       # Injected options, in a fixed canonical order regardless of --with order.
       # A file that lacks a requested key is silently skipped for that key. Any
       # `#' has to be re-escaped to `\#': read_meta un-escaped it on the way in
       # (\# -> #), but `\%' it left intact, so % needs no re-escaping here.
-      # The `else' branch below is the ONLY branch for a kind with no injectable
-      # keys (the passage bank), not merely the fallback it used to be -- so it
-      # stays even though nothing here can add an option for such a kind.
+      # The `else' branch below is the ordinary fallback again: it is what a
+      # problem or fact run without --with takes. (It was briefly the passage
+      # bank's only branch; that bank no longer reaches this emitter at all.)
       opts=""
       for key in ${with_keys[@]+"${with_keys[@]}"}; do
         [[ -n ${want[$key]:-} ]] || continue

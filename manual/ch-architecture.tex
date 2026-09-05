@@ -212,13 +212,14 @@ So a passage bank is a \textbf{content submodule}, mounted at the course root
 beside the topic submodules and reached by relative path:
 
 \begin{manexsource}
-\importpassage{../teaching/passages/}{why-learn-math.tex}
+\import{../teaching/passages/}{why-learn-math.tex}
 \end{manexsource}
 
 \noindent It differs from a topic repo only in not being a topic, and no
 mechanism cares about that. Nothing in \file{.latexmkrc} changes; see
-section~\ref{sec:ch5-passages} for what the class contributes, which is a
-heading level and nothing else.
+section~\ref{sec:ch5-passages} for what the class contributes, which since
+2026-09-04 is nothing at all: the importing document writes the heading and
+\file{import} does the rest.
 
 There is a cautionary precedent for the reflex. The per-offering setup file
 was designed on the assumption that every master would want it and it would
@@ -362,10 +363,10 @@ corner of the toolkit, worth a skim before debugging anything odd:
     internals at load time; after a titlesec/amsthm upgrade a failed
     patch prints only \texttt{Couldn't patch ...} in the log. Grep for
     it: \texttt{grep "Couldn't patch" *.log}.
-  \item \textbf{A reflowed \cs{ProblemMeta}, \cs{FactMeta} or
-    \cs{PassageMeta} block still compiles} -- and silently vanishes from
-    \file{find-problems} / \file{find-facts} / \file{find-passages}
-    (section~\ref{sec:problemmeta}).
+  \item \textbf{A reflowed \cs{ProblemMeta} or \cs{FactMeta} block still
+    compiles} -- and silently vanishes from \file{find-problems} /
+    \file{find-facts} (section~\ref{sec:problemmeta}). \file{find-passages}
+    cannot fail this way: it reads no block.
   \item \textbf{\texttt{[5, hint]} errors} -- the lone-integer points
     shorthand works only alone; write \texttt{[points=5, hint]}.
   \item \textbf{Points are integers}; \texttt{points=2.5} errors at the

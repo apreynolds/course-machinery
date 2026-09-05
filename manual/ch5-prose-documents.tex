@@ -100,87 +100,50 @@ solution readable. Because it is shared across courses it lives in its own
 content repository, mounted beside the topic submodules and reached by
 relative path --- it is content, not a tier (see the architecture chapter).
 
-The reason this is a command rather than a bare \cs{input} is \textbf{heading
-level}. The same passage is a \cs{section} of one document and a
-\cs{subsection} of another, and a passage carrying headings of its own has to
-move with its title. So the file is written at its \emph{natural} depth ---
-\cs{PassageTitle} for its own title, plain \cs{subsection} for anything
-inside it --- and the importing document says where that lands:
+There is no machinery. A passage is a \file{.tex} fragment of body prose, and
+the document that wants it writes its own heading and pulls it in with the
+\file{import} package's \cs{import}:
 
 \begin{manexsource}
-% teaching/passages/why-learn-math.tex
-\PassageMeta{
-  title = {Why Learn Math?},
-  label = {sec:whylearnmath},
-}
-\PassageTitle
-Mathematics is beautiful, powerful, and useful.
+\section{Webwork Tips}\label{sec:webwork_tips}
+
+\import{../teaching/passages/}{webwork-tips.tex}
 \end{manexsource}
 
-\begin{manexsource}
-\importpassage{../teaching/passages/}{why-learn-math.tex}
-\importpassage[level=subsection]{../teaching/passages/}{why-learn-math.tex}
-\end{manexsource}
+\noindent The fragment itself starts at its first paragraph. It carries no
+title, no metadata block, and no top-level sectioning command --- only
+\cs{subsection} and below, for structure \emph{inside} the passage.
 
-\noindent There is one other option, \env{note}, described below.
+\textbf{The heading belongs to the importing document, and that is the whole
+design.} A passage's own name for itself was never quite the name a document
+wanted: \file{how-work-is-marked.tex} is ``How Student Work is Marked'' in the
+student handout and ``Guidelines for Marking'' in the TA instructions. The
+same is true of its \cs{label}, its depth, and any editor's note about it ---
+all four are facts about the \emph{importer}. Writing the heading at the call
+site puts them where they are known, in one ordinary line, and costs nothing.
 
-\noindent \cs{PassageTitle} takes \emph{no arguments}. Its title and its
-\cs{label} both come from the \cs{PassageMeta} block above it --- the same block
-\file{find-passages} reads off disk (section~\ref{sec:ref-passagemeta}). The
-label names the passage's own idea, so it belongs to the passage rather than to
-whichever document imports it.
+\textbf{What this replaced}, since the repository's history is full of it: an
+\cs{importpassage} wrapper that shifted heading levels with three \cs{let}s in
+a group, a \cs{PassageTitle} that took its title and \cs{label} from a
+\cs{PassageMeta} block, a \texttt{level=} key limited to one rank of headroom,
+and a \texttt{note=} key for the editor's gloss. It was retired on 2026-09-04.
+Every piece of it existed to carry across a file boundary something the
+importing document already knew.
 
-Unlike \cs{ProblemMeta} and \cs{FactMeta}, which are validated and thrown away,
-this block is read at build time, so it is not optional: a passage with no
-\env{title} is an error rather than an empty heading.
+Two things came back for free when it went. \file{vimtex} cannot match
+\cs{importpassage} --- its include regex wants a brace immediately after
+\cs{import} --- so passages had to be faked into the table of contents and
+their labels never reached \cs{ref} completion. Plain \cs{import} is matched
+natively, and a passage's \cs{subsection}s are now real sectioning commands in
+a file vimtex will descend into.
 
-The shift is three \cs{let}s inside a group, run top-down so each captures the
-still-original meaning of the level below. \cs{PassageTitle} then needs no
-special case --- it is \cs{section}, already pointed at the right target ---
-and \cs{label}, \cs{ref}, starred forms and table-of-contents entries keep
-working because these are the real sectioning commands.
-
-\textbf{One level of headroom, and deeper is an error.} This class styles
-three heading levels and \cs{paragraph} is not among them, so \texttt{level}
-accepts \texttt{section} (the default) or \texttt{subsection} and refuses
-anything further rather than degrading silently. A passage may therefore carry
-one rank of headings below its title and no more. In practice that is the
-constraint that decides how a passage is cut: a body of prose with three
-ranks is two passages, not one.
-
-\textbf{The editor's note.} A passage is written in one voice and imported by
-several documents, and sometimes the second document needs to say something
-about the first document's prose. \file{how-work-is-marked.tex} is written for
-students and appears in \file{advice-for-students}; when
-\file{notes-for-instructors} takes the same passage, its declarative student
-voice wants a gloss, and that gloss would be nonsense in the syllabus it is
-describing. So the note is given at the import:
-
-\begin{manexsource}
-\importpassage[note={Note: this section is included in the student syllabus;
-                     we can discuss and refine as needed.}]%
-  {../teaching/passages/}{how-work-is-marked.tex}
-\end{manexsource}
-
-\noindent It prints as an italic parenthetical between the passage's heading and
-its first paragraph, in that document and nowhere else. The machinery supplies
-the italics and the parentheses and nothing else --- no fixed \texttt{Note:}
-prefix --- because a note that does not want to open with the word is as likely
-as one that does.
-
-\textbf{Why this is not a \cs{PassageMeta} key}, which is the question it
-invites. It is the \env{level} argument again: a note saying ``this is in the
-student syllabus'' is true from the instructor document's side and meaningless
-from the syllabus's own, so it describes the \emph{importer}, and a key in the
-block would print it in every document that takes the passage
-(section~\ref{sec:ref-passagemeta}). Nothing about the passage bank changes ---
-no passage file gains a key, \file{find-passages} still emits bare import lines,
-and a passage still has nothing injectable.
-
-One failure mode comes with it, since the key is set at the call site and
-consumed a file away: a passage that never calls \cs{PassageTitle} has nowhere
-to print the note. That is a class warning naming the file rather than a silent
-loss.
+\textbf{Finding one.} \file{find-passages} lists the bank and writes those two
+lines for you, computing the relative directory and deriving the heading from
+the file name (section~\ref{sec:build-and-find}); \texttt{<Space>ig} does it
+from inside Vim. The derived title is a starting point --- it will offer
+``Well Written Solutions'' for \file{well-written-solutions.tex} --- and the
+\cs{section} line is simply deleted when a passage lands under a heading that
+already exists.
 
 A passage needing a number the course owns names a macro --- say
 \cs{PointsPerQuestion} --- and lets the course define it in its own

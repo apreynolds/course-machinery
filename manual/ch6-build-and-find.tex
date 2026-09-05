@@ -123,28 +123,48 @@ $ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
                 [--tsv] [PATH ...]
 $ find-facts    [--topic PAT] [--source PAT] [--untagged] [--vocab]
                 [--import] [--tsv] [PATH ...]
-$ find-passages [--untagged] [--vocab] [--import] [--tsv] [PATH ...]
+$ find-passages [--import] [--tsv] PATH ...
 \end{manexsource}
 
-Reads the \cs{ProblemMeta} (resp.\ \cs{FactMeta}, \cs{PassageMeta}) block off
-every \file{.tex} file under each \env{PATH} (default: the current directory,
-recursively) and reports the matches -- without running LaTeX, which is the
-point (section~\ref{sec:problem-files}). With no filters, it lists every
-file that has a block. The kind fixes the block macro it reads, the
-\cs{importproblem}~/ \cs{importfact}~/ \cs{importpassage} lines it emits, and
-the filter set -- facts carry no \env{type} or \env{difficulty}, and a passage
-bank is not searched at all, so the three have four filters, two, and none. Everything below holds for all three.
+Reads the \cs{ProblemMeta} (resp.\ \cs{FactMeta}) block off every \file{.tex}
+file under each \env{PATH} (default: the current directory, recursively) and
+reports the matches -- without running LaTeX, which is the point
+(section~\ref{sec:problem-files}). With no filters, it lists every file that
+has a block. The kind fixes the block macro it reads, the
+\cs{importproblem}~/ \cs{importfact} lines it emits, and the filter set --
+facts carry no \env{type} or \env{difficulty}, so the two have four filters and
+two.
 
-One difference is worth stating here rather than leaving to be discovered:
-\file{find-passages} accepts no \texttt{-{}-with}. A passage has no injectable
-keys, because both options \cs{importpassage} takes belong to the importing
-document rather than to the passage: \env{level}, where the passage's natural
-depth lands, and \env{note}, a gloss printed under its heading in that document
-alone (section~\ref{sec:ref-passagemeta}). Emitted passage lines are
-therefore always bare. The passage bank also sits in a sibling submodule rather
-than a directory of the course, so give it as an operand ---
-\texttt{find-passages teaching/passages} --- or a bare run from the course root
-will walk everything else too.
+\textbf{\file{find-passages} is the odd one, and differs in kind rather than in
+degree.} A passage bank has \emph{no metadata block at all}: the directory is
+the bank, every \file{.tex} in it is a passage, and a passage's title and label
+are derived from its file name (section~\ref{sec:ch5-passages}). So there is
+nothing to search and nothing to inject, and four things the other two accept
+are refused outright rather than left silently useless: every filter,
+\texttt{-{}-with}, \texttt{-{}-untagged} (it inverts a membership that no
+longer exists) and \texttt{-{}-vocab} (there are no tags).
+
+\textbf{It also requires a \env{PATH}}, where the other two default to the
+current directory. The bank is a sibling submodule rather than a directory of
+the course, so name it --- \texttt{find-passages teaching/passages}. With no
+block to tell a passage from any other \file{.tex}, a bare run from a course
+root would report every lecture and assessment as a passage, so it is refused.
+
+What it emits is a heading and an import, the shape a call site writes by hand:
+
+\begin{manexsource}
+$ find-passages --import --from _admin teaching/passages
+\section{Webwork Tips}\label{sec:webwork_tips}
+
+\import{../teaching/passages/}{webwork-tips.tex}
+\end{manexsource}
+
+\noindent The label is exact; the title is mechanical and worth reading before
+keeping (\file{well-written-solutions.tex} yields ``Well Written Solutions'').
+Delete the \cs{section} line when the passage lands under a heading that
+already exists.
+
+Everything below holds for all three unless it says otherwise.
 
 Filters combine with AND. \env{PAT} is an extended regular
 expression matched case-insensitively against each comma-separated item, so
@@ -191,7 +211,7 @@ machine modes through
 picker (fuzzy-search the metadata, \file{bat}-preview the \file{.tex},
 multi-select with Tab), then pipes the chosen files back through
 \texttt{-{}-import} so the accepted set comes out as \cs{importproblem} (or
-\cs{importfact}, \cs{importpassage}) lines on
+\cs{importfact}, or a \cs{section} and \cs{import} pair) on
 standard output. Its \texttt{-{}-from} and any \file{find-problems} filters pass
 straight through, e.g.\ \texttt{pick-problems -{}-from \_assessment -{}-type
 multiple-choice derivatives/}. The Vim commands \texttt{:ImportProblem}
@@ -200,13 +220,14 @@ multiple-choice derivatives/}. The Vim commands \texttt{:ImportProblem}
 pipeline, inserting the lines at the cursor
 with \texttt{-{}-from} pinned to the buffer's own directory -- so picking a
 problem while writing an assessment drops in a ready line, needing only its
-\env{points}, and picking a passage drops in one needing nothing at all.
+\env{points}, and picking a passage drops in a heading and an import.
 
-Two things about picking \emph{passages} in particular. The emitted lines are
-separated by a blank line, matching how every call site writes them, which makes
-each one a paragraph object --- and that matters because fzf returns a
-multi-selection in \emph{input} order, not the order you ticked them, while a
-passage's position in a document can be load-bearing wherever one passage refers
-to another. So reorder after pasting: \texttt{dap}, \texttt{p}. Second, \env{level}\texttt{=subsection} is
-always added by hand and is always safe to try: \file{CourseDocument} refuses a
-shift that would push a heading past \cs{subsubsection}, loudly, at build time.
+Two things about picking \emph{passages} in particular. \textbf{Give the bank as
+the operand} --- \texttt{pick-passages teaching/passages} --- because a passage
+bank has no metadata block and a bare run is refused rather than offering every
+\file{.tex} in the course; \texttt{<Space>ig} does this for you. Second, the
+blocks come out separated by a blank line, which makes each one two paragraph
+objects. That matters because fzf returns a multi-selection in \emph{input}
+order, not the order you ticked them, while a passage's position in a document
+can be load-bearing wherever one passage refers to another --- so reorder after
+pasting, and expect to edit the derived title.
