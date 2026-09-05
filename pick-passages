@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
-# pick-passages — fzf picker over the passage bank; emits \importpassage lines.
-# A thin shim over pick-meta (the shared picker). Forwards find-passages' filters
-# and PATH operands; `--from DIR' makes emitted paths relative to DIR. See
-# pick-meta and find-passages.
+# pick-passages — fzf picker over the passage bank; emits \section + \import.
+# A thin shim over pick-meta (the shared picker). Forwards find-passages' PATH
+# operands; `--from DIR' makes emitted paths relative to DIR. See pick-meta and
+# find-passages.
 #
-# Emitted lines never carry [opts]: a passage has no injectable keys. If a passage
-# needs level=subsection here, add it by hand -- and check the depth column first,
-# because a passage carrying subsections cannot be shifted.
+# What comes out, per passage picked, is a heading built from the file name, a
+# blank line, then the import -- the shape every call site writes by hand:
+#
+#     \section{Webwork Tips}\label{sec:webwork_tips}
+#
+#     \import{../teaching/passages/}{webwork-tips.tex}
+#
+# The heading is a starting point, not an answer: the title is derived
+# mechanically and will want editing (`Well Written' for `Well-written'), and a
+# passage imported under an existing heading wants the \section line deleted.
+#
+# A PATH is required -- name the bank (`pick-passages teaching/passages'), never
+# a course root. There is no metadata block to filter on.
 exec "$(dirname -- "$0")/pick-meta" --kind passage --as pick-passages "$@"
