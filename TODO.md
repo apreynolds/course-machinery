@@ -29,6 +29,50 @@ place. Editor integrations that parse the `.log` are the ones to check: an
 unreadable log usually means "no errors", not "wrong path", so the failure is
 quiet.
 
+**`pdflatex` here does not pass `-file-line-error`, and log readers cannot tell.**
+Both invocation sites — the view override at `build-pdfs:368` and the plain build
+at `build-pdfs:412` — leave it off, so errors print in the traditional two-line
+form: `! Undefined control sequence.` then `l.4 \undefinedcontrolsequence`. The
+line number is there; the **filename is not**. With the flag the same error reads
+`./sub.tex:4: Undefined control sequence.`, carrying both.
+
+Without it a parser can only recover the filename by tracking the log's `(`/`)`
+file pushes. That is fragile in principle and dangerous in practice: vim's
+`errorformat` does it with `%*[^()]` rules that backtrack exponentially, and one
+2000-column line carrying a few hundred parens — a `qrcodetikz` QR path,
+unwrapped because of `max_print_line` (`build-pdfs:106`) — hangs the editor
+outright rather than slowly. Those rules were deleted from the vim side on
+2026-09-06 rather than fixed, since they never produced a correct filename
+anyway.
+
+So today every error is attributed to the master document. That is not vague but
+*wrong*, and it matters here because documents are not single files: 49 of 55
+built documents read more than one first-party source, and the lecture masters
+read 28–38 each. An error inside an imported passage or a shared `.sty` sends
+the reader to that line number in the wrong file.
+
+*Settled, so it need not be re-derived:*
+
+- **This cannot land alone.** With the flag on, the leading `! ` disappears
+  entirely. Any parser matching `%E! %m` stops matching errors and reports a
+  clean build — loud failures become silent ones. The consumer must understand
+  `%E%f:%l: %m` first; that half is independent, backward-compatible, and worth
+  doing on its own.
+- **An editor that also compiles these documents writes to the same aux dir**
+  (the scheme in the contract above), so its log and this script's log are the
+  same file, and the last build wins. If the two producers disagree about
+  `-file-line-error`, a reader that understands only one format reports "no
+  errors" for a document that has them. Making both producers agree is the real
+  argument for the flag; nicer attribution is the smaller half.
+- **It does not touch warnings.** `Overfull \hbox … detected at line 1` is
+  byte-identical either way, and warnings are almost all of what a quickfix list
+  ever holds in practice. The gain is confined to genuine errors.
+- **Reference implementation:** vimtex passes the flag and parses the result with
+  no paren rules at all — `autoload/vimtex/compiler/latexmk.vim` for the
+  invocation, `autoload/vimtex/qf/latexlog.vim` for the format.
+- `pr-latexmk` is a third producer writing into the same scheme and would need
+  the same treatment for the formats to agree everywhere.
+
 **There is no `LICENSE`.**
 The repository is public and carries no licence terms, which leaves anyone who
 wants to adapt it with no permission to. Pick something and add it.
