@@ -223,7 +223,7 @@
   {0pt}{4.5ex plus 1ex minus .2ex}{2ex plus .2ex}
 
 \titleformat{\subsubsection}[block]
-  {\sffamily\bfseries\itshape\color{HeadingColor}}{\thesubsubsection}{0.5em}{}
+  {\large\sffamily\bfseries\itshape\color{HeadingColor}}{\thesubsubsection}{0.5em}{}
 \titlespacing*{\subsubsection}
   {0pt}{4.5ex plus 1ex minus .2ex}{2ex plus .2ex}
 
