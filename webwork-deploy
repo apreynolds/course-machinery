@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+#
+# webwork-deploy — build an uploadable tarball from a topic repo's webwork/ tree
+# Usage: webwork-deploy [-o DIR] [-n] [TOPIC ...]
+#
+#   -o DIR   write tarballs to DIR (default: ./_deploy, which is gitignored)
+#   -n       dry run: report what would go in, build nothing
+#   TOPIC    topic directories to build; default is all that have a webwork/
+#
+# Produces one .tgz per topic. Upload it through WeBWorK's file manager into the
+# course's templates/ directory and unpack it there; WeBWorK will create
+#
+#     templates/<topic>/diffyqs/sec_2.1/prob01.pg
+#     templates/<topic>/opl/Rochester/setDiffEQ1/ur_de_1_1.pg
+#     templates/<topic>/local/...
+#     templates/<topic>/setM1_1_Homogeneous.def
+#     templates/<topic>/LICENSE.md
+#
+# then import the sets from those .def files. The tree is TOPIC-rooted and
+# carries no course name, so a second course reusing this topic needs only its
+# own .def files, not a second copy of the problems.
+#
+# The tarball root is named for the topic, not for the repo directory, which is
+# why this stages into a temporary directory rather than tarring in place.
+# Modelled on Lebl's make-tar.sh in the diffyqs-webwork repo.
+#
+# Runs webwork-check first and refuses to build if it fails — shipping a set
+# whose problem paths do not resolve is the failure mode this whole layout
+# exists to prevent.
+
+set -uo pipefail
+
+# This script lives in the MACHINERY, which is mounted at
+# <course>/.course-machinery/ -- so the course repo is its parent, not its own
+# directory. Getting this wrong is not a small error: REPO is what every topic
+# path, every problem lookup and SETS_DIR below are built from, so a wrong
+# answer means the script quietly examines an empty tree.
+MACHINERY=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=${COURSE_ROOT:-$(dirname "$MACHINERY")}
+
+if [ ! -d "$REPO/.course-machinery" ]; then
+    echo "$(basename "${BASH_SOURCE[0]}"): cannot find the course repo." >&2
+    echo "  Looked in: $REPO" >&2
+    if [ -n "${COURSE_ROOT:-}" ]; then
+        echo "  (from COURSE_ROOT)" >&2
+    else
+        echo "  (the parent of $MACHINERY)" >&2
+    fi
+    echo "  That has no .course-machinery/ in it, so it is not a course repo." >&2
+    echo "  Set COURSE_ROOT if the machinery is mounted somewhere unusual." >&2
+    exit 2
+fi
+
+# Set definitions live at COURSE level, not inside a topic repo -- a .def file
+# is course curation, while the topic repo owns the problems. Kept in step with
+# webwork-check, which reads the same variable.
+SETS_DIR=${WEBWORK_SETS_DIR:-$REPO/_assessments/webwork-assignments}
+
+OUTDIR="$REPO/_deploy"
+dryrun=0
+topics=()
+
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        -o) shift; OUTDIR=$1 ;;
+        -n) dryrun=1 ;;
+        -*) echo "webwork-deploy: unknown option $1" >&2; exit 2 ;;
+        *)  topics+=("$1") ;;
+    esac
+    shift
+done
+
+if [ ${#topics[@]} -eq 0 ]; then
+    for d in "$REPO"/*/webwork; do
+        [ -d "$d" ] || continue
+        topics+=("$(basename "$(dirname "$d")")")
+    done
+fi
+
+# Refuse to ship a broken tree.
+if [ "$dryrun" -eq 0 ]; then
+    echo "Verifying before build..."
+    if ! "$REPO/webwork-check" "${topics[@]}" > /dev/null; then
+        echo "webwork-deploy: webwork-check failed — run it to see what, and fix" >&2
+        echo "                before building. Nothing was written." >&2
+        exit 1
+    fi
+    echo "  checks pass"
+    echo
+fi
+
+# ---------------------------------------------------------------------------
+# defs_for_topic TOPIC -- the .def files belonging to that topic, one per line.
+#
+# The .def files all live together in SETS_DIR, so a set's topic is derived
+# from its own `source_file' lines, which are topic-rooted post-flip
+# (<topic>/diffyqs/..., <topic>/opl/..., <topic>/local/...).
+#
+# MAPPING.md's rule is that NO practice set straddles two topics -- every one
+# draws from a single chapter. That is what makes this derivation sound, so a
+# set that turns out to straddle is a hard error rather than something to guess
+# at: it means either the rule has been broken or a path is wrong, and both are
+# worth stopping for.
+#
+# A PRE-FLIP set (source_file lines reading diffyqs-webwork/... or Library/...)
+# names no topic at all and cannot be placed. Those are reported, not silently
+# dropped -- an unplaced set is one the server will never see.
+# ---------------------------------------------------------------------------
+defs_for_topic() {
+    local want=$1 def owners
+    for def in "$SETS_DIR"/*.def; do
+        [ -e "$def" ] || continue
+        owners=$(grep -h '^source_file' "$def" \
+                 | sed 's|.*= *||' \
+                 | grep -E '^[^/]+/(diffyqs|opl|local)/' \
+                 | cut -d/ -f1 | sort -u)
+        if [ -z "$owners" ]; then
+            echo "webwork-deploy: $(basename "$def") names no topic (pre-flip paths?)" \
+                 " -- it will not be packaged" >&2
+            continue
+        fi
+        if [ "$(printf '%s\n' "$owners" | wc -l | tr -d ' ')" -gt 1 ]; then
+            echo "webwork-deploy: $(basename "$def") straddles topics:" >&2
+            printf '                  %s\n' $owners >&2
+            echo "                MAPPING.md says a set draws from one chapter." >&2
+            exit 1
+        fi
+        [ "$owners" = "$want" ] && echo "$def"
+    done
+}
+
+mkdir -p "$OUTDIR"
+
+for topic in "${topics[@]}"; do
+    src="$REPO/$topic/webwork"
+    if [ ! -d "$src" ]; then
+        echo "webwork-deploy: no webwork/ in $topic, skipping" >&2
+        continue
+    fi
+
+    pg=$(find "$src" -name '*.pg' | wc -l | tr -d ' ')
+
+    # Which .def files belong to THIS topic. They all sit in one course-level
+    # directory now, so ownership is derived from their own source_file lines
+    # rather than from where the file happens to live.
+    topic_defs=()
+    while IFS= read -r def; do
+        [ -n "$def" ] && topic_defs+=("$def")
+    done < <(defs_for_topic "$topic")
+    defs=${#topic_defs[@]}
+
+    if [ "$dryrun" -eq 1 ]; then
+        printf '%-24s would package %3s problems, %s set definitions\n' \
+               "$topic" "$pg" "$defs"
+        continue
+    fi
+
+    # Stage under a directory named for the topic so the tarball unpacks to
+    # templates/<topic>/ rather than templates/webwork/.
+    stage=$(mktemp -d)
+    mkdir -p "$stage/$topic"
+
+    for part in diffyqs opl local; do
+        [ -d "$src/$part" ] && cp -R "$src/$part" "$stage/$topic/"
+    done
+    [ "$defs" -gt 0 ] && cp "${topic_defs[@]}" "$stage/$topic/"
+
+    # LICENSE.md travels with the problems. These are CC BY-NC-SA files being
+    # redistributed onto another machine, and while each .pg keeps its own
+    # `## Author' header, nothing in the tree would otherwise name the licence
+    # those headers sit under. Cheap to include, wrong to leave behind.
+    [ -f "$src/LICENSE.md" ] && cp "$src/LICENSE.md" "$stage/$topic/"
+
+    # Drop the .gitkeep placeholders; they mean nothing on the server.
+    find "$stage" -name '.gitkeep' -delete
+
+    tarball="$OUTDIR/$topic.tgz"
+    rm -f "$tarball"
+    # --exclude '.*' keeps .DS_Store and friends out. No --sort=name here:
+    # that is a GNU tar option and this runs on BSD tar under macOS.
+    ( cd "$stage" && GZIP=-9 tar czf "$tarball" --exclude '.*' "$topic" )
+    rm -rf "$stage"
+
+    printf '%-24s %3s problems, %s sets  →  %s (%s)\n' \
+           "$topic" "$pg" "$defs" "${tarball#"$REPO"/}" \
+           "$(du -h "$tarball" | cut -f1 | tr -d ' ')"
+done

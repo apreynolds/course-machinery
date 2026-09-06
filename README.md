@@ -71,6 +71,14 @@ which one:
   picture per problem, for a learning-management system whose question pools
   take an image rather than text. Question-only and question-with-solution
   versions of each, at the same measure a printed build uses.
+- `pg-to-latex` — scaffold a `.tex` problem file from a WeBWorK `.pg` at a
+  frozen seed. A scaffold, not a converter: it does the mechanical part and
+  marks its own gaps `% TODO`.
+- `webwork-check` / `webwork-deploy` — verify a course's WeBWorK set
+  definitions and problem trees, and build one uploadable tarball per topic.
+  Only useful to a course that assigns WeBWorK, but many do.
+- `build-d2l-import.py` — read a quiz's pool `.tex` files and emit a D2L
+  question-import CSV, plus a paste sheet for entering the questions by hand.
 - `find-problems` / `find-facts` — search a bank by its metadata blocks,
   without running LaTeX; `--import` emits paste-ready import lines.
 - `find-passages` — the odd one out, because a passage bank has **no metadata

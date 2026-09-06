@@ -1,0 +1,314 @@
+#!/usr/bin/env bash
+#
+# webwork-check — verify the WeBWorK problem trees in this course's topic repos
+# Usage: webwork-check [--paths] [--drift] [TOPIC ...]
+#
+# Two independent checks. With no flags, both run.
+#
+#   --paths   Every `source_file` line in every .def file under
+#             _assessments/webwork-assignments/ points at a problem that
+#             actually exists. This is the check that would have caught the
+#             Module 6 renumbering hazards, where a set referenced a problem
+#             upstream had quietly renumbered away. Finding NO .def files is
+#             itself a failure -- see the note above the check.
+#
+#   --drift   Every .pg file under a topic's webwork/diffyqs/ and webwork/opl/
+#             either matches the reference clone it was copied from, or records
+#             the blob hash it was copied from and is checked against that.
+#             This is what the source-shaped layout buys: it answers "did
+#             upstream fix something I should look at, and have I accidentally
+#             edited a file I'm supposed to be tracking?"
+#
+# TOPIC restricts --drift to named topic directories; default is all of them.
+# It does NOT restrict --paths: the sets live in one course-level directory and
+# each names its own topic, so there is nothing per-topic to narrow.
+#
+# WEBWORK_SETS_DIR overrides where the .def files are looked for; DIFFYQS_CLONE
+# and OPL_CLONE override the reference clones.
+#
+# Expected steady state: paths all resolve, drift reports nothing but counts.
+# A file you have edited STAYS where it is and records an UPSTREAM-BLOB line;
+# webwork/local/ is for problems that are ours outright — written here, or
+# rewritten far enough that upstream's author no longer belongs on them.
+#
+# Exit status is 1 if any check failed, so this is usable in a pre-push hook.
+
+set -uo pipefail
+
+# Reference clones. These are read-only upstreams, never edited in place.
+DIFFYQS_CLONE=${DIFFYQS_CLONE:-$HOME/2teach/diffyqs-webwork-clone}
+OPL_CLONE=${OPL_CLONE:-$HOME/2teach/webwork-open-problem-library-clone/OpenProblemLibrary}
+
+# This script lives in the MACHINERY, which is mounted at
+# <course>/.course-machinery/ -- so the course repo is its parent, not its own
+# directory. Getting this wrong is not a small error: REPO is what every topic
+# path, every problem lookup and SETS_DIR below are built from, so a wrong
+# answer means the script quietly examines an empty tree.
+MACHINERY=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=${COURSE_ROOT:-$(dirname "$MACHINERY")}
+
+if [ ! -d "$REPO/.course-machinery" ]; then
+    echo "$(basename "${BASH_SOURCE[0]}"): cannot find the course repo." >&2
+    echo "  Looked in: $REPO" >&2
+    if [ -n "${COURSE_ROOT:-}" ]; then
+        echo "  (from COURSE_ROOT)" >&2
+    else
+        echo "  (the parent of $MACHINERY)" >&2
+    fi
+    echo "  That has no .course-machinery/ in it, so it is not a course repo." >&2
+    echo "  Set COURSE_ROOT if the machinery is mounted somewhere unusual." >&2
+    exit 2
+fi
+
+# Where the set definitions live. They sit at COURSE level, not inside a topic
+# repo: a .def file is course curation -- which problems, in which order, under
+# which module number -- while a topic repo owns the problems themselves and is
+# meant to be reusable in another course that will write its own .def files.
+# Must come after REPO, which it reads.
+SETS_DIR=${WEBWORK_SETS_DIR:-$REPO/_assessments/webwork-assignments}
+
+# Fail loudly on a missing reference clone. Without this a moved or renamed
+# clone is silently indistinguishable from upstream having deleted every file
+# it holds, and the run buries the real cause under a screen of GONE lines --
+# which is exactly what happened when the OPL clone was renamed to
+# -clone (2026-09-02).
+for _c in "$DIFFYQS_CLONE" "$OPL_CLONE"; do
+    if [ ! -d "$_c" ]; then
+        echo "webwork-check: reference clone not found: $_c" >&2
+        echo "  Set DIFFYQS_CLONE / OPL_CLONE, or fix the defaults at the top" >&2
+        echo "  of this script if a clone has moved." >&2
+        exit 2
+    fi
+done
+
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+do_paths=0
+do_drift=0
+topics=()
+
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage; exit 0 ;;
+        --paths)   do_paths=1 ;;
+        --drift)   do_drift=1 ;;
+        -*)        echo "webwork-check: unknown option $arg" >&2; exit 2 ;;
+        *)         topics+=("$arg") ;;
+    esac
+done
+
+# No check selected means run both.
+if [ "$do_paths" -eq 0 ] && [ "$do_drift" -eq 0 ]; then
+    do_paths=1
+    do_drift=1
+fi
+
+# Default to every topic directory that actually has a webwork/ tree.
+if [ ${#topics[@]} -eq 0 ]; then
+    for d in "$REPO"/*/webwork; do
+        [ -d "$d" ] || continue
+        topics+=("$(basename "$(dirname "$d")")")
+    done
+fi
+
+failed=0
+
+# ---------------------------------------------------------------------------
+# --paths
+#
+# A source_file line can point at one of four places, and the script has to
+# understand all four because the sets are mid-migration: they currently
+# reference the upstream trees on the server, and will later reference this
+# repo's own trees. Both forms must verify.
+#
+#   diffyqs-webwork/sec_2.1/prob01.pg   → the diffyqs clone   (pre-flip)
+#   Library/Rochester/.../ur_de_1_1.pg  → the OPL clone       (pre-flip)
+#   <topic>/diffyqs/sec_2.1/prob01.pg   → this repo           (post-flip)
+#   <topic>/opl/Rochester/.../x.pg      → this repo           (post-flip)
+#   <topic>/local/whatever.pg           → this repo           (post-flip)
+# ---------------------------------------------------------------------------
+check_paths() {
+    local def base rel src files=0 bad=0 dn dbad
+
+    for def in "$SETS_DIR"/*.def; do
+        [ -e "$def" ] || continue
+        files=$((files + 1))
+        base=$(basename "$def" .def)
+        dn=0
+        dbad=0
+        while IFS= read -r rel; do
+            dn=$((dn + 1))
+            case "$rel" in
+                diffyqs-webwork/*) src="$DIFFYQS_CLONE/${rel#diffyqs-webwork/}" ;;
+                Library/*)         src="$OPL_CLONE/${rel#Library/}" ;;
+                */diffyqs/*|*/opl/*|*/local/*)
+                    # Topic-rooted: strip the leading topic name, which is the
+                    # server-side directory, and look inside this repo.
+                    src="$REPO/${rel%%/*}/webwork/${rel#*/}" ;;
+                *)
+                    echo "  ? UNKNOWN SOURCE  $base: $rel"
+                    dbad=$((dbad + 1)); continue ;;
+            esac
+            if [ ! -f "$src" ]; then
+                echo "  ✗ MISSING  $base: $rel"
+                dbad=$((dbad + 1))
+            fi
+        done < <(grep -h '^source_file' "$def" | sed 's|.*= *||')
+
+        bad=$((bad + dbad))
+        if [ "$dbad" -eq 0 ]; then
+            printf '  %-26s %3d references, all resolve\n' "$base" "$dn"
+        else
+            printf '  %-26s %3d references, %d BROKEN\n' "$base" "$dn" "$dbad"
+        fi
+    done
+
+    # Finding nothing is a FAILURE, not a quiet "no .def files". This check
+    # used to be per-topic and globbed <topic>/webwork/*.def; when the sets
+    # moved to the course-level directory it went on reporting "no .def files"
+    # per topic and still exited 0, so --paths silently checked nothing and
+    # webwork-deploy went on trusting it. A check that cannot find its input
+    # must say so loudly -- that is the whole point of having it.
+    if [ "$files" -eq 0 ]; then
+        echo "  ✗ NO .def FILES FOUND in $SETS_DIR"
+        echo "    --paths checked nothing. If the sets have moved, point"
+        echo "    WEBWORK_SETS_DIR at them or fix SETS_DIR at the top of this script."
+        failed=1
+        return
+    fi
+    [ "$bad" -gt 0 ] && failed=1
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# --drift
+#
+# Compares this repo's copies against the reference clones.
+#
+# A file may legitimately differ from upstream — adding a solution does not
+# make a problem ours, so an edited problem STAYS under diffyqs/ or opl/ next
+# to its unedited siblings. Such a file records the blob hash it was copied
+# from, in a header line:
+#
+#     # UPSTREAM-BLOB: 02b6a97499f4a05af144116dacfc0835c9bcc0ec
+#
+# That is what makes the two questions drift-checking bundles together
+# separable, and it is why the hash is recorded rather than just the commit:
+#
+#   "have I edited this?"        — my copy vs. the recorded hash
+#   "has upstream moved?"        — the CLONE's copy vs. the recorded hash
+#
+# The second question is the one that matters, and it is answerable for edited
+# and unedited files alike. Filing edited problems away in local/ instead would
+# have answered it for neither, precisely on the files where an upstream fix is
+# most expensive to absorb by hand.
+#
+# Outcomes:
+#
+#   DIFFERS  a file with no recorded blob differs from upstream. Unexpected:
+#            either take upstream's version, or record a blob hash and say in
+#            the header what you changed and why.
+#   MOVED    upstream has changed a file we have deliberately modified. Not a
+#            failure — news. Read the diff and decide whether to port it.
+#   GONE     upstream deleted or renamed it. Your copy still works, but the
+#            problem no longer exists upstream — worth knowing before relying
+#            on upstream for a fix.
+#   AHEAD    upstream has problems in these sections that you do not have,
+#            reported as a count only. Usually means new problems were added.
+# ---------------------------------------------------------------------------
+
+# Blob hash recorded in a file's header, or empty if it records none.
+recorded_blob() {
+    sed -n 's/^#[[:space:]]*UPSTREAM-BLOB:[[:space:]]*\([0-9a-f]\{40\}\).*/\1/p' "$1" | head -1
+}
+
+check_drift() {
+    local topic=$1 kind clone dir f rel blob upstream n=0 differs=0 gone=0 ahead=0 moved=0 kept=0
+
+    for kind in diffyqs opl; do
+        dir="$REPO/$topic/webwork/$kind"
+        [ -d "$dir" ] || continue
+        case "$kind" in
+            diffyqs) clone=$DIFFYQS_CLONE ;;
+            opl)     clone=$OPL_CLONE ;;
+        esac
+
+        while IFS= read -r f; do
+            rel=${f#"$dir/"}
+            n=$((n + 1))
+            if [ ! -f "$clone/$rel" ]; then
+                echo "  - GONE     $kind/$rel"
+                gone=$((gone + 1))
+                continue
+            fi
+
+            blob=$(recorded_blob "$f")
+            if [ -n "$blob" ]; then
+                # Deliberately modified. Ask only whether upstream has moved
+                # since we copied it; our own divergence is the point.
+                kept=$((kept + 1))
+                upstream=$(git hash-object "$clone/$rel")
+                if [ "$upstream" != "$blob" ]; then
+                    echo "  ! MOVED    $kind/$rel  (upstream changed since we forked it)"
+                    echo "             diff $f $clone/$rel"
+                    moved=$((moved + 1))
+                fi
+            elif ! cmp -s "$f" "$clone/$rel"; then
+                echo "  ~ DIFFERS  $kind/$rel  (no UPSTREAM-BLOB recorded)"
+                differs=$((differs + 1))
+            fi
+        done < <(find "$dir" -name '*.pg' | sort)
+
+        # Only meaningful for diffyqs, where whole sections were taken, so a
+        # missing file really is something upstream added. The OPL is copied
+        # on selection, so "not present" there is the normal case.
+        #
+        # local/ is NOT counted here: it now holds only problems that are ours
+        # outright, not adopted copies, so it can never fill an upstream gap.
+        if [ "$kind" = diffyqs ]; then
+            local sec secname here there
+            for sec in "$dir"/sec_*; do
+                [ -d "$sec" ] || continue
+                secname=$(basename "$sec")
+                here=$(find "$sec" -name '*.pg' | wc -l)
+                there=$(find "$clone/$secname" -name '*.pg' 2>/dev/null | wc -l)
+                [ "$there" -gt "$here" ] && ahead=$((ahead + there - here))
+            done
+        fi
+    done
+
+    if [ "$n" -eq 0 ]; then
+        printf '  %-22s no problem tree\n' "$topic"
+        return
+    fi
+
+    if [ "$differs" -eq 0 ] && [ "$gone" -eq 0 ]; then
+        printf '  %-22s %3d files, %d match upstream' "$topic" "$n" "$((n - kept))"
+    else
+        printf '  %-22s %3d files, %d differ, %d gone' "$topic" "$n" "$differs" "$gone"
+        failed=1
+    fi
+    [ "$kept"  -gt 0 ] && printf ', %d modified here' "$kept"
+    [ "$moved" -gt 0 ] && printf '  (%d TO REVIEW)' "$moved"
+    [ "$ahead" -gt 0 ] && printf '  (upstream has %d more)' "$ahead"
+    printf '\n'
+}
+
+if [ "$do_paths" -eq 1 ]; then
+    echo "Set definition references"
+    check_paths
+    echo
+fi
+
+if [ "$do_drift" -eq 1 ]; then
+    echo "Drift against upstream clones"
+    for t in "${topics[@]}"; do check_drift "$t"; done
+    echo
+fi
+
+if [ "$failed" -eq 0 ]; then
+    echo "OK"
+else
+    echo "FAILED — see above"
+fi
+exit "$failed"
