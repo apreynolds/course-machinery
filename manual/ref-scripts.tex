@@ -31,6 +31,50 @@ aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
 \end{tabularx}
 \end{center}
 
+\subsection*{build-images}
+
+\begin{manexsource}
+build-images [OPTIONS] FILE.tex ...
+\end{manexsource}
+
+One problem file in, one picture out --- for a learning-management system whose
+question pools take an image rather than text. Each input yields
+\file{NAME.pdf} and \file{NAME.png} (the question alone), plus
+\file{NAME-SOLUTIONS.pdf} and \file{NAME-SOLUTIONS.png} (the question with its
+worked solution), reusing build-pdfs' view suffix.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+wrapper & a throwaway \texttt{article} document in \env{\$TMPDIR}, never
+  written into your tree. It loads \file{Exercises.sty} directly, because none
+  of the three classes wants to be a single problem on a page: \file{Assessment}
+  hangs numbers and marks in margin rails that fall outside a crop box, and
+  \file{CourseDocument} brings a title block and headers a question has no use
+  for.\\
+heading & \cs{ProblemHeadingFormat} is emptied, so no ``Problem~N.'' appears
+  --- the LMS numbers its own questions.\\
+solutions & \cs{ShowSolutions} is defined \emph{before} \cs{documentclass}, the
+  way build-pdfs injects it. Defined any later it is silently ignored
+  (\file{Exercises.sty} reads it with \cs{ifdefined} at load time), and the
+  solution is quietly absent.\\
+\file{Workspace} & deliberately \emph{not} loaded, which is what makes the
+  solution box render at its natural height: \file{Exercises} routes it through
+  \cs{WSZeroHeight} only when that exists. Loading Workspace and calling
+  \cs{collapseworkspace} reaches the same place by a longer road.\\
+measure & \texttt{2.6\cs{alphabet}} --- the rule the classes use, not a number
+  chosen here, so an image matches the same problem in a printed build and keeps
+  matching if the typeface changes. \texttt{-{}-width} overrides it; a
+  \env{matching} problem is the case that wants a wider one.\\
+crop & vertical only. Every image comes out exactly one measure wide, so pool
+  members display consistently wherever the LMS scales images to its column. The
+  page is 200\,cm tall so that a long question can never split across two pages,
+  which would yield two images of half a question each; the crop replaces the
+  paper, so the height never reaches the output.\\
+needs & \texttt{pdflatex}, \texttt{pdfcrop}, \texttt{gs}; \texttt{pdftoppm} for
+  the PNG (\texttt{-{}-no-png} to skip).\\
+\end{tabularx}
+\end{center}
+
 \subsection*{find-problems}
 
 \begin{manexsource}

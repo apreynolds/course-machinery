@@ -1,0 +1,275 @@
+#!/usr/bin/env bash
+#
+# build-images — render single problem files to cropped PDFs and PNGs
+# Usage: build-images [OPTIONS] FILE.tex ...
+#
+#   -o, --out DIR       write outputs here                    (default: cwd)
+#   -r, --dpi N         PNG resolution                        (default: 300)
+#       --width LEN     typeset measure, any TeX length       (default: 2.6\alphabet)
+#       --margins N     white border in TeX pt                (default: 10)
+#       --no-png        stop at the cropped PDF
+#       --no-solutions  skip the -SOLUTIONS variant
+#       --keep          keep the generated wrapper and log, and say where
+#   -h, --help          this text
+#
+# For each problem file this writes, into --out:
+#
+#     <name>.pdf            <name>.png              the question alone
+#     <name>-SOLUTIONS.pdf  <name>-SOLUTIONS.png    question + worked solution
+#
+# The -SOLUTIONS suffix is build-pdfs' own view naming, deliberately.
+#
+# WHAT IT IS FOR. A D2L (or Moodle, or Canvas) question pool wants one IMAGE per
+# question. This turns one problem file from the bank into that image, without
+# the file having to know anything about it: the same .tex is a graded question
+# here, a worked example in a lecture, and a page of the solutions PDF.
+#
+# HOW IT WORKS. A throwaway wrapper document is generated per problem in $TMPDIR
+# and never written into your tree. It loads Exercises directly rather than going
+# through a course class, because none of the three classes wants to be a single
+# problem on a page: Assessment.cls hangs question numbers and marks in margin
+# rails (Assessment.cls:324-330) that fall outside a naive crop box, and
+# CourseDocument brings a title block, headers and a table of contents that a
+# question image has no use for.
+#
+# Nothing in the machinery is modified or special-cased to support this. Every
+# hook used is one Exercises already documents:
+#
+#   \ProblemHeadingFormat   emptied, so no "Problem 1." appears -- the LMS
+#                           numbers its own questions (Exercises.sty:640)
+#   \ShowSolutions          defined BEFORE \documentclass for the solutions
+#                           variant, exactly as build-pdfs injects it
+#                           (Exercises.sty:90-91, build-pdfs:441)
+#
+# Workspace.sty is deliberately NOT loaded. Exercises routes its solution box
+# through \WSZeroHeight only when that exists, falling back to an identity
+# (Workspace.sty:64-68) -- so leaving Workspace out is what makes solutions
+# render at their natural height here. Do not "fix" this by loading Workspace
+# and calling \collapseworkspace; that is the same result by a longer road.
+#
+# THE MEASURE is 2.6\alphabet, which is not a number chosen here -- it is the
+# house rule every class uses (CourseDocument.cls:103, LectureNotes.cls:193),
+# where \alphabet is the width of the lowercase alphabet measured in the real
+# body font (Typefaces.sty:135). So an image matches the same problem as it
+# appears in a printed build, and it keeps matching if the typeface ever
+# changes. --width overrides it; you should rarely want to.
+#
+# WHY THE PAGE IS ABSURDLY TALL. paperheight is set to 200cm so that a long
+# problem can never break across two pages, which would silently yield two
+# images of half a question each. The paper never reaches the output: the crop
+# below replaces it.
+#
+# WHY THE CROP IS VERTICAL ONLY. Every image comes out exactly one measure wide,
+# because a pool whose members differ in width displays inconsistently -- a short
+# question would be blown up larger than a long one wherever the LMS scales
+# images to fit its column. So the horizontal bounds are the page (which is
+# exactly the measure plus margins) and only the vertical bounds follow the ink.
+#
+# Requires: pdflatex, pdfcrop, ghostscript (gs), and pdftoppm for the PNG.
+
+set -uo pipefail
+
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+# ---------------------------------------------------------------------------
+# Options
+# ---------------------------------------------------------------------------
+
+out_dir="."
+dpi=300
+width='2.6\alphabet'
+margins=10
+want_png=1
+want_solutions=1
+keep=0
+files=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)      usage; exit 0 ;;
+        -o|--out)       out_dir=${2:?--out needs a directory}; shift 2 ;;
+        -r|--dpi)       dpi=${2:?--dpi needs a number}; shift 2 ;;
+        --width)        width=${2:?--width needs a TeX length}; shift 2 ;;
+        --margins)      margins=${2:?--margins needs a number}; shift 2 ;;
+        --no-png)       want_png=0; shift ;;
+        --no-solutions) want_solutions=0; shift ;;
+        --keep)         keep=1; shift ;;
+        --)             shift; files+=("$@"); break ;;
+        -*)             echo "build-images: unknown option: $1" >&2
+                        echo "Try 'build-images --help'." >&2; exit 2 ;;
+        *)              files+=("$1"); shift ;;
+    esac
+done
+
+if [ ${#files[@]} -eq 0 ]; then
+    usage; exit 2
+fi
+
+for tool in pdflatex pdfcrop gs; do
+    command -v "$tool" >/dev/null || { echo "build-images: $tool not found" >&2; exit 1; }
+done
+if [ "$want_png" -eq 1 ] && ! command -v pdftoppm >/dev/null; then
+    echo "build-images: pdftoppm not found (use --no-png for PDFs only)" >&2; exit 1
+fi
+
+mkdir -p "$out_dir" || exit 1
+out_dir=$(cd "$out_dir" && pwd)
+
+# ---------------------------------------------------------------------------
+# Where the machinery is
+# ---------------------------------------------------------------------------
+# This script LIVES in the machinery, so there is no need to repeat the walk-up
+# search in latexmkrc-shared:33-44 -- the answer is its own directory. The
+# course's own shared layer, if it has one, sits beside that and is added flat,
+# matching latexmkrc-shared:46.
+
+machinery=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+texinputs="$machinery//:"
+course_local="$(dirname "$machinery")/.course-machinery-local"
+[ -d "$course_local" ] && texinputs="$texinputs$course_local:"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/build-images.XXXXXX") || exit 1
+[ "$keep" -eq 0 ] && trap 'rm -rf "$work"' EXIT
+
+status=0
+
+# ---------------------------------------------------------------------------
+# render <problem-dir> <problem-file> <stem> <show-solutions 0|1>
+# ---------------------------------------------------------------------------
+render() {
+    local pdir=$1 pfile=$2 stem=$3 solutions=$4
+    local job="$stem"
+    [ "$solutions" -eq 1 ] && job="$stem-SOLUTIONS"
+
+    local wrapper="$work/$job.tex"
+
+    # \ShowSolutions must be defined BEFORE \documentclass: Exercises reads it
+    # with \ifdefined at load time (Exercises.sty:91), so a definition placed
+    # any later is simply ignored -- silently, with the solution absent and no
+    # error to notice. build-pdfs injects it the same way.
+    {
+        [ "$solutions" -eq 1 ] && printf '%s\n' '\def\ShowSolutions{}'
+        printf '%s\n' \
+          '\documentclass{article}' \
+          '\usepackage{geometry}' \
+          '\usepackage[lining]{Typefaces}' \
+          '\newlength{\imgmargin}\setlength{\imgmargin}{'"$margins"'pt}' \
+          '\newlength{\imgwidth}\setlength{\imgwidth}{'"$width"'}' \
+          '\geometry{paperwidth=\dimexpr\imgwidth+2\imgmargin\relax,' \
+          '          paperheight=200cm,' \
+          '          textwidth=\imgwidth,' \
+          '          left=\imgmargin, right=\imgmargin,' \
+          '          top=\imgmargin, bottom=\imgmargin,' \
+          '          marginparwidth=0pt, marginparsep=0pt}' \
+          '\usepackage{parskip}' \
+          '\usepackage{ProblemMeta}' \
+          '\usepackage{Exercises}' \
+          '\pagestyle{empty}' \
+          '\renewcommand{\ProblemHeadingFormat}{}' \
+          '\begin{document}' \
+          '\importproblem{'"$pdir"'}{'"$pfile"'}' \
+          '\end{document}'
+    } > "$wrapper"
+
+    # Twice: totcount and any \label/\ref inside a problem need the second pass,
+    # and a single run would report them as undefined rather than resolving.
+    local pass
+    for pass in 1 2; do
+        ( cd "$work" && TEXINPUTS="$texinputs" \
+            pdflatex -interaction=nonstopmode -halt-on-error \
+                     -file-line-error "$job.tex" ) >/dev/null 2>&1
+        local rc=$?
+        if [ $rc -ne 0 ]; then
+            echo "  FAILED  $job (pdflatex, pass $pass)" >&2
+            # pdflatex logs are ISO-8859, so grep -a; without it the log reads
+            # as binary and the error lines are silently not found.
+            grep -a -m5 '^.*:[0-9]*:' "$work/$job.log" 2>/dev/null | sed 's/^/          /' >&2
+            [ "$keep" -eq 1 ] && echo "          wrapper kept: $wrapper" >&2
+            return 1
+        fi
+    done
+
+    # Overfull boxes mean the content does not fit the measure -- the reader
+    # would see it running off the edge of the image, so say so, but do not
+    # fail: it is the problem file that needs a line broken, not this script.
+    local overfull
+    overfull=$(grep -ac 'Overfull \\hbox' "$work/$job.log" 2>/dev/null)
+    [ "${overfull:-0}" -gt 0 ] && echo "  warning: $job has $overfull overfull hbox(es)" >&2
+
+    # --- Crop: full page width, ink height. See the header for why.
+    local pw
+    pw=$(gs -dQUIET -dBATCH -dNOPAUSE -sDEVICE=bbox "$work/$job.pdf" 2>&1 \
+         | awk '/HiResBoundingBox/{print; exit}')
+    local y0 y1
+    y0=$(awk '{print $3}' <<<"$pw")
+    y1=$(awk '{print $5}' <<<"$pw")
+    if [ -z "$y0" ] || [ -z "$y1" ]; then
+        echo "  FAILED  $job (could not read the ink bounding box)" >&2
+        return 1
+    fi
+    # The page is exactly imgwidth + 2*imgmargin. Read it back from the log
+    # rather than recomputing it here, so --width can be any TeX length (an
+    # expression in \alphabet included) without this script having to evaluate
+    # TeX arithmetic.
+    local pagew
+    pagew=$(grep -a -m1 '\\paperwidth=' "$work/$job.log" | sed 's/.*=\([0-9.]*\)pt.*/\1/')
+    if [ -z "$pagew" ]; then
+        echo "  FAILED  $job (could not read the page width from the log)" >&2
+        return 1
+    fi
+    # The log reports TeX pt (1/72.27 in); a PDF bounding box is in bp (1/72 in).
+    local bbox
+    bbox=$(awk -v w="$pagew" -v y0="$y0" -v y1="$y1" -v m="$margins" \
+        'BEGIN { bp = w * 72 / 72.27; mb = m * 72 / 72.27;
+                 printf "0 %.3f %.3f %.3f", y0 - mb, bp, y1 + mb }')
+
+    pdfcrop --bbox "$bbox" "$work/$job.pdf" "$out_dir/$job.pdf" >/dev/null 2>&1 || {
+        echo "  FAILED  $job (pdfcrop)" >&2; return 1; }
+
+    # One page is the contract. More means the 200cm page was somehow not
+    # enough and the reader would get half a question, so refuse quietly rather
+    # than shipping it.
+    local pages
+    pages=$(gs -dQUIET -dBATCH -dNOPAUSE -sDEVICE=nullpage \
+               -c "($out_dir/$job.pdf) (r) file runpdfbegin pdfpagecount = quit" 2>/dev/null)
+    if [ -n "$pages" ] && [ "$pages" -gt 1 ] 2>/dev/null; then
+        echo "  FAILED  $job ($pages pages; a question image must be one)" >&2
+        return 1
+    fi
+
+    if [ "$want_png" -eq 1 ]; then
+        pdftoppm -png -r "$dpi" -singlefile "$out_dir/$job.pdf" "$out_dir/$job" || {
+            echo "  FAILED  $job (pdftoppm)" >&2; return 1; }
+        echo "  ok: $job.pdf, $job.png"
+    else
+        echo "  ok: $job.pdf"
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+for f in "${files[@]}"; do
+    if [ ! -f "$f" ]; then
+        echo "build-images: no such file: $f" >&2; status=1; continue
+    fi
+    # \importproblem takes DIR and FILE separately, and \import (which it wraps)
+    # accepts an ABSOLUTE directory -- which is what lets the wrapper live in
+    # $TMPDIR while \includegraphics inside the problem still resolves relative
+    # to the problem's own directory.
+    pdir=$(cd "$(dirname "$f")" && pwd)/
+    pfile=$(basename "$f")
+    stem=${pfile%.tex}
+
+    echo "$pfile"
+    render "$pdir" "$pfile" "$stem" 0 || status=1
+    if [ "$want_solutions" -eq 1 ]; then
+        render "$pdir" "$pfile" "$stem" 1 || status=1
+    fi
+done
+
+[ "$keep" -eq 1 ] && echo "wrappers and logs kept in $work"
+
+exit $status

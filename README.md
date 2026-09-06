@@ -67,6 +67,10 @@ which one:
   one requests through a `%! views:` magic comment, and optionally mirror the
   PDFs to a destination named in a `.MIRRORDIR` file (`SAMPLE-MIRRORDIR` is the
   annotated template).
+- `build-images` — render single problem files to cropped PDFs and PNGs, one
+  picture per problem, for a learning-management system whose question pools
+  take an image rather than text. Question-only and question-with-solution
+  versions of each, at the same measure a printed build uses.
 - `find-problems` / `find-facts` — search a bank by its metadata blocks,
   without running LaTeX; `--import` emits paste-ready import lines.
 - `find-passages` — the odd one out, because a passage bank has **no metadata
