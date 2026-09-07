@@ -70,7 +70,10 @@ which one:
 - `build-images` — render single problem files to cropped PDFs and PNGs, one
   picture per problem, for a learning-management system whose question pools
   take an image rather than text. Question-only and question-with-solution
-  versions of each, at the same measure a printed build uses.
+  versions of each, at the same measure a printed build uses. Both variants and
+  both formats by default; `--no-question` / `--no-solutions` pick a variant and
+  `--no-pdf` / `--no-png` pick a format, so any one of the four outputs can be
+  asked for on its own.
 - `pg-to-latex` — scaffold a `.tex` problem file from a WeBWorK `.pg` at a
   frozen seed. A scaffold, not a converter: it does the mechanical part and
   marks its own gaps `% TODO`.

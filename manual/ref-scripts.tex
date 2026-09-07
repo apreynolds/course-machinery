@@ -43,6 +43,14 @@ question pools take an image rather than text. Each input yields
 \file{NAME-SOLUTIONS.pdf} and \file{NAME-SOLUTIONS.png} (the question with its
 worked solution), reusing build-pdfs' view suffix.
 
+Those four are two independent choices, each defaulting to both, so any single
+output can be asked for on its own: \texttt{-{}-no-question} and
+\texttt{-{}-no-solutions} pick the variant, \texttt{-{}-no-pdf} and
+\texttt{-{}-no-png} the format. \texttt{-{}-no-pdf} skips no work --- the PDF is
+still built, in \env{\$TMPDIR}, because the PNG is rasterized from it --- it just
+never reaches \texttt{-{}-out}. Turning off both variants, or both formats, is an
+error rather than a silent no-op.
+
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 wrapper & a throwaway \texttt{article} document in \env{\$TMPDIR}, never

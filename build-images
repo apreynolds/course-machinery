@@ -7,15 +7,24 @@
 #   -r, --dpi N         PNG resolution                        (default: 300)
 #       --width LEN     typeset measure, any TeX length       (default: 2.6\alphabet)
 #       --margins N     white border in TeX pt                (default: 10)
-#       --no-png        stop at the cropped PDF
+#       --no-question   skip the question-only variant
 #       --no-solutions  skip the -SOLUTIONS variant
+#       --no-pdf        keep only the PNG, not the cropped PDF
+#       --no-png        keep only the cropped PDF, not the PNG
 #       --keep          keep the generated wrapper and log, and say where
 #   -h, --help          this text
 #
-# For each problem file this writes, into --out:
+# Two independent choices, each defaulting to BOTH. WHICH VARIANTS to render:
 #
 #     <name>.pdf            <name>.png              the question alone
 #     <name>-SOLUTIONS.pdf  <name>-SOLUTIONS.png    question + worked solution
+#
+# where --no-question drops the top row and --no-solutions the bottom one. And
+# WHICH FORMATS to keep of whatever is rendered: --no-png stops at the cropped
+# PDF, --no-pdf keeps only the PNG. Note --no-pdf does not skip any work -- the
+# PDF is still produced, in $TMPDIR, because the PNG is rasterized from it; it
+# simply never reaches --out. Asking for no variant, or for neither format, is
+# an error rather than a silent no-op.
 #
 # The -SOLUTIONS suffix is build-pdfs' own view naming, deliberately.
 #
@@ -79,8 +88,10 @@ out_dir="."
 dpi=300
 width='2.6\alphabet'
 margins=10
-want_png=1
+want_question=1
 want_solutions=1
+want_pdf=1
+want_png=1
 keep=0
 files=()
 
@@ -91,8 +102,10 @@ while [ $# -gt 0 ]; do
         -r|--dpi)       dpi=${2:?--dpi needs a number}; shift 2 ;;
         --width)        width=${2:?--width needs a TeX length}; shift 2 ;;
         --margins)      margins=${2:?--margins needs a number}; shift 2 ;;
-        --no-png)       want_png=0; shift ;;
+        --no-question)  want_question=0; shift ;;
         --no-solutions) want_solutions=0; shift ;;
+        --no-pdf)       want_pdf=0; shift ;;
+        --no-png)       want_png=0; shift ;;
         --keep)         keep=1; shift ;;
         --)             shift; files+=("$@"); break ;;
         -*)             echo "build-images: unknown option: $1" >&2
@@ -103,6 +116,15 @@ done
 
 if [ ${#files[@]} -eq 0 ]; then
     usage; exit 2
+fi
+
+# Both pairs are subtractive, so both can be turned all the way off. Say so
+# rather than running the whole compile to produce nothing.
+if [ "$want_question" -eq 0 ] && [ "$want_solutions" -eq 0 ]; then
+    echo "build-images: --no-question and --no-solutions leave nothing to render" >&2; exit 2
+fi
+if [ "$want_pdf" -eq 0 ] && [ "$want_png" -eq 0 ]; then
+    echo "build-images: --no-pdf and --no-png leave nothing to keep" >&2; exit 2
 fi
 
 for tool in pdflatex pdfcrop gs; do
@@ -223,7 +245,17 @@ render() {
         'BEGIN { bp = w * 72 / 72.27; mb = m * 72 / 72.27;
                  printf "0 %.3f %.3f %.3f", y0 - mb, bp, y1 + mb }')
 
-    pdfcrop --bbox "$bbox" "$work/$job.pdf" "$out_dir/$job.pdf" >/dev/null 2>&1 || {
+    # The crop has to land somewhere even under --no-pdf, because the PNG is
+    # rasterized from it. Put it in $work then, so it is cleaned up with the
+    # rest of the scaffolding and never appears in --out.
+    local cropped
+    if [ "$want_pdf" -eq 1 ]; then
+        cropped="$out_dir/$job.pdf"
+    else
+        cropped="$work/$job-cropped.pdf"
+    fi
+
+    pdfcrop --bbox "$bbox" "$work/$job.pdf" "$cropped" >/dev/null 2>&1 || {
         echo "  FAILED  $job (pdfcrop)" >&2; return 1; }
 
     # One page is the contract. More means the 200cm page was somehow not
@@ -231,19 +263,23 @@ render() {
     # than shipping it.
     local pages
     pages=$(gs -dQUIET -dBATCH -dNOPAUSE -sDEVICE=nullpage \
-               -c "($out_dir/$job.pdf) (r) file runpdfbegin pdfpagecount = quit" 2>/dev/null)
+               -c "($cropped) (r) file runpdfbegin pdfpagecount = quit" 2>/dev/null)
     if [ -n "$pages" ] && [ "$pages" -gt 1 ] 2>/dev/null; then
         echo "  FAILED  $job ($pages pages; a question image must be one)" >&2
         return 1
     fi
 
     if [ "$want_png" -eq 1 ]; then
-        pdftoppm -png -r "$dpi" -singlefile "$out_dir/$job.pdf" "$out_dir/$job" || {
+        pdftoppm -png -r "$dpi" -singlefile "$cropped" "$out_dir/$job" || {
             echo "  FAILED  $job (pdftoppm)" >&2; return 1; }
-        echo "  ok: $job.pdf, $job.png"
-    else
-        echo "  ok: $job.pdf"
     fi
+
+    # Report what actually reached --out, which is not the same as what was
+    # built: under --no-pdf the cropped PDF exists but stays in $TMPDIR.
+    local wrote=""
+    [ "$want_pdf" -eq 1 ] && wrote="$job.pdf"
+    [ "$want_png" -eq 1 ] && wrote="${wrote:+$wrote, }$job.png"
+    echo "  ok: $wrote"
     return 0
 }
 
@@ -264,7 +300,9 @@ for f in "${files[@]}"; do
     stem=${pfile%.tex}
 
     echo "$pfile"
-    render "$pdir" "$pfile" "$stem" 0 || status=1
+    if [ "$want_question" -eq 1 ]; then
+        render "$pdir" "$pfile" "$stem" 0 || status=1
+    fi
     if [ "$want_solutions" -eq 1 ]; then
         render "$pdir" "$pfile" "$stem" 1 || status=1
     fi
