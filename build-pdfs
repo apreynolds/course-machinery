@@ -143,7 +143,8 @@ done
 # A `LABEL: path' named-destination line: a label (letters, digits, _ or -),
 # a colon, then REQUIRED whitespace. The space is load-bearing -- it keeps a
 # Windows-style bare path like C:/course-pdfs parseable as a path (see
-# NOTE-ON-WINDOWS.md). The ONE classifier, shared by parse_dest_file (which
+# NOTE-ON-WINDOWS.md in the course-demo repo, one level up from this submodule).
+# The ONE classifier, shared by parse_dest_file (which
 # skips these lines) and resolve_label (which reads them), so the two parsers
 # can never disagree about what counts as a label line.
 is_label_line() {
@@ -310,7 +311,8 @@ ship_label() {
 # -- $(...) strips trailing newlines from both sides, which is harmless here.
 # Deliberately not rsync: its default quick-check is size+mtime, and a submodule
 # checkout restamps mtimes, so identical files would copy anyway; -c would fix
-# that but Git for Windows ships no rsync (see NOTE-ON-WINDOWS.md).
+# that but Git for Windows ships no rsync (see NOTE-ON-WINDOWS.md in the
+# course-demo repo, one level up from this submodule).
 ensure_latexmkrc() {
   local src=$machinery_dir/latexmkrc-shared
   [[ -e $src ]] || return 0
