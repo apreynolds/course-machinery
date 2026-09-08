@@ -160,6 +160,18 @@ the problem reads ``2.1.8'' too), and \texttt{name=} adds a parenthetical
 content label -- which also becomes the problem's contents-list entry. Points keys are simply ignored in notes -- the same import line can
 move between a test and a lecture unchanged.
 
+The \texttt{label=} key renames \emph{this one import}: the noun, not the
+content label. A text that numbers two kinds of worked item in separate
+sequences --- OpenStax counts its Examples and its Checkpoints apart --- gives a
+lecture that must show both, and the notes should call each what the book calls
+it. So \texttt{[label=\{Checkpoint\}, number=\{1.3\}, name=\{piecewise
+domains\}]} reads ``Checkpoint 1.3 (piecewise domains)''\ where its neighbours
+read ``Example''. \texttt{label} is what the item is \emph{called};
+\texttt{name} is what it is \emph{about}. The per-course
+\cs{NotesProblemLabelWord} stays the default and the usual answer; this is only
+for mixing. \file{Assessment.cls} reads neither, setting ``Q'' outright, so a renamed
+notes item cannot reach an exam.
+
 The \texttt{yourturn} key says the example is the \emph{student's} to work
 rather than yours to present at the board. It prefixes the heading with the
 same mark the \env{yourturn} aside uses (\cs{YourTurnMark}, so the two cannot

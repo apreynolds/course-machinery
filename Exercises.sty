@@ -158,6 +158,26 @@
 % that is what source/number are for, and they stay store-only.
 \newcommand{\CurrentProblemName}{}
 
+% The NOUN for this one import, set by \importproblem's `label' key -- "Checkpoint"
+% where the rest of the lecture says "Example". The per-COURSE noun
+% (\NotesProblemLabelWord) remains the default and the usual answer; this is for a
+% document that must MIX nouns, which happens when the text numbers two kinds of
+% worked item separately (OpenStax numbers Examples and Checkpoints apart) and the
+% notes should echo the book for both. That is the naming rule the whole extrinsic
+% model rests on: the LOOK is the course's, the NAME is the text's.
+%
+% A FLAG, not an emptiness test, because "unset" has to be decidable inside an
+% \edef: the contents entry is built by \protected@edef (LectureNotes'
+% \CourseBoxTocEntry), and a \newif conditional expands there cleanly where
+% etoolbox's \ifdefempty does not. The same reason \ifcheckinmode is a flag.
+%
+% Presentation only, so a class is free to ignore it -- and Assessment.cls does,
+% setting \ProblemLabelWord to "Q" literally without consulting either hook. So a
+% renamed notes item CANNOT leak into an exam, and one import line still moves
+% between a test and a lecture unchanged.
+\newif\ifCurrentProblemLabel
+\newcommand{\CurrentProblemLabel}{}
+
 % Whether the current import prints at all. \importproblem's `noprint' flag
 % (equivalently print=false) clears this, and \importproblem then SKIPS the
 % \import entirely -- the file is not read, so no counter steps, no points are
@@ -308,6 +328,14 @@
 %                 used as the \label text. Empty = the context numbers it (or not).
 %   name={...}    short content label; a parenthetical after the heading in a
 %                 notes context, and the check-in box's title.
+%   label={...}   the NOUN for this one import, overriding the course's
+%                 \NotesProblemLabelWord: label={Checkpoint} in a lecture whose
+%                 other items are Examples. For a text that numbers two kinds of
+%                 worked item separately, so the notes can echo the book for both.
+%                 Not to be confused with `name' -- label is WHAT IT IS CALLED,
+%                 name is WHAT IT IS ABOUT: [label={Checkpoint}, number={1.3},
+%                 name={piecewise domains}] -> "Checkpoint 1.3 (piecewise
+%                 domains)". Ignored by Assessment.cls, like number=/name=.
 %   noprint       skip this import entirely (equivalently print=false): no output,
 %                 no counter step, no points, no \label -- the file is not read.
 %   checkin       render as a "check-in": wrap in a neutral box with a run-in
@@ -372,6 +400,13 @@
 \define@key{eximport}{nohint}[true]{\gdef\CurrentProblemHint{off}}
 \define@key{eximport}{number}{\gdef\CurrentProblemNumber{#1}}
 \define@key{eximport}{name}{\gdef\CurrentProblemName{#1}}
+% `label' -- the noun for THIS import, overriding the per-course
+% \NotesProblemLabelWord. Sets the flag as well as the text, so an explicit
+% label={} (a deliberate blank) is still distinguishable from no key at all.
+\define@key{eximport}{label}{%
+  \global\CurrentProblemLabeltrue
+  \gdef\CurrentProblemLabel{#1}%
+}
 % `noprint' is the flag form (matching nocount/nohint); `print=false' the value
 % form, for toggling from a variable. Anything but "false" reads as true.
 \define@key{eximport}{noprint}[true]{\global\CurrentProblemPrintfalse}
@@ -393,6 +428,8 @@
 
   \gdef\CurrentProblemNumber{}%
   \gdef\CurrentProblemName{}%
+  \global\CurrentProblemLabelfalse
+  \gdef\CurrentProblemLabel{}%
   \global\CurrentProblemPrinttrue
   \global\checkinmodefalse
   \global\yourturnmodefalse

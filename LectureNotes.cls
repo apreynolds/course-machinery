@@ -110,8 +110,23 @@
 % ASSESSMENT document can retune the notes noun without disturbing
 % Assessment.cls's fixed "Q"
 % (Assessment sets \ProblemLabelWord literally and never reads \NotesProblemLabelWord).
+%
+% A PER-IMPORT override sits in front of that: \importproblem's `label' key names
+% the noun for one item, for a document that must MIX nouns. OpenStax numbers
+% Examples and Checkpoints in separate sequences, and a lecture drawing on both
+% should call each what the book calls it -- the same "the look is mine, the name
+% is the text's" rule that puts text-specific vocabulary in the text layer.
+%
+% Routed through THIS macro rather than handled in \ProblemHeadingFormat, so
+% every consumer of the noun follows at once: the run-in heading, the contents
+% entry (which is fed \ProblemLabelWord as its first argument), and the group
+% stem. One indirection, one place it can be got wrong.
+%
+% Assessment.cls reads NEITHER hook -- it sets \ProblemLabelWord to "Q" outright
+% -- so neither the per-course noun nor a per-import one can reach an exam.
 \providecommand{\NotesProblemLabelWord}{Example}
-\renewcommand{\ProblemLabelWord}{\NotesProblemLabelWord}
+\renewcommand{\ProblemLabelWord}{%
+  \ifCurrentProblemLabel\CurrentProblemLabel\else\NotesProblemLabelWord\fi}
 
 % Run-in heading: the label word, then -- only if given at import -- a literal
 % number (\importproblem[number=2.1.8], typically the textbook's) and a

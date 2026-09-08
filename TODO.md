@@ -112,13 +112,6 @@ Nearly free while the group is already parsing keys, but not free overall: the
 unnumbered stem is a deliberate choice in lecture context, and a literal number
 would need `problem`'s `\@currentlabel` handling mirrored onto the group.
 
-**A per-import `label=` override for the notes noun** → *if one document must
-mix nouns.*
-Deliberately out of scope now — judged overkill against the per-course
-`\NotesProblemLabelWord`, which already lets a course call them Examples or
-Exercises. Note `Assessment.cls` never reads that hook (it sets "Q" literally),
-so retuning the notes noun cannot leak into an exam.
-
 **`yourturn` on a `problemgroup` stem** → *when a whole set is handed over at once.*
 The per-import key marks a single top-level problem; a group member never reaches `\ProblemHeadingFormat` (it renders through the lettered `(a)` branch), so the key warns there rather than working.
 The natural home is the group's own key set, `exgroup` in `Exercises.sty`, which today carries only `name` — the mark would land on the stem via `\ProblemGroupHeadingFormat`, reading "Your turn: Example. Differentiate each of the following."

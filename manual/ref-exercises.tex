@@ -66,6 +66,12 @@ per-import settings (keyval family \env{eximport});
   \cs{ref} both read ``2.1.8''; no counter shown.\\
 \texttt{name=\{...\}} & short content label: a parenthetical after the
   heading, the check-in box's title, and the contents entry (notes).\\
+\texttt{label=\{...\}} & notes: the \emph{noun} for this one import, overriding
+  the course's \cs{NotesProblemLabelWord} --- \texttt{label=\{Checkpoint\}} in a
+  lecture whose other items are Examples. \texttt{label} is what it is
+  \emph{called}, \texttt{name} what it is \emph{about}. Reaches the heading, the
+  contents entry and a group stem alike, all three going through
+  \cs{ProblemLabelWord}.\\
 \texttt{noprint} & skip the file entirely -- not read, no counter step, no
   points, no label (deliberately not typeset-then-hide).\\
 \texttt{checkin} & wrap in the ``CHECK IN'' box with coloured A--E labels
