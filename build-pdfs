@@ -54,6 +54,20 @@
 # NB the class reads these as \ifdefined, so the same source builds both ways
 # with no option at the call site -- see LectureNotes.cls / Assessment.cls.
 #
+# Cover page via a magic comment: a `%! coverpage: yes' line in the same leading
+# block additionally writes FILE_COVERPAGE.pdf, page 1 of the finished PDF on its
+# own, for printing an assessment's cover separately. `no' or no line at all is
+# off; any other value warns. It is taken from the base (student) PDF only, not
+# from any view, and follows the same mirror / BOTH handling as that PDF.
+#   Why page 1 is cut out of the built PDF rather than selected during the run:
+# the cover's own numbers are two-pass values. \printtotalpoints is a totcount
+# sum written to the .aux at end-of-document, and the footer's "Page 1 of N" is
+# \pageref{LastPage}. The LaTeX package for this, `pagesel', suppresses the .aux
+# and aborts the job after the last selected page, so it prints the point total
+# WRONG -- the reason this feature is a post-process. Needs ghostscript, which
+# build-images already requires; without it the extract is skipped with a warning
+# and the build still succeeds.
+#
 # Auxiliary files (.aux/.log/etc.) go to a per-directory folder under
 # $XDG_CACHE_HOME/latexmk/ -- ~/.cache/latexmk/ when that is unset -- so they
 # clutter neither the repo nor the output directory.
@@ -331,28 +345,50 @@ aux_key() {
   fi
 }
 
-# Read requested views from a source's leading magic-comment block. Recognises
-# lines of the form `%! views: a, b, c' (flexible spacing) and echoes one view
-# token per line. Scanning stops at the first line that is neither blank nor a
-# `%'-comment, so only the leading block (before \documentclass) is consulted.
-read_views() {
-  local file=$1 line val tok toks
+# Read one key out of a source's leading magic-comment block. Recognises lines of
+# the form `%! KEY: value' (flexible spacing) and echoes the value, trailing
+# whitespace trimmed, one line per matching line. Scanning stops at the first
+# line that is neither blank nor a `%'-comment, so only the leading block
+# (before \documentclass) is consulted.
+#
+# The block is the house idiom for per-file build requests and now has more than
+# one key here (`views', `coverpage'), so the scan lives in ONE place and each
+# key's own parsing sits on top of it. build-d2l-import.py reads its `d2l-*' keys
+# out of the same block with a single regex, for the same reason.
+#   $1 key  $2 file
+read_magic() {
+  local key=$1 file=$2 line val
   while IFS= read -r line; do
     # First real (non-blank, non-comment) line ends the magic-comment block.
     if [[ -n $line && ${line#\%} == "$line" ]]; then
       break
     fi
-    if [[ $line =~ ^%![[:space:]]*views[[:space:]]*:[[:space:]]*(.*)$ ]]; then
+    # $key unquoted so it lands in the regex as a literal word; every key here is
+    # a plain identifier, so there is nothing in it for the regex engine to read.
+    if [[ $line =~ ^%![[:space:]]*$key[[:space:]]*:[[:space:]]*(.*)$ ]]; then
       val=${BASH_REMATCH[1]}
-      IFS=',' read -ra toks <<<"$val"
-      for tok in "${toks[@]}"; do
-        # Trim surrounding whitespace.
-        tok=${tok#"${tok%%[![:space:]]*}"}
-        tok=${tok%"${tok##*[![:space:]]}"}
-        [[ -n $tok ]] && printf '%s\n' "$tok"
-      done
+      val=${val%"${val##*[![:space:]]}"}    # trim trailing space
+      printf '%s\n' "$val"
     fi
   done <"$file"
+}
+
+# The `%! views: a, b, c' request: split read_magic's value on commas and echo one
+# view token per line, whitespace trimmed. One token per LINE rather than one
+# space-separated string, because a token may carry a space -- a `:LABEL' naming
+# a .MIRRORDIR destination like `instructor:TA dir' -- and build_file's mapfile
+# depends on the line split to keep it whole.
+read_views() {
+  local file=$1 val tok toks
+  while IFS= read -r val; do
+    IFS=',' read -ra toks <<<"$val"
+    for tok in "${toks[@]}"; do
+      # Trim surrounding whitespace.
+      tok=${tok#"${tok%%[![:space:]]*}"}
+      tok=${tok%"${tok##*[![:space:]]}"}
+      [[ -n $tok ]] && printf '%s\n' "$tok"
+    done
+  done < <(read_magic views "$file")
 }
 
 # Build a view of a document: inject a \def before \input to flip a class toggle,
@@ -367,6 +403,70 @@ compile_view() {
   latexmk -pdf -g -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} -jobname="$jobname$suffix" \
     -pdflatex="pdflatex %O -interaction=nonstopmode \"$inject \\input{%S}\"" \
     "$src"
+}
+
+# Whether a source asks for a cover-page extract: `%! coverpage: yes'. An
+# unrecognised value warns and is ignored, the way an unknown view name does, so
+# a typo is visible rather than silently off. A repeated key takes the last one.
+# An absent key and an empty value both mean "not asked for", and say nothing.
+#   $1 file
+wants_coverpage() {
+  local file=$1 val
+  val=$(read_magic coverpage "$file" | tail -n 1)
+  case $val in
+    "" | no) return 1 ;;
+    yes)     return 0 ;;
+    *)
+      echo "build-pdfs: coverpage '$val' not understood (expected yes or no), skipping" >&2
+      return 1
+      ;;
+  esac
+}
+
+# Extract page 1 of a built PDF to FILE_COVERPAGE.pdf, so a test's cover can be
+# printed on its own (a different paper, a different count) without printing the
+# paper behind it.
+#
+# Deliberately a POST-PROCESS rather than a LaTeX page-selection package. The
+# obvious package, `pagesel', cannot work here: it calls \nofiles by default, so
+# no .aux is written, and it aborts the job after the last selected page. The
+# cover's own numbers are two-pass values read back from that .aux --
+# \printtotalpoints is a totcount total written at end-of-document
+# (Exercises.sty), and the footer's "Page 1 of N" is \pageref{LastPage} -- so a
+# run that never reaches \end{document} prints the total WRONG. Cutting the page
+# out of a normally-built PDF cannot be wrong.
+#
+# gs, not a new dependency: build-images already requires it. -dAutoRotatePages
+# =/None because pdfwrite otherwise re-orients a page from its text direction,
+# which would turn a [legalpaper] cover the wrong way.
+#
+# Never fatal, and never returns false: a missing gs or a failed extraction warns
+# and leaves the build's own success alone.
+#
+# gs's chatter is captured rather than printed, and shown only if it FAILS. Even
+# under -q a one-page extract of a hyperref'd document always reports the links
+# it had to drop ("Destination page 3 lies outside the valid page range",
+# "Outline has invalid link that was discarded") -- inherent to taking one page
+# out of a linked document, so it is noise every time, and noise in a build log
+# reads as breakage.
+#   $1 directory the built PDF lives in   $2 jobname
+extract_coverpage() {
+  local pdfdir=$1 job=$2 out="$2_COVERPAGE.pdf" log
+  if ! command -v gs >/dev/null 2>&1; then
+    echo "build-pdfs: ghostscript (gs) not found, skipping $out" >&2
+    return 0
+  fi
+  if log=$(gs -q -dBATCH -dNOPAUSE -dFirstPage=1 -dLastPage=1 \
+              -sDEVICE=pdfwrite -dAutoRotatePages=/None \
+              -sOutputFile="$pdfdir/$out" "$pdfdir/$job.pdf" 2>&1); then
+    echo "    + $out (cover page)"
+  else
+    echo "build-pdfs: could not extract the cover page of $job.pdf" >&2
+    [[ -n $log ]] && printf '%s\n' "$log" >&2
+  fi
+  # Explicit: the last statement above can be false, and this must never be the
+  # thing that fails a build.
+  return 0
 }
 
 # Build one .tex file. Runs in a subshell so the cd stays local to this build.
@@ -419,6 +519,24 @@ build_file() {
     # mirror dir in MOVE mode, else the local build dir (BOTH keeps a local copy;
     # no .MIRRORDIR builds locally).
     pdfdir="."; [[ -n $movedir ]] && pdfdir="$movedir"
+
+    # Cover page requested via `%! coverpage: yes'. Taken from the BASE build
+    # only, never from a view -- a solutions or instructor cover is the same
+    # sheet of paper, and it is the student cover that gets printed on its own.
+    # Placed here, before the views loop, for that reason: it belongs to the
+    # build just finished. $pdfdir is already the right directory in both output
+    # modes, so only the extra BOTH copy needs a mode test.
+    if wants_coverpage "$base"; then
+      extract_coverpage "$pdfdir" "$jobname"
+      # An `if' (not `&&') for the same reason as at the end of the views loop
+      # below -- and it matters more here, since a source with no `%! views:'
+      # line makes this block the subshell's last statement, where a trailing
+      # false would have build_file report the whole file FAILED. The -f test
+      # keeps a skipped extraction (no gs) from failing the copy.
+      if [[ $mode == BOTH && -f "${jobname}_COVERPAGE.pdf" ]]; then
+        cp -- "${jobname}_COVERPAGE.pdf" "$outdir/" || exit
+      fi
+    fi
 
     # Extra views requested via `%! views: ...' in the source's leading comment.
     # A view is just a jobname SUFFIX plus the \def(s) to inject -- the case sets
