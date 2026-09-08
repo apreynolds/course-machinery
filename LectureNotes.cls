@@ -359,10 +359,21 @@
 % Built up by \protected@edef rather than assembled inside \addcontentsline's
 % argument, so the conditionals run here as conditionals and only finished text
 % reaches the .toc write.
+% EXPAND FIRST, THEN TEST -- the order matters because the two callers pass
+% different things. CourseBoxes' factories pass literal values (\begin{example}
+% {2.1.8}[Cubic]), for which \ifblank on the raw argument was right. But
+% \ProblemHeadingFormat passes the REGISTERS -- \CurrentProblemNumber,
+% \CurrentProblemName -- and a register is a single macro token, which \ifblank
+% never reads as blank however empty it expands to. Both guards therefore always
+% took the "present" branch on the problem path, gluing in an empty number
+% ("Example<2 spaces>(name)") and an empty parenthetical ("Example 1.8 ()").
+% Expanding into \CB@num/\CB@nam first makes one test serve both callers.
 \renewcommand{\CourseBoxTocEntry}[3]{%
+  \protected@edef\CB@num{#2}%
+  \protected@edef\CB@nam{#3}%
   \def\CB@tocline{#1}%
-  \ifblank{#2}{}{\protected@edef\CB@tocline{\CB@tocline\space#2}}%
-  \ifblank{#3}{}{\protected@edef\CB@tocline{\CB@tocline\space(#3)}}%
+  \ifdefempty{\CB@num}{}{\protected@edef\CB@tocline{\CB@tocline\space\CB@num}}%
+  \ifdefempty{\CB@nam}{}{\protected@edef\CB@tocline{\CB@tocline\space(\CB@nam)}}%
   \addcontentsline{toc}{cbresult}{\CB@tocline}%
 }
 
