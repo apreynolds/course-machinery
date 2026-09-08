@@ -105,6 +105,16 @@ per-bank commands are thin shims over them.
 - The fonts are **Libertinus** with **newtx** math, so those packages must be
   installed — they are part of a full TeX Live, but not of a minimal one.
   `fontawesome5` and `tcolorbox` likewise.
+- **Ghostscript** (`gs`) for the two features that manipulate a finished PDF, and
+  it is *not* part of a TeX distribution: TeX Live ships `gsftopk`, not `gs`, so
+  this is a separate install (`port install ghostscript`, `brew install
+  ghostscript`, `apt install ghostscript`). `build-images` requires it outright
+  and exits if it is missing — twice over, since `pdfcrop` is a TeX Live *script*
+  that shells out to Ghostscript itself. `build-pdfs` needs it only for
+  `%! coverpage:`, and treats it as optional: without it the cover page is
+  skipped with a warning and the build still succeeds. PNG output from
+  `build-images` additionally wants `pdftoppm`, from **poppler** — also a
+  separate install, and `--no-png` does without it.
 - The scripts need **bash 4.0 or newer** (they use associative arrays and
   `mapfile`), and the pickers additionally need
   [`fzf`](https://github.com/junegunn/fzf). **On macOS this is the one thing

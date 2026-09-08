@@ -73,6 +73,19 @@ the reader to that line number in the wrong file.
 - `pr-latexmk` is a third producer writing into the same scheme and would need
   the same treatment for the formats to agree everywhere.
 
+**Ghostscript is invoked as `gs`, which is not its name on Windows.**
+`build-images` (its tool check, the bbox probe and the page count) and
+`build-pdfs`' `%! coverpage:` extract all call the binary `gs`. That is right on
+macOS and Linux and wrong on Windows, where Ghostscript installs as
+`gswin64c.exe` — so both would report it missing on a machine that has it.
+`pdfcrop`, which `build-images` also runs, already solves this: `pdfcrop.pl:181`
+keeps a per-platform candidate list (`win => gswin32c, gswin64c, gs`; `miktex =>
+mgs, …`) and probes. Nothing to do while this is a macOS/Linux toolkit, and it is
+recorded here rather than fixed speculatively — but if Windows ever matters, the
+fix is ONE resolver shared by both scripts, not a second copy of the probe in
+each. Note Ghostscript is a separate install on every platform: TeX Live ships
+`gsftopk`, never `gs`.
+
 **There is no `LICENSE`.**
 The repository is public and carries no licence terms, which leaves anyone who
 wants to adapt it with no permission to. Pick something and add it.
