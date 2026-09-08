@@ -268,9 +268,44 @@
 %%% meta-content, not part of the lecture. \textbookref works inside it, so a
 %%% skipped section can link to the book; and \InstructorInline works too, which
 %%% is how the reason for a cut reaches co-instructors without reaching students.
+%%% The Your-turn mark, FACTORED OUT because it now reaches the page two ways:
+%%% as this aside's head, and as the prefix on a marked example's heading
+%%% (LectureNotes' \ProblemHeadingFormat, driven by \importproblem's `yourturn'
+%%% key). Re-typing the glyph, words and colour at the second site would put the
+%%% same string in two places that drift -- exactly what \ProblemNumberText was
+%%% created to prevent (Exercises.sty, "One macro so the standalone heading and
+%%% the group stem can never disagree").
+%%%
+%%% NO COLON HERE, deliberately: the colon is head PUNCTUATION, the 6th argument
+%%% of \newtheoremstyle, so the aside gets it from cbnotecolon and the heading
+%%% writes it literally. Folding it in would mean a seventh, punctuation-less
+%%% head style to retire the sixth -- a wash.
+%%%
+%%% It carries its own \sffamily\bfseries\color even though cbnote's head font
+%%% already sets all three: redundant inside the aside (harmless), and REQUIRED
+%%% at the heading, which has no ambient head font to inherit. Robust rather than
+%%% \newcommand so it survives any \protected@edef it may later be written into.
+\DeclareRobustCommand{\YourTurnMark}{%
+  {\sffamily\bfseries\color{NoteColor}\faPenFancy\ Your turn}}
+
+%%% The same mark for a CONTENTS entry: the bare glyph, no words and no colour
+%%% (a contents list sets its own face). Separate from \YourTurnMark rather than
+%%% derived from it, because the two differ in every respect but the glyph.
+%%%
+%%% ROBUST, and that is the whole point of it existing as a macro. A contents
+%%% entry is written twice from one call: into the .toc, and into a PDF BOOKMARK,
+%%% where a font glyph cannot be represented at all -- hyperref strips it and
+%%% warns. \texorpdfstring is the fix, but it has to still BE \texorpdfstring when
+%%% hyperref reaches it, and \CourseBoxTocEntry pre-expands its line with
+%%% \protected@edef; written inline there it would resolve to the glyph branch on
+%%% the spot and hyperref would never see the alternative. Wrapped in a robust
+%%% macro it survives that \protected@edef whole and picks its branch later, at
+%%% \pdfstringdef time -- glyph on the page, words in the bookmark pane.
+\DeclareRobustCommand{\YourTurnTocMark}{\texorpdfstring{\faPenFancy\ }{Your turn: }}
+
 \NewAside[cbcaution]  {caution} {\faExclamationTriangle\ CAUTION}{cb/caution}
 \NewAside[cbnote]     {takeaway}{TAKEAWAY}                       {cb/note}
-\NewAside[cbnotecolon]{yourturn}{\faPenFancy\ Your turn}        {cb/note}
+\NewAside[cbnotecolon]{yourturn}{\YourTurnMark}                  {cb/note}
 \NewAside[cbnote]     {prepwork}{\faBookOpen\ Prepwork}          {cb/note}
 \NewAside[cbnote]     {notcovered}{\faForward\ Not covered}      {cb/note}
 

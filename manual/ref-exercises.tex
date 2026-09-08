@@ -70,6 +70,11 @@ per-import settings (keyval family \env{eximport});
   points, no label (deliberately not typeset-then-hide).\\
 \texttt{checkin} & wrap in the ``CHECK IN'' box with coloured A--E labels
   (what \cs{importcheckin} sets).\\
+\texttt{yourturn} & notes: mark this one as the \emph{student's} to work, not
+  yours to present. Prefixes the heading with \cs{YourTurnMark} (CourseBoxes',
+  shared with the aside of the same name) and adds the pen glyph to the
+  contents entry. Top-level problems only --- on a check-in or a
+  \env{problemgroup} member the heading is never rendered, and it warns.\\
 \end{tabularx}
 \end{center}
 

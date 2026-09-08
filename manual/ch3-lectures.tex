@@ -149,6 +149,9 @@ not a text citation:
 \importproblem[number={2.1.8}, name={differentiating a polynomial}]
   {../problems/}{power-rule-basic.tex}
 % -> "Example 2.1.8 (differentiating a polynomial). ..."
+
+\importproblem[number={2.1.8}, yourturn]{../problems/}{power-rule-basic.tex}
+% -> "(pen) Your turn: Example 2.1.8. ..."
 \end{manexsource}
 
 The \texttt{number=} key sets a \emph{literal} display number (typically the
@@ -156,6 +159,17 @@ textbook's -- the same declared-number philosophy as the boxes; a \cs{ref} to
 the problem reads ``2.1.8'' too), and \texttt{name=} adds a parenthetical
 content label -- which also becomes the problem's contents-list entry. Points keys are simply ignored in notes -- the same import line can
 move between a test and a lecture unchanged.
+
+The \texttt{yourturn} key says the example is the \emph{student's} to work
+rather than yours to present at the board. It prefixes the heading with the
+same mark the \env{yourturn} aside uses (\cs{YourTurnMark}, so the two cannot
+drift), and puts the bare pen glyph on the contents entry -- the full phrase
+would not fit beside the dotted leader, and the glyph in the left margin is
+what makes the list scannable for ``what are they working?''. It is a
+\emph{prefix}, not a replacement for the noun, so it composes with whatever
+\cs{NotesProblemLabelWord} the course chose. Top-level problems only: a
+check-in and a \env{problemgroup} member never render this heading, so both
+warn rather than dropping the mark quietly.
 
 Three more import forms round out the lecture repertoire:
 

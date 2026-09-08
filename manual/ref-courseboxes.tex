@@ -53,6 +53,15 @@ Shared asides (the author's voice, consistent course to course):
 an optional audience tier --- \texttt{[surviving]} or \texttt{[thriving]} ---
 appending ``for the \emph{surviving/thriving}'' to the head.
 
+\env{yourturn} is the one aside whose head is also used \emph{outside} a box:
+\cs{importproblem}'s \texttt{yourturn} key prefixes a marked example's heading
+with it (section~\ref{sec:lectures}). So the head lives in a macro,
+\cs{YourTurnMark} --- glyph, words and colour, but no colon, that being head
+\emph{punctuation} and hence the style's (\texttt{cbnotecolon}). Its contents-list
+twin, \cs{YourTurnTocMark}, is the bare glyph wrapped in \cs{texorpdfstring},
+because the same entry also becomes a PDF bookmark, where a font glyph cannot be
+represented. Change the wording in those two places and both sites follow.
+
 Text-\emph{specific} vocabulary (Key Idea, Axiom, \dots) deliberately does
 not ship here -- it is declared in the course's text layer,
 \file{.course-machinery-local/textbook.tex}, with the factories below

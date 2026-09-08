@@ -119,6 +119,17 @@ Deliberately out of scope now — judged overkill against the per-course
 Exercises. Note `Assessment.cls` never reads that hook (it sets "Q" literally),
 so retuning the notes noun cannot leak into an exam.
 
+**`yourturn` on a `problemgroup` stem** → *when a whole set is handed over at once.*
+The per-import key marks a single top-level problem; a group member never reaches `\ProblemHeadingFormat` (it renders through the lettered `(a)` branch), so the key warns there rather than working.
+The natural home is the group's own key set, `exgroup` in `Exercises.sty`, which today carries only `name` — the mark would land on the stem via `\ProblemGroupHeadingFormat`, reading "Your turn: Example. Differentiate each of the following."
+Deferred only because the immediate use is single problems; nothing about the current design blocks it.
+
+**A contents-list legend for the pen glyph** → *if the bare glyph proves unclear in use.*
+The contents entry for a `yourturn` example carries the glyph alone, and `\lecturetoc` sits on page 1 — before the reader has met "Your turn:" on a page that explains it.
+A legend line would fix that, but is noise in the great majority of lectures that contain no such example.
+The conditional form removes that objection: set a flag when a your-turn renders, write it to the `.aux`, and emit the legend on the next run only if it is set — the same two-pass trick `\label`/`\ref` and `\printtotalpoints` already depend on, so latexmk's reruns cost nothing extra.
+Wait for evidence the glyph actually confuses someone; the bookmark pane already spells it out in words.
+
 **A per-instance `text=` on `\ProblemChoiceInstruction`** → *if a one-off lead-in
 is ever needed.*
 The wording is deliberately a class-level hook, not per-block prose, so a course

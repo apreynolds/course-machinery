@@ -313,6 +313,12 @@
 %   checkin       render as a "check-in": wrap in a neutral box with a run-in
 %                 "CHECK IN:" header, suppress the problem's own heading, and color
 %                 the A/B/C labels (see \importcheckin and MULTIPLE CHOICE).
+%   yourturn      mark this one as the STUDENT's to work rather than the
+%                 instructor's to present: the notes heading gains a "Your turn:"
+%                 prefix (CourseBoxes' \YourTurnMark, shared with the aside of the
+%                 same name) and the contents entry gains the pen glyph. Pure
+%                 presentation, so it is ignored outside a notes class, like
+%                 number=/name=. Top-level problems only -- see the warnings below.
 %
 % As a shorthand, a LONE integer means points: \importproblem[5]{...}{...} is
 % exactly \importproblem[points=5]{...}{...} (this is the back-compat form and the
@@ -372,6 +378,12 @@
 \define@key{eximport}{print}[true]{%
   \ifstrequal{#1}{false}{\global\CurrentProblemPrintfalse}{\global\CurrentProblemPrinttrue}}
 \define@key{eximport}{checkin}[true]{\global\checkinmodetrue}
+% `yourturn' -- the notes-to-marker note the keyval interface was opened for (see
+% the "New per-import axes" note above). A flag like nocount/hint/checkin, so bare
+% [yourturn] is the documented call and yourturn=true works for free. Global,
+% because the heading renders inside the imported file's own groups.
+\newif\ifyourturnmode
+\define@key{eximport}{yourturn}[true]{\global\yourturnmodetrue}
 
 \newcommand{\importproblem@reset}{%
   \gdef\CurrentProblemPoints{}%
@@ -383,6 +395,7 @@
   \gdef\CurrentProblemName{}%
   \global\CurrentProblemPrinttrue
   \global\checkinmodefalse
+  \global\yourturnmodefalse
   \global\CurrentProblemBonusfalse
   % Case-2 multipart points (\ifPartsSeen is per-PROBLEM, reset there, not here).
   \global\PartsListModefalse
@@ -424,6 +437,23 @@
      never display -- but counted points still enter the total.\MessageBreak
      Drop the points spec, or the checkin key}}
 
+% yourturn reaches the page ONLY through \ProblemHeadingFormat, and there are
+% exactly two ways to import a problem that never calls it. Both render a
+% perfectly good problem with the mark silently absent -- the source says "this
+% one is theirs" and the page does not.
+%
+%   checkin   suppresses the heading outright (the box title is the label).
+%   a \problemgroup member  renders through the lettered "(a)" branch instead.
+%
+% The group case is a NOT-YET rather than a never: marking a whole set at once is
+% a sensible thing to want, and would belong on the group's own key set (`exgroup')
+% so the mark lands on the stem. Parked in the machinery TODO; until then, say so
+% rather than dropping it quietly.
+\newcommand{\Ex@warn@yourturnhidden}[1]{%
+  \PackageWarning{Exercises}%
+    {yourturn has no effect #1 --\MessageBreak
+     that heading is never rendered, so the mark cannot show}}
+
 % The import is wrapped in the check-in box only when `checkin' is set -- the box
 % (\CheckinBox@begin/@end) is defined in the MULTIPLE CHOICE section. Splitting
 % the box's begin/end across \import is fine: \import introduces no group that
@@ -446,6 +476,14 @@
         {both points={...} and pointseach given; the positional\MessageBreak
          list wins and pointseach is ignored}%
     \fi\fi
+    % yourturn on an import whose heading never renders (see the block above).
+    \ifyourturnmode
+      \ifcheckinmode
+        \Ex@warn@yourturnhidden{on a checkin}%
+      \else
+        \ifinproblemgroup\Ex@warn@yourturnhidden{on a problemgroup member}\fi
+      \fi
+    \fi
     \ifcheckinmode\CheckinBox@begin\fi
     \import{#2}{#3}%
     \ifcheckinmode\CheckinBox@end\fi

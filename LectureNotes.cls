@@ -134,10 +134,40 @@
 % that had drifted into provenance and could hold a \textbookref -- a link nested
 % inside the contents entry's own link. As a content label it is exactly what a
 % contents line wants, and carries no links.
+% \importproblem's `yourturn' key adds the mark in BOTH places, differently:
+%
+%   page  the full "Your turn:" prefix, ahead of the label word --
+%         "(pen) Your turn: Example 1.7 (composing two formulas)."
+%         Sans-bold blue against the bold serif label, which is not decoration:
+%         it reads as MY annotation on the TEXT's item, the same category A/B
+%         split the boxes draw. \YourTurnMark is CourseBoxes', shared with the
+%         aside of the same name so the two cannot drift; the colon is written
+%         here because it belongs to the aside's head STYLE, not to the mark.
+%
+%   TOC   the GLYPH ONLY -- "(pen) Example 1.7 (composing two formulas)".
+%         The full phrase would add ~13 characters to a line that already runs
+%         to the dotted leader, and this list is deliberately flat and quiet
+%         (see TOC below). Prepending to argument #1 -- which already IS the
+%         label word -- keeps \CourseBoxTocEntry and the cbresult level
+%         untouched, and puts the marks in a column down the left margin, which
+%         is what makes the list scannable for "what are they working?".
+%         \YourTurnTocMark rather than the glyph written out, because this entry
+%         is also a PDF BOOKMARK and a font glyph cannot go in a PDF string. That
+%         macro carries the \texorpdfstring, and is robust so it survives
+%         \CourseBoxTocEntry's \protected@edef intact and still offers hyperref
+%         the choice -- see its comment in CourseBoxes.sty.
 \renewcommand{\ProblemHeadingFormat}{%
-  \CourseBoxTocEntry{\ProblemLabelWord}{\CurrentProblemNumber}{\CurrentProblemName}%
+  \CourseBoxTocEntry
+    {\ifyourturnmode\YourTurnTocMark\fi\ProblemLabelWord}%
+    {\CurrentProblemNumber}{\CurrentProblemName}%
   \par\addvspace{\medskipamount}%
   \noindent
+  % The colon is written here, not in \YourTurnMark, because it belongs to the
+%   aside's head STYLE (cbnotecolon) rather than to the mark -- but it is coloured
+%   to match, so the whole prefix reads as one unit and the two sites agree.
+%   NoteColor is CourseBoxes' named house colour, which is the documented way to
+%   reference it from outside; only the punctuation is local.
+  \ifyourturnmode\YourTurnMark\textcolor{NoteColor}{:}\ \fi
   \textbf{\ProblemLabelWord
     \ifdefempty{\CurrentProblemNumber}{}{\space\CurrentProblemNumber}}%
   \ifdefempty{\CurrentProblemName}{}{ \textnormal{(\CurrentProblemName)}}%
