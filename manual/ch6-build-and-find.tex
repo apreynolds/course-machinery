@@ -67,6 +67,29 @@ An unrecognised view name warns and is skipped; the student PDF always
 builds. Under the default overlay mode, every view of a document has
 identical page breaks (section~\ref{sec:overlay}).
 
+\subsubsection{Cover page: one page of one PDF}
+
+A second key lives in the same leading block:
+
+\begin{manexsource}
+%! coverpage: yes
+\end{manexsource}
+
+\noindent That writes \file{FILE_COVERPAGE.pdf} as well --- page~1 of the
+finished PDF on its own, for printing an assessment's cover separately from
+the paper behind it (section~\ref{sec:assessments} has the assessment-side
+account). \texttt{no}, or no line at all, is off; any other value warns.
+
+Unlike a view, this is not a compile: it is a page lifted out of the base
+PDF \emph{after} it is built, with ghostscript. That is deliberate rather
+than incidental --- a cover carries \cs{printtotalpoints} and ``Page 1 of
+$M$'', both two-pass values that only exist once a run has reached
+\cs{end\{document\}} and written the \file{.aux}, so a package that selects
+page~1 \emph{during} the run prints the point total wrong. It is taken from
+the base build only, never a view, and follows the same mirror and
+\texttt{BOTH} handling as that PDF. Without ghostscript on the machine the
+extract is skipped with a warning and the build still succeeds.
+
 \subsubsection{Where the PDFs go}
 
 The output mirror is one \file{.MIRRORDIR} file, found by walking up from the

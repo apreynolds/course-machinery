@@ -17,6 +17,12 @@ views & \texttt{\%!\ views: solutions, hints, projector, instructor} in
   injecting its layer definition(s). Unknown views warn and skip. A
   \texttt{:LABEL} suffix also drops that view, flat, into the named
   \file{.MIRRORDIR} destination (\env{default} = the base PDF).\\
+coverpage & \texttt{\%!\ coverpage: yes} in the same block also writes
+  \file{FILE_COVERPAGE.pdf}, page~1 of the finished PDF on its own. From
+  the base build only, never a view; same mirror handling as that PDF.
+  \texttt{no} or no line is off, any other value warns. Needs
+  \texttt{gs}; without it the extract is skipped and the build still
+  succeeds.\\
 output & nearest ancestor \file{.MIRRORDIR} (bare base path $+$ optional
   \texttt{BOTH}) tree-mirrors the repo under the base $\to$ else local.
   Base must exist; missing $\to$ warn and fall back to local.
