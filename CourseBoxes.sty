@@ -52,6 +52,9 @@
                                      % tcolorbox pulls it in anyway; named here so the
                                      % dependency is stated rather than inherited.
 \RequirePackage[most]{tcolorbox}     % \tcolorboxenvironment, enhanced, breakable
+\RequirePackage{graphicx}            % \scalebox (\YourTurnTocGlyphScale). tcolorbox
+                                     % pulls it in anyway; named here so the
+                                     % dependency is stated rather than inherited.
 \RequirePackage{fontawesome5}        % topic glyphs + expressive faces (pdflatex-safe,
                                      % monochrome, inherit surrounding colour). NOT
                                      % wasysym: that redefines math symbols newtxmath
@@ -301,7 +304,14 @@
 %%% the spot and hyperref would never see the alternative. Wrapped in a robust
 %%% macro it survives that \protected@edef whole and picks its branch later, at
 %%% \pdfstringdef time -- glyph on the page, words in the bookmark pane.
-\DeclareRobustCommand{\YourTurnTocMark}{\texorpdfstring{\faPenFancy\ }{Your turn: }}
+%%% THE KNOB: the glyph's size in a contents line, as a fraction of the entry's
+%%% own type size. A contents list is set smaller and tighter than the page, and
+%%% the pen at full size sits heavy in it. Change this ONE number to retune; it
+%%% affects the contents entry only -- the page mark is \YourTurnMark above and is
+%%% deliberately untouched by it.
+\newcommand{\YourTurnTocGlyphScale}{0.8}
+\DeclareRobustCommand{\YourTurnTocMark}{%
+  \texorpdfstring{\scalebox{\YourTurnTocGlyphScale}{\faPenFancy}\ }{Your turn: }}
 
 \NewAside[cbcaution]  {caution} {\faExclamationTriangle\ CAUTION}{cb/caution}
 \NewAside[cbnote]     {takeaway}{TAKEAWAY}                       {cb/note}
