@@ -66,7 +66,8 @@ which one:
 - `build-pdfs` — compile a directory of sources, including the extra views each
   one requests through a `%! views:` magic comment, and optionally mirror the
   PDFs to a destination named in a `.MIRRORDIR` file (`SAMPLE-MIRRORDIR` is the
-  annotated template).
+  annotated template). A `%! coverpage: yes` comment additionally saves the
+  first page on its own, for printing an assessment's cover separately.
 - `build-images` — render single problem files to cropped PDFs and PNGs, one
   picture per problem, for a learning-management system whose question pools
   take an image rather than text. Question-only and question-with-solution
@@ -159,5 +160,6 @@ cd _assessment
 ```
 
 A source declaring `%! views: solutions, hints` yields the student PDF plus a
-`-SOLUTIONS` and a `-HINTS` copy. The manual's build chapter covers the view
-system, the mirror file and the label routing in full.
+`-SOLUTIONS` and a `-HINTS` copy. One declaring `%! coverpage: yes` also yields
+`test_COVERPAGE.pdf`, page 1 of the finished test on its own. The manual's build
+chapter covers the view system, the mirror file and the label routing in full.

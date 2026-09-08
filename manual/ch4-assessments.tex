@@ -194,3 +194,25 @@ Under the default overlay mode all three have \emph{identical page breaks} --
 the whole point of section~\ref{sec:overlay}. (Add \texttt{hints} to the list
 -- as the demo's \file{quiz.tex} does -- for a fourth, student-facing
 \file{-HINTS} copy.) Build mechanics are in section~\ref{sec:build-and-find}.
+
+\subsection{Printing the cover on its own}
+
+A test's first page is the one page you may want to print by itself --- on
+heavier paper, or in a different quantity from the paper behind it. Adding
+\texttt{\%! coverpage: yes} to the magic comment writes
+\file{test_COVERPAGE.pdf} beside \file{test.pdf}: page~1 of the finished
+test, nothing else. It is taken from the student build only, since a
+solutions or instructor cover is the same sheet of paper.
+
+Note \emph{finished}. The obvious way to do this would be a page-selection
+package in the preamble, and it does not work here, for a reason worth
+knowing because it applies to anything that stops a run early. The cover's
+own numbers are two-pass values: \cs{printtotalpoints} is a
+\texttt{totcount} sum written to the \file{.aux} at \cs{end\{document\}} and
+read back on the next run, and the footer's ``Page 1 of $M$'' is
+\cs{pageref\{LastPage\}}. The package for the job, \texttt{pagesel},
+suppresses the \file{.aux} outright and aborts the job after the last
+selected page --- so the run never reaches the point where the total is
+written, and the cover prints the \emph{wrong} number of points. Cutting
+page~1 out of a normally-built PDF has no such failure mode: the document
+compiled exactly as it always does, and the page is the page.
