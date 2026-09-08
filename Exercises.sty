@@ -20,6 +20,10 @@
 %   \importproblem[points=5, ...]{DIR}{FILE}  \import a problem; keyval options:
 %                                             points= / nocount / hint / nohint
 %                                             ([5] alone is shorthand for points=5)
+%   \begin{notesproblem}[number=1.7] ...   the same, written IN PLACE rather than
+%     \begin{notescheckin}[...] ...        imported: same keys, same registers.
+%                                          For a problem living in a DOCUMENT;
+%                                          a bank file still holds bare `problem'
 %   \importfact[kind=, name=, number=]{DIR}{FILE} \import a fact from the bank,
 %                                             shown via the opt-in \ShowFactMeta
 %   \printtotalpoints                      the summed points of the assessment
@@ -542,6 +546,55 @@
 % \importcheckin[name={reading a derivative off a graph}]{...}{...}.
 \NewDocumentCommand{\importcheckin}{O{} m m}{%
   \ifblank{#1}{\importproblem[checkin]{#2}{#3}}{\importproblem[checkin, #1]{#2}{#3}}%
+}
+
+% \begin{notesproblem}[number={1.7}, yourturn] ... \end{notesproblem} -- the
+% same problem, written IN PLACE instead of imported. This is \importproblem
+% with \BODY where the \import was; every eximport key therefore behaves
+% identically, because it IS the same key family, the same registers and the
+% same reset.
+%
+% WHY THIS EXISTS. \begin{problem} is deliberately bare -- it renders a problem
+% and knows nothing about where the problem came from. Everything extrinsic (the
+% display number, the label noun, the points, the workspaces) is supplied by the
+% CALL SITE, which for a bank file is \importproblem. A problem written directly
+% in a document had no call site, so it could say none of it: it could not print
+% "Example 1.7" or carry `yourturn'. That gap only surfaced when lectures began
+% to be drafted whole and extracted afterwards (write the section, then decide
+% what is worth banking) rather than assembled from an already-populated bank.
+%
+% NOT A SECOND WAY TO WRITE A BANK FILE. A file under problems/ holds a bare
+% \begin{problem}: its keys come from the \importproblem that pulls it in, and a
+% \notesproblem there would fight that call site for the same global registers.
+% The split is by WHERE THE PROBLEM LIVES, not by taste -- in a bank file,
+% `problem'; in a document, `notesproblem'. Extraction therefore rewrites the
+% environment back to `problem' and lifts these keys onto the emitted
+% \importproblem line; the reverse move inlines them.
+%
+% \NewEnviron, not \NewDocumentEnvironment, for a real reason: the
+% \ifCurrentProblemPrint guard STRADDLES the body, and a conditional cannot span
+% the two halves of an environment definition -- the \if and the \fi would land
+% in different groups. Capturing the body keeps the guard in one piece, so
+% `noprint' means here what it means on an import (never typeset, no counter
+% step, no points) instead of being silently ignored. Same reason `solution' and
+% `hint' are \NewEnviron.
+\NewEnviron{notesproblem}[1][]{%
+  \importproblem@reset
+  \importproblem@opts{#1}%
+  \ifCurrentProblemPrint
+    \ifcheckinmode\CheckinBox@begin\fi
+    \begin{problem}\BODY\end{problem}%
+    \ifcheckinmode\CheckinBox@end\fi
+  \fi
+  \importproblem@reset
+}
+% \begin{notescheckin}[...] -- the check-in flavour pre-set, mirroring
+% \importcheckin, and omitting the lone-integer points shorthand for the same
+% reason it does (an ungraded notes check-in has no points).
+\NewDocumentEnvironment{notescheckin}{O{}}{%
+  \ifblank{#1}{\notesproblem[checkin]}{\notesproblem[checkin, #1]}%
+}{%
+  \endnotesproblem
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

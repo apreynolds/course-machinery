@@ -183,6 +183,36 @@ what makes the list scannable for ``what are they working?''. It is a
 check-in and a \env{problemgroup} member never render this heading, so both
 warn rather than dropping the mark quietly.
 
+\subsection{Writing a problem in place: \env{notesproblem}}
+
+Not every problem starts life in the bank. A lecture drafted from the textbook
+is written whole first --- every worked example the section flags, in the
+section's own order --- and only afterwards is it worth asking which of them
+earn a file. \env{notesproblem} is that draft state: the same problem, written
+where it is used.
+
+\begin{manexsource}
+\begin{notesproblem}[number={1.7}, name={composing two formulas}]
+  Consider the functions $f(x) = x^2+1$ and $g(x) = 1/x$ ...
+\end{notesproblem}
+% -> "Example 1.7 (composing two formulas). ..." -- identical to the
+%    rendering of the same body imported with the same keys.
+\end{manexsource}
+
+It takes the \emph{same} keys as \cs{importproblem}, because it is the same
+key family and the same registers with the body in place of the \cs{import}.
+So \texttt{number=}, \texttt{name=}, \texttt{label=}, \texttt{yourturn},
+\texttt{noprint} and the points and workspace keys all mean exactly what they
+mean above. \env{notescheckin} is its \cs{importcheckin} twin.
+
+\textbf{The split is by where the problem lives, not by taste.} A file under
+\file{problems/} holds a bare \env{problem} and takes its keys from the
+\cs{importproblem} that pulls it in; a \env{notesproblem} there would fight
+that call site for the same registers. In a bank file, \env{problem}; in a
+document, \env{notesproblem}. Extraction is therefore mechanical in both
+directions: rewrite the environment name, and move the bracket onto the
+emitted \cs{importproblem} line.
+
 Three more import forms round out the lecture repertoire:
 
 \begin{itemize}
