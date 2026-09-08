@@ -154,6 +154,62 @@
 %%% environment names that would drift the moment a text layer adds one.
 \providecommand{\CourseBoxTocEntry}[3]{}
 
+%%% --- Name-collision guard (shared by both factories) -------------------------
+%%% \cb@checkname{env} -- refuse to declare an environment whose name is already
+%%% a control sequence, and say what to do about it.
+%%%
+%%% Worth a message of our own because LaTeX's ("Command \rule already defined")
+%%% names the symptom and not the fix, and the fix is genuinely not obvious: the
+%%% DISPLAY name is a SEPARATE argument, so the book's word survives renaming the
+%%% environment. \NewTextResult{Rule}{Rule}{cb/textresult} still prints "Rule".
+%%%
+%%% This is not a rare trap. Taken in one of our documents, all of them plausible
+%%% textbook nouns: rule, proof, box, list, table, figure, part, item, index,
+%%% title, center, quote, abstract -- and `problem', which is Exercises' own, so
+%%% the guard is protecting the exercise machinery too. Capitalising is usually
+%%% the cleanest escape (Rule, Proof) since it matches the display name exactly.
+%%%
+%%% AN ERROR, not a warning, unlike \importfact's kind= guard. There the fallback
+%%% is meaningful -- import the fact unboxed -- so a hard stop would be out of
+%%% proportion. Here there is no fallback: skipping the declaration would leave
+%%% every later \begin{rule} silently running LaTeX's \rule instead, which is far
+%%% worse than stopping. It joins the amsthm load-order check above as the second
+%%% thing this package refuses to continue past.
+%%%
+%%% Two different mistakes get two different messages. A name WE declared
+%%% (cb@<env> exists) is a duplicate -- nearly always a text layer re-declaring
+%%% something CourseBoxes already ships. Anything else is a foreign collision.
+%%% Sets \ifcb@namefree, and the factories declare nothing when it is false. That
+%%% matters: \PackageError RETURNS (and in nonstopmode never even pauses), so a
+%%% guard that only complained would fall straight through into \newtheorem* and
+%%% bury its own clear message under a cascade of derived ones.
+\newif\ifcb@namefree
+\newcommand{\cb@checkname}[1]{%
+  \cb@namefreetrue
+  \@ifundefined{#1}{}{%
+    \cb@namefreefalse
+    \@ifundefined{cb@#1}%
+      {\PackageError{CourseBoxes}%
+         {`#1' is already defined and cannot be an environment name}%
+         {Rename the ENVIRONMENT. The display name is a separate argument
+          and can stay\MessageBreak exactly as it is, so the book's word is
+          not lost.\MessageBreak
+          Capitalising usually reads best, because the environment then
+          matches\MessageBreak the display name -- a `Rule' that collides
+          becomes\MessageBreak
+          \space\space\string\NewTextResult{Rule}{Rule}{cb/textresult}
+          \MessageBreak
+          Already taken in these documents: rule, proof, problem, box, list,
+          \MessageBreak table, figure, part, item, index, title, center,
+          quote, abstract.}}%
+      {\PackageError{CourseBoxes}%
+         {`#1' is already a CourseBoxes environment}%
+         {It is being declared twice. Most likely the course's text layer
+          declares\MessageBreak a name CourseBoxes already ships -- drop the
+          duplicate there.}}%
+  }%
+}
+
 %%% --- The factories ----------------------------------------------------------
 %%% \NewTextResult[amsthm-style]{env}{Display Name}{tcb style}
 %%%   Default style is cbdefn (upright); pass [cbthm] for an italic-bodied result.
@@ -180,6 +236,8 @@
 %%% OUTSIDE the tcolorbox -- which is exactly why layout (tcolorbox) and mechanics
 %%% (the label) do not interfere.
 \NewDocumentCommand{\NewTextResult}{O{cbdefn} m m m}{%
+  \cb@checkname{#2}%
+  \ifcb@namefree
   \theoremstyle{#1}%
   \newtheorem*{cb@#2}{#3}%                 % base: starred = no counter
   \ifblank{#4}{}{\tcolorboxenvironment{cb@#2}{#4}}%   % box the base, unless no style
@@ -202,6 +260,7 @@
   }{%
     \end{cb@#2}%
   }%
+  \fi
 }
 
 %%% \NewAside[head style]{env}{Display Name}{tcb style}
@@ -209,6 +268,8 @@
 %%%   colour it. The sentinel \@currentlabel makes a stray \label print
 %%%   "[unlabelled aside]" -- loud, not the silent section-number leak.
 \NewDocumentCommand{\NewAside}{O{cbaside} m m m}{%
+  \cb@checkname{#2}%
+  \ifcb@namefree
   \theoremstyle{#1}%
   \newtheorem*{cb@#2}{#3}%
   \tcolorboxenvironment{cb@#2}{#4}%
@@ -218,6 +279,7 @@
   }{%
     \end{cb@#2}%
   }%
+  \fi
 }
 
 %%% --- Universal default vocabulary -------------------------------------------

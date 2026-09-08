@@ -95,6 +95,27 @@ the same loud-sentinel trick asides use: without it an unnumbered result
 would still be \cs{label}-able and \cs{ref} would expand to \emph{nothing},
 leaving ``by Theorem~'' and a blank space in the PDF.
 
+Both factories \textbf{refuse a name that is already a control sequence},
+with an error naming the fix rather than LaTeX's bare ``Command
+\cs{rule} already defined''. This is not a rare trap: \env{rule},
+\env{proof}, \env{box}, \env{list}, \env{table}, \env{figure}, \env{part},
+\env{item}, \env{index}, \env{title}, \env{center}, \env{quote} and
+\env{abstract} are all taken in one of these documents, and \env{problem} is
+\file{Exercises.sty}'s own --- so the guard protects the exercise machinery
+as well as the boxes. The escape is that the \emph{display} name is a
+separate argument: capitalising the environment usually reads best, because
+it then matches what prints ---
+\texttt{\char`\\NewTextResult\{Rule\}\{Rule\}\{cb/textresult\}}.
+
+A name \emph{this package already declared} gets a different message, since
+that is a duplicate declaration rather than a collision --- nearly always a
+text layer re-declaring something CourseBoxes already ships.
+
+Unlike \cs{importfact}'s \texttt{kind=} guard, which warns and imports the
+fact bare, this one is an \textbf{error}: there is no sensible fallback.
+Skipping the declaration silently would leave every later
+\texttt{\char`\\begin\{rule\}} running LaTeX's \cs{rule} instead.
+
 \subsection*{Restyling knobs}
 
 Named once, referenced everywhere -- each is a one-line edit:
