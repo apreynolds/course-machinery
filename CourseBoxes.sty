@@ -235,6 +235,26 @@
 %%% \@currentlabel assignment run in the BEGIN CODE, before \begin{cb@env}, i.e.
 %%% OUTSIDE the tcolorbox -- which is exactly why layout (tcolorbox) and mechanics
 %%% (the label) do not interfere.
+%%% Emit the run-in head before the body starts, so a body that OPENS WITH A LIST
+%%% does not swallow it.
+%%%
+%%% amsthm builds a run-in head as \trivlist\item[HEAD], which leaves \@inlabel
+%%% true until something typesets the label. A list started while \@inlabel is
+%%% true attaches to that pending label instead of beginning cleanly, so
+%%%
+%%%   \begin{prepwork}\begin{itemize}\item Read S1.1 ...
+%%%
+%%% set the first item ON the head's line, and indented differently from its
+%%% siblings -- a box holding nothing but a list came out visibly misaligned.
+%%% \leavevmode forces the pending label out, after which the list breaks
+%%% normally. A prose body is unaffected: it starts a paragraph anyway, so the
+%%% head still runs in exactly as before.
+%%%
+%%% It is one control sequence rather than a bare \leavevmode at three call
+%%% sites so the reason lives in one place -- and because "flush the head" is
+%%% the intent, while \leavevmode is only how it is achieved here.
+\newcommand{\cb@flushhead}{\leavevmode}
+
 \NewDocumentCommand{\NewTextResult}{O{cbdefn} m m m}{%
   \cb@checkname{#2}%
   \ifcb@namefree
@@ -247,6 +267,7 @@
     % After \phantomsection, so the contents entry links to THIS result.
     \IfValueTF{##2}{\CourseBoxTocEntry{#3}{##1}{##2}}{\CourseBoxTocEntry{#3}{##1}{}}%
     \IfValueTF{##2}{\begin{cb@#2}[##1 (##2)]}{\begin{cb@#2}[##1]}%
+    \cb@flushhead
   }{%
     \end{cb@#2}%
   }%
@@ -257,6 +278,7 @@
     \protected@edef\@currentlabel{[unnumbered #3]}%   % loud, never empty
     \IfValueTF{##1}{\CourseBoxTocEntry{#3}{}{##1}}{\CourseBoxTocEntry{#3}{}{}}%
     \IfValueTF{##1}{\begin{cb@#2}[(##1)]}{\begin{cb@#2}}%
+    \cb@flushhead
   }{%
     \end{cb@#2}%
   }%
@@ -276,6 +298,7 @@
   \NewDocumentEnvironment{#2}{}{%
     \protected@edef\@currentlabel{[unlabelled aside]}%
     \begin{cb@#2}%
+    \cb@flushhead
   }{%
     \end{cb@#2}%
   }%

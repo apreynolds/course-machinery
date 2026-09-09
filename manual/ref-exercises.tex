@@ -14,7 +14,15 @@ section~\ref{sec:assessments}.
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \env{problem} & a numbered, cross-referenceable problem (flat document-wide
-  counter; \cs{counterwithin} to restart per section).\\
+  counter; \cs{counterwithin} to restart per section). What a \emph{bank file}
+  contains: extrinsic settings come from the \cs{importproblem} that pulls it
+  in.\\
+\env{notesproblem}\texttt{[...]} / \env{notescheckin}\texttt{[...]} & the same
+  problem written \emph{in place} in a document rather than imported --- the
+  \env{eximport} keys below, with the body where the \cs{import} would be, and
+  an identical rendering. For drafting a lecture whole and extracting later. A
+  bank file still holds bare \env{problem}; putting a \env{notesproblem} there
+  would fight the call site for the same registers.\\
 \env{problemgroup}\texttt{[name=\{...\}]\{STEM\}} & assembly-time grouping:
   ``Problem $N$.''\ $+$ stem, members render as parts (a), (b). Label the group
   \emph{inside} it, before the first part. The optional \texttt{name=} is a
