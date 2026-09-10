@@ -18,14 +18,21 @@
 #   - Blank lines and #-comment lines (like these) are ignored; the base path and
 #     the BOTH keyword may appear in any order.
 #
-# Named destinations for selected views:
-#   A `%! views: ...' magic comment in a source may tag a view with a colon and a
-#   label -- e.g. `%! views: solutions, instructor:TA-dir' -- to drop THAT view's
-#   PDF, flat, into the directory the matching `LABEL: path' line names here, IN
-#   ADDITION to the mirror. The labelled directory must already exist; a missing
-#   label or directory warns and skips only that extra copy. `default:LABEL' does
-#   the same for the base (student) PDF. This keeps machine-specific paths out of
-#   the git-tracked source: the source names a label, this file maps it to a path.
+# Named destinations:
+#   A `LABEL: path' line here gives a directory a NAME. A source asks for a PDF
+#   to be dropped there, flat and IN ADDITION to the mirror, with a `%! copies:'
+#   magic comment naming that label -- e.g.
+#
+#       %! copies: default-->TA-dir, instructor-->TA-dir(from 2026-10-01)
+#
+#   where `default' is the base (student) PDF and the other names are views from
+#   the source's own `%! views:' line. The labelled directory must already exist;
+#   a missing label or directory warns and skips only that extra copy.
+#
+#   This file is only the ADDRESS BOOK. Which document goes where is stated in
+#   the source, which is what keeps machine-specific paths out of the git-tracked
+#   .tex -- and a `(from YYYY-MM-DD)' embargo, which holds a copy until that date
+#   arrives, is likewise the source's business, not this file's.
 #
 # .MIRRORDIR is meant to be git-ignored, so each machine or checkout can point
 # somewhere different (keep SAMPLE-MIRRORDIR tracked as the reference).

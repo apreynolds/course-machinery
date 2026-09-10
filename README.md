@@ -66,8 +66,11 @@ which one:
 - `build-pdfs` — compile a directory of sources, including the extra views each
   one requests through a `%! views:` magic comment, and optionally mirror the
   PDFs to a destination named in a `.MIRRORDIR` file (`SAMPLE-MIRRORDIR` is the
-  annotated template). A `%! coverpage: yes` comment additionally saves the
-  first page on its own, for printing an assessment's cover separately.
+  annotated template). A `%! copies:` comment sends chosen PDFs to further
+  destinations named there, optionally holding one until a date it names; every
+  run ends by sending whatever has come due, and `--release` does that on its
+  own. A `%! coverpage: yes` comment additionally saves the first page on its
+  own, for printing an assessment's cover separately.
 - `build-images` — render single problem files to cropped PDFs and PNGs, one
   picture per problem, for a learning-management system whose question pools
   take an image rather than text. Question-only and question-with-solution
@@ -171,5 +174,7 @@ cd _assessment
 
 A source declaring `%! views: solutions, hints` yields the student PDF plus a
 `-SOLUTIONS` and a `-HINTS` copy. One declaring `%! coverpage: yes` also yields
-`test_COVERPAGE.pdf`, page 1 of the finished test on its own. The manual's build
-chapter covers the view system, the mirror file and the label routing in full.
+`test_COVERPAGE.pdf`, page 1 of the finished test on its own. One declaring
+`%! copies: solutions-->TA-dir(from 2026-10-01)` sends the solutions to a folder
+named in `.MIRRORDIR`, but not before that date. The manual's build chapter
+covers the view system, the mirror file and dated copies in full.
