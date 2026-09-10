@@ -111,15 +111,15 @@ lands next to its source.
 copy it to \file{.MIRRORDIR} and uncomment. \file{.MIRRORDIR} is meant to be
 git-ignored: each machine points its own way.
 
-\paragraph{Routing a view to a named folder.}
-Sometimes one view of a document belongs somewhere else too -- the instructor
-copy of a test in a folder shared with TAs, say, while the rest of the build
-still mirrors to your private cloud. Add \texttt{LABEL: path} lines to
-\file{.MIRRORDIR} and tag the view with a matching \texttt{:LABEL} suffix in the
-magic comment:
+\paragraph{Sending a PDF to a named folder.}
+Sometimes one PDF belongs somewhere else too -- the instructor copy of a test in
+a folder shared with TAs, say, while the rest of the build still mirrors to your
+private cloud. Add \texttt{LABEL: path} lines to \file{.MIRRORDIR}, then name the
+label from the source in a \texttt{\%! copies:} magic comment of its own:
 
 \begin{manexsource}
-%! views: solutions, instructor:TA-dir
+%! views: solutions, instructor
+%! copies: instructor-->TA-dir
 \end{manexsource}
 
 \noindent That drops \file{FILE-INSTRUCTOR.pdf}, flat, into the directory
@@ -127,15 +127,52 @@ magic comment:
 goes only to the mirror. The labelled directory must already exist (a missing
 label or directory warns and skips just that extra copy -- the build still
 succeeds and still mirrors). Because the source names only a \emph{label} and
-the git-ignored \file{.MIRRORDIR} maps it to a path, no machine-specific path ever
-enters a tracked source. The pseudo-view \env{default} names the base (student)
-PDF itself, so \texttt{default:LABEL} routes it the same way; a bare
-\env{default} is a harmless no-op.
+the git-ignored \file{.MIRRORDIR} maps it to a path, no machine-specific path
+ever enters a tracked source. \env{default} names the base (student) PDF, so
+\texttt{default-->LABEL} sends it the same way.
 
-Routing decides \emph{where} a view goes, not \emph{when} it is released: if
-you would rather TAs not see solutions until after the assessment, point the
-label at a private staging folder and copy across by hand at release time --
-\file{build-pdfs} deliberately knows nothing about dates.
+Two lines, not one, because they answer different questions.
+\texttt{\%! views:} says which PDFs a document \emph{has};
+\texttt{\%! copies:} says where any of them additionally \emph{goes}. A view
+named on the copies line must also be requested on the views line -- declaring a
+copy never adds a build -- and the arrow is deliberate: its left side is a view
+name, its right a label, so nothing has to be guessed. (An older source may
+still carry the destination as a \texttt{:LABEL} suffix on the views line. It
+builds the view and warns you where the copy moved to.)
+
+\paragraph{Holding a copy until a date.}
+Where a PDF goes and \emph{when} it may go are also different questions, and the
+second one has teeth: solutions that reach TAs before the assessment cannot be
+recalled from a folder other people sync. Give the destination a date:
+
+\begin{manexsource}
+%! views: solutions
+%! copies: solutions-->TA-dir(from 2026-10-01)
+\end{manexsource}
+
+\noindent The destination is inert before that date and an ordinary destination
+on and after it. \texttt{from} includes its own day, and the boundary is
+midnight, so for a test written on the first you want \texttt{from 2026-10-02}.
+
+That one rule is read twice, and it needs both readings. The build honours it,
+so no rebuild before the date can leak the PDF, and it announces a held copy
+instead of passing over it in silence. But a build-time check alone would only
+ever \emph{suppress}: nothing rebuilds a document that is finished, so an
+October copy would sit unsent for ever while looking automatic. So every run
+also ends by sweeping the whole repo for copies that have come due, and
+\texttt{build-pdfs -{}-release} does that sweep on its own for a scheduler to
+call. Building \emph{any} document therefore releases \emph{every} document that
+is due.
+
+The sweep keeps no record of what it has done -- it re-reads the sources every
+time and sends only what is absent or out of date at the destination. So it
+costs nothing to run often, and deleting a \texttt{\%! copies:} line is how you
+cancel a standing order.
+
+Everything here fails closed. A malformed entry, a date that is not a real date,
+a view the source does not build, a label that does not resolve, a PDF that has
+come due but was never built -- each one warns and sends nothing. Late is a
+warning you can act on; early is not.
 
 \subsection{\texorpdfstring{\texttt{find-problems} / \texttt{find-facts} /
   \texttt{find-passages}}{find-problems / find-facts / find-passages}}

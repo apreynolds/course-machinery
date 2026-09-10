@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # build-pdfs — compile course .tex files into PDFs with latexmk
-# Usage: build-pdfs [FILE.tex ...]
+# Usage: build-pdfs [--release [--dry-run]] [--no-release] [FILE.tex ...]
 #
 # With no arguments, compiles every *.tex file in the current directory.
 # Each source FILE.tex produces FILE.pdf.
+#
+#   --release     ship copies that have come due and build nothing (see
+#                 `%! copies:' below). What a scheduler or sync script calls.
+#   --dry-run     with --release, report what would be sent and send nothing.
+#   --no-release  skip the due-check that otherwise ends every run.
 #
 # Output mirror via a top-level .MIRRORDIR file: build-pdfs looks upward from the
 # build directory for a .MIRRORDIR (at the repo top level, found the way .latexmkrc
@@ -19,14 +24,12 @@
 # wins, letting a subtree mirror elsewhere. (COPY, a songsheets synonym for
 # BOTH, is deliberately not wired here; it warns and is ignored.)
 #
-# Named destinations for selected views: besides the bare mirror-base line, a
-# .MIRRORDIR may carry `LABEL: path' lines (e.g. `TA-dir: ~/shared/calc-ta'). A view
-# in the magic comment below may name one with a colon suffix — `instructor:TA-dir'
-# — which drops that view's PDF, flat, into the labelled directory IN ADDITION to
-# the mirror. The labelled directory must already exist; a missing label or
-# directory warns and skips that one extra copy without failing the build. This
-# keeps machine-specific paths out of the (git-tracked) source: the source names a
-# label, the git-ignored .MIRRORDIR maps it to a path.
+# Named destinations: besides the bare mirror-base line, a .MIRRORDIR may carry
+# `LABEL: path' lines (e.g. `TA-dir: ~/shared/calc-ta'), naming flat extra
+# directories a source can ship a PDF to BY NAME through the `%! copies:' comment
+# below. The .MIRRORDIR is only the address book — which document goes to which
+# label is stated in the source — so machine-specific paths stay out of the
+# git-tracked .tex and the git-ignored .MIRRORDIR maps a label to a path.
 #
 # Views via a magic comment: a `%! views: ...' line in the leading comment block
 # of a source (before \documentclass) requests extra PDFs. Four views are wired:
@@ -46,13 +49,54 @@
 #                instructor copy IS the staff copy -- TAs get it too; there is no
 #                separate marker tier.)
 # Any other view name warns and is skipped.
-# View PDFs follow the same mirror / BOTH handling as the default build. Any view
-# may take a `:LABEL' suffix (see above) to also drop a flat copy into a named
-# directory. `default' is a pseudo-view naming the base (student) PDF itself, wired
-# only so it too can carry such a label -- a bare `default' is a harmless no-op.
+# View PDFs follow the same mirror / BOTH handling as the default build. A view
+# says which PDFs a document HAS; where any of them additionally goes is a
+# separate question, answered by `%! copies:' below.
 #
 # NB the class reads these as \ifdefined, so the same source builds both ways
 # with no option at the call site -- see LectureNotes.cls / Assessment.cls.
+#
+# Copies via a magic comment: a `%! copies: ...' line ships built PDFs to named
+# .MIRRORDIR destinations, flat, IN ADDITION to the mirror. Comma-separated
+# entries, each naming a PDF and a label:
+#
+#     %! copies: default-->TAs, instructor-->TA-dir(from 2026-10-01)
+#
+# `default' is the base (student) PDF; every other name is one of the views
+# above, and a view named here must also be requested in `%! views:' --
+# declaring a copy never adds a build. The label must resolve to an existing
+# directory through a `LABEL: path' line in the governing .MIRRORDIR.
+#
+# `(from YYYY-MM-DD)' embargoes a copy: the destination is inert before that
+# date and an ordinary destination on and after it. Dates are compared as text,
+# which is why they must be ISO; it needs no date(1) arithmetic and so behaves
+# the same on macOS, Linux and Git for Windows.
+#
+# That one rule has TWO readers, and it needs both. The build consults it, so no
+# rebuild before the date can leak the PDF and a held copy is announced rather
+# than passed over. But a build-time gate alone would only ever suppress:
+# nothing rebuilds a document that is finished, so a copy dated for October
+# would sit unsent for ever while looking automatic. So every run also ends by
+# sweeping the whole repo for copies that have come due (--no-release opts out),
+# and --release does that sweep on its own for a caller with a clock. Building
+# ANY document therefore releases EVERY document that is due, which is what
+# makes this work for someone with no scheduler of their own.
+#
+# The sweep is idempotent -- it sends only what is absent or stale at the
+# destination -- and keeps no record of what it has done. Everything it needs is
+# re-derived from the sources each run, so deleting a `%! copies:' line is how
+# you cancel a standing order, and there is no state file to drift.
+#
+# Everything here fails CLOSED. A malformed entry, an out-of-range date, an
+# unknown view, a view that is not built, a label that does not resolve -- each
+# warns and copies NOTHING. A copy that goes out early cannot be recalled from a
+# folder other people sync; one that is late is a warning you can act on.
+#
+# Why this is not part of `%! views:', which used to carry a `:LABEL' suffix:
+# that line was answering two questions at once, and `default' had to be
+# invented as a pseudo-view so the distribution half had something to name. A
+# source still using the old suffix builds its view and warns that the copy
+# moved here.
 #
 # Cover page via a magic comment: a `%! coverpage: yes' line in the same leading
 # block additionally writes FILE_COVERPAGE.pdf, page 1 of the finished PDF on its
@@ -116,6 +160,11 @@ cache_root=${XDG_CACHE_HOME:-$HOME/.cache}
 # is the answer. Resolved ONCE, here, and absolute -- build_file cd's into each
 # source's directory, after which a relative $0 would point nowhere.
 machinery_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
+# Today, for the `%! copies:' embargo dates. Read once so a run cannot straddle
+# midnight and publish one document but not its twin -- and so a sweep of a few
+# hundred sources does not fork date(1) a few hundred times.
+today=$(date +%F)
 
 # Unwrap pdflatex's 79-column log lines so multi-line warnings keep their
 # "on input line N" tails intact for log parsers -- vim's quickfix reads these
@@ -220,7 +269,16 @@ find_mirrordir_file() {
 # directory is created if missing, but the base itself must exist — if it doesn't,
 # warn and build locally rather than materialising a stray tree. Echoes two lines
 # (mode, dest) on success, or nothing when the caller should build locally.
+#
+# $1 is `create' (the default, for a build that is about to write there) or
+# `check' (for the --release sweep, which only reads). A sweep must never
+# materialise a directory tree: it runs over the whole repo, including sources
+# whose PDF was never built, and a stray mirror branch is exactly what the
+# base-must-exist rule above is there to prevent. In `check' mode a missing
+# mirror sub-directory simply means "nothing was built there", and the caller
+# falls back to the local build directory.
 read_mirrordir() {
+  local create=${1:-create}
   local finfo f root info base mode rel dest
   finfo=$(find_mirrordir_file)
   [[ -n $finfo ]] || return 0          # no .MIRRORDIR anywhere above -> build locally
@@ -237,14 +295,18 @@ read_mirrordir() {
   # Mirror the cwd's path relative to the .MIRRORDIR's directory under the base.
   rel=${PWD#"$root"}; rel=${rel#/}
   dest=$base${rel:+/$rel}
-  if ! mkdir -p -- "$dest"; then
-    echo "build-pdfs: could not create .MIRRORDIR path '$dest', building locally" >&2
+  if [[ $create == create ]]; then
+    if ! mkdir -p -- "$dest"; then
+      echo "build-pdfs: could not create .MIRRORDIR path '$dest', building locally" >&2
+      return 0
+    fi
+  elif [[ ! -d $dest ]]; then
     return 0
   fi
   printf '%s\n%s\n' "$mode" "$dest"
 }
 
-# Resolve a named view destination from the governing .MIRRORDIR: find the first
+# Resolve a named copy destination from the governing .MIRRORDIR: find the first
 # `LABEL: path' line whose label matches $1, expand a leading ~, and require the
 # path to be an existing directory. Echoes the directory on success, or warns and
 # echoes nothing (no .MIRRORDIR, no such label, or the path is missing / not a
@@ -253,7 +315,7 @@ resolve_label() {
   local label=$1 finfo f root line trimmed path
   finfo=$(find_mirrordir_file)
   if [[ -z $finfo ]]; then
-    echo "build-pdfs: view label '$label' needs a .MIRRORDIR, skipping extra copy" >&2
+    echo "build-pdfs: copies label '$label' needs a .MIRRORDIR, skipping extra copy" >&2
     return 0
   fi
   { read -r f; read -r root; } <<<"$finfo"
@@ -273,21 +335,21 @@ resolve_label() {
   done <"$f"
 
   if [[ -z ${path:-} ]]; then
-    echo "build-pdfs: view label '$label' not found in $f, skipping extra copy" >&2
+    echo "build-pdfs: copies label '$label' not found in $f, skipping extra copy" >&2
     return 0
   fi
   if [[ ! -d $path ]]; then
-    echo "build-pdfs: view label '$label' path '$path' is not a directory, skipping extra copy" >&2
+    echo "build-pdfs: copies label '$label' path '$path' is not a directory, skipping extra copy" >&2
     return 0
   fi
   printf '%s\n' "$path"
 }
 
-# Drop one built PDF, flat, into the .MIRRORDIR destination named by a view label.
+# Drop one built PDF, flat, into the .MIRRORDIR destination named by a copies label.
 # Additive: this is an extra copy on top of the mirror, never a replacement. A
 # label that does not resolve (resolve_label already warned) is skipped, and a
 # failed copy warns but does not abort the build.
-#   $1 directory the built PDFs live in   $2 pdf filename   $3 view label
+#   $1 directory the built PDFs live in   $2 pdf filename   $3 copies label
 ship_label() {
   local pdfdir=$1 file=$2 label=$3 dest
   dest=$(resolve_label "$label")
@@ -375,13 +437,14 @@ read_magic() {
   done <"$file"
 }
 
-# The `%! views: a, b, c' request: split read_magic's value on commas and echo one
-# view token per line, whitespace trimmed. One token per LINE rather than one
-# space-separated string, because a token may carry a space -- a `:LABEL' naming
-# a .MIRRORDIR destination like `instructor:TA dir' -- and build_file's mapfile
-# depends on the line split to keep it whole.
-read_views() {
-  local file=$1 val tok toks
+# Split a comma-separated magic-comment value into one entry per line, trimmed.
+# One entry per LINE rather than one space-separated string, because an entry may
+# carry a space -- `TAs(from 2026-10-01)' -- and build_file's mapfile depends on
+# the line split to keep it whole. Both list-valued keys parse identically, so
+# they share this and can never drift apart.
+#   $1 key  $2 file
+read_magic_list() {
+  local key=$1 file=$2 val tok toks
   while IFS= read -r val; do
     IFS=',' read -ra toks <<<"$val"
     for tok in "${toks[@]}"; do
@@ -390,7 +453,142 @@ read_views() {
       tok=${tok%"${tok##*[![:space:]]}"}
       [[ -n $tok ]] && printf '%s\n' "$tok"
     done
-  done < <(read_magic views "$file")
+  done < <(read_magic "$key" "$file")
+}
+
+# The `%! views: a, b, c' request -- which extra PDFs this document has.
+read_views() { read_magic_list views "$1"; }
+
+# The `%! copies: a-->X, b-->Y(from DATE)' request -- where built PDFs also go.
+read_copies() { read_magic_list copies "$1"; }
+
+# The view vocabulary, in ONE place: echo a view's jobname SUFFIX and the TeX to
+# inject for it, one per line, or return 1 for a name that is not a view. Both
+# the views loop and the copies pass need the suffix, so a new view stays a
+# one-line change in a single case.
+#
+# `default' is deliberately absent. It names the base PDF, which is already
+# built and needs no injection; it is meaningful only to `%! copies:', and every
+# caller here handles it before asking.
+view_spec() {
+  case $1 in
+    solutions)  printf '%s\n%s\n' "-SOLUTIONS"  "\\def\\ShowSolutions{}" ;;
+    hints)      printf '%s\n%s\n' "-HINTS"      "\\def\\ShowHints{}" ;;
+    projector)  printf '%s\n%s\n' "-PROJECTOR"  "\\def\\ProjectorView{}" ;;
+    # A view is a BUNDLE of content layers: instructor = solutions + hints
+    # + the staff-notes tier (see InstructorNotes.sty's view model).
+    instructor) printf '%s\n%s\n' "-INSTRUCTOR" "\\def\\ShowSolutions{}\\def\\ShowHints{}\\def\\ShowInstructorNotes{}" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Parse one `%! copies:' entry -- `VIEW-->LABEL' or `VIEW-->LABEL(from DATE)' --
+# and echo three lines: the view name, the label, and the date (empty when the
+# entry carries none). Warns and returns 1 on anything else, so every caller
+# fails closed by simply skipping the entry.
+#
+# Split on the FIRST `-->': the left side is a view name from a closed
+# vocabulary and the right a label, so the arrow can never be ambiguous the way
+# a colon was (a label may itself contain `-', and `TA-->x' still parses).
+#   $1 entry  $2 source file (named in warnings)
+parse_copy_entry() {
+  local entry=$1 file=$2 view rest label date="" m d
+  # The arrow must be QUOTED inside [[ ]]: unquoted, `*-->*' parses as the
+  # pattern `*-' followed by the string-comparison operator `>', which is a
+  # syntax error rather than a wrong answer -- but only when this line is reached.
+  if [[ $entry != *"-->"* ]]; then
+    echo "build-pdfs: $file: copies entry '$entry' has no '-->', skipping" >&2
+    return 1
+  fi
+  view=${entry%%-->*}
+  rest=${entry#*-->}
+  view=${view%"${view##*[![:space:]]}"}     # trim before the arrow
+  rest=${rest#"${rest%%[![:space:]]*}"}     # trim after it
+
+  if [[ $rest =~ ^([A-Za-z0-9_-]+)[[:space:]]*\(from[[:space:]]+([0-9]{4}-[0-9]{2}-[0-9]{2})\)$ ]]; then
+    label=${BASH_REMATCH[1]}
+    date=${BASH_REMATCH[2]}
+  elif [[ $rest =~ ^([A-Za-z0-9_-]+)$ ]]; then
+    label=$rest
+  else
+    echo "build-pdfs: $file: copies entry '$entry' is not LABEL or LABEL(from YYYY-MM-DD), skipping" >&2
+    return 1
+  fi
+
+  # The shape test is not enough: `2026-13-99' matches it. Check the ranges too,
+  # or a typo would compare as an ordinary date -- and a typo that lands in the
+  # PAST would publish immediately, which is the direction that cannot be undone.
+  # (10# because 08 and 09 are not octal.)
+  if [[ -n $date ]]; then
+    m=${date:5:2}; d=${date:8:2}
+    if (( 10#$m < 1 || 10#$m > 12 || 10#$d < 1 || 10#$d > 31 )); then
+      echo "build-pdfs: $file: copies entry '$entry' names no real date, holding" >&2
+      return 1
+    fi
+  fi
+
+  printf '%s\n%s\n%s\n' "$view" "$label" "$date"
+}
+
+# Whether a copy has come due: no date means always, otherwise today must have
+# reached it. ISO dates compare correctly as text (see the header), and $today is
+# read once at startup rather than per entry -- a fork here is not free on an
+# EDR-laden machine.
+copy_is_due() {
+  [[ -z $1 || ! $today < $1 ]]
+}
+
+# Resolve a source's `%! copies:' entries against its own `%! views:' line and
+# echo one VALIDATED entry per line, three `|'-separated fields: the jobname
+# suffix (empty for the base PDF), the label, and the date (empty when the entry
+# carries none). Anything invalid warns and is dropped here, so a caller can act
+# on every line it receives without re-checking.
+#
+# `|' and not a tab: two of the three fields are legitimately empty, and `read'
+# strips leading and collapses repeated IFS *whitespace*, so a tab-separated
+# line beginning with an empty suffix silently shifts every field left -- the
+# label lands in the suffix and the date in the label. None of the three fields
+# can contain a `|': the suffix and label are [A-Za-z0-9_-]+ and the date is
+# digits and hyphens.
+#
+# Shared by the build and the --release sweep, so the two can never disagree
+# about what a source asked for -- the same reason is_label_line is the ONE
+# classifier for the .MIRRORDIR parsers.
+#   $1 file
+copies_for_file() {
+  local file=$1 entry parsed view label date suffix spec v found
+  local -a fviews fcopies
+
+  mapfile -t fcopies < <(read_copies "$file")
+  ((${#fcopies[@]})) || return 0
+  mapfile -t fviews < <(read_views "$file")
+
+  for entry in "${fcopies[@]}"; do
+    parsed=$(parse_copy_entry "$entry" "$file") || continue
+    { read -r view; read -r label; read -r date; } <<<"$parsed"
+
+    suffix=""
+    if [[ $view != default ]]; then
+      if ! spec=$(view_spec "$view"); then
+        echo "build-pdfs: $file: copies names '$view', which is not a view, skipping" >&2
+        continue
+      fi
+      suffix=${spec%%$'\n'*}                 # first line of view_spec = the suffix
+      # Declaring a copy must never ADD a build: a view the source does not
+      # request has no PDF here to ship. (A `views' token may still carry a
+      # legacy `:LABEL', so compare on the part before the colon.)
+      found=0
+      for v in ${fviews[@]+"${fviews[@]}"}; do
+        [[ ${v%%:*} == "$view" ]] && { found=1; break; }
+      done
+      if (( ! found )); then
+        echo "build-pdfs: $file: copies names view '$view', which '%! views:' does not request, skipping" >&2
+        continue
+      fi
+    fi
+
+    printf '%s|%s|%s\n' "$suffix" "$label" "$date"
+  done
 }
 
 # Build a view of a document: inject a \def before \input to flip a class toggle,
@@ -474,7 +672,7 @@ extract_coverpage() {
 # Build one .tex file. Runs in a subshell so the cd stays local to this build.
 build_file() {
   local src=$1 dir base jobname auxkey auxdir outinfo mode outdir movedir pdfdir
-  local views view name label suffix inject varaux
+  local views view spec suffix inject varaux csuffix clabel cdate
   dir=$(dirname -- "$src")
   base=$(basename -- "$src")
   jobname=${base%.tex}
@@ -541,46 +739,153 @@ build_file() {
     fi
 
     # Extra views requested via `%! views: ...' in the source's leading comment.
-    # A view is just a jobname SUFFIX plus the \def(s) to inject -- the case sets
-    # those two and one shared block below does the rest, so a new view is a
-    # one-line arm. Each view gets its own aux dir (so it never clobbers the main
-    # build's log) and follows the same MOVE/BOTH output handling as the default
-    # build above. A `view:LABEL' token additionally drops a flat copy into the
-    # named .MIRRORDIR destination; `default:LABEL' does the same for the base PDF.
+    # A view is just a jobname SUFFIX plus the \def(s) to inject -- view_spec
+    # holds both and one shared block below does the rest, so a new view is a
+    # one-line arm there. Each view gets its own aux dir (so it never clobbers
+    # the main build's log) and follows the same MOVE/BOTH output handling as the
+    # default build above. Where a view ALSO goes is not decided here; see the
+    # copies pass below.
     # mapfile, not `for view in $(...)': read_views emits one token per line,
-    # and word-splitting would shred a token containing a space (a label like
-    # `instructor:TA dir') and glob-expand any stray * against the build dir.
+    # and word-splitting would glob-expand any stray * against the build dir.
     mapfile -t views < <(read_views "$base")
     for view in "${views[@]}"; do
-      name=$view; label=""
-      if [[ $view == *:* ]]; then name=${view%%:*}; label=${view#*:}; fi
-      case $name in
-        # The base PDF is already built; only a :LABEL does anything here.
-        default)    [[ -n $label ]] && ship_label "$pdfdir" "$jobname.pdf" "$label"
-                    continue ;;
-        solutions)  suffix="-SOLUTIONS";  inject="\\def\\ShowSolutions{}" ;;
-        hints)      suffix="-HINTS";      inject="\\def\\ShowHints{}" ;;
-        projector)  suffix="-PROJECTOR";  inject="\\def\\ProjectorView{}" ;;
-        # A view is a BUNDLE of content layers: instructor = solutions + hints
-        # + the staff-notes tier (see InstructorNotes.sty's view model).
-        instructor) suffix="-INSTRUCTOR"; inject="\\def\\ShowSolutions{}\\def\\ShowHints{}\\def\\ShowInstructorNotes{}" ;;
-        *)
-          echo "build-pdfs: view '$name' not yet supported, skipping" >&2
-          continue
-          ;;
-      esac
+      # The `:LABEL' suffix moved to `%! copies:'. Strip it so the view still
+      # builds, and say so -- an unmigrated source loses its copy loudly.
+      if [[ $view == *:* ]]; then
+        echo "build-pdfs: $base: the ':${view#*:}' suffix moved to '%! copies: ${view%%:*}-->${view#*:}', not copying" >&2
+        view=${view%%:*}
+      fi
+      # `default' is the base PDF, already built. It was only ever a view so it
+      # could carry a label, and labels live in `%! copies:' now.
+      if [[ $view == default ]]; then
+        echo "build-pdfs: $base: 'default' is not a view; name it in '%! copies:' instead" >&2
+        continue
+      fi
+      if ! spec=$(view_spec "$view"); then
+        echo "build-pdfs: view '$view' not yet supported, skipping" >&2
+        continue
+      fi
+      { read -r suffix; read -r inject; } <<<"$spec"
       varaux="$cache_root/latexmk/$auxkey-$jobname$suffix"
       mkdir -p "$varaux" || exit
       compile_view "$jobname" "$base" "$varaux" "$suffix" "$inject" "$movedir" || exit
-      echo "    + $jobname$suffix.pdf ($name)"
+      echo "    + $jobname$suffix.pdf ($view)"
+      # An `if' (not `&&') so a MOVE-mode build leaves exit status 0: this is the
+      # loop's last statement, and a trailing false here would make build_file
+      # wrongly report the whole file FAILED.
       if [[ $mode == BOTH ]]; then cp -- "$jobname$suffix.pdf" "$outdir/" || exit; fi
-      # An `if' (not `&&') so a label-less view leaves exit status 0 -- this is
-      # the loop's (and so the subshell's) last statement, and a trailing false
-      # here would make build_file wrongly report the whole file FAILED.
-      if [[ -n $label ]]; then ship_label "$pdfdir" "$jobname$suffix.pdf" "$label"; fi
     done
+
+    # Copies requested via `%! copies: ...'. Last, so every PDF an entry can name
+    # has been built by now. Additive like the mirror, never a replacement, and
+    # each entry independent: one bad entry warns and the rest still ship.
+    # A held entry is ANNOUNCED rather than passed over in silence -- a pending
+    # embargo should be visible in the build you just ran, not a surprise weeks
+    # later.
+    while IFS='|' read -r csuffix clabel cdate; do
+      if copy_is_due "$cdate"; then
+        ship_label "$pdfdir" "$jobname$csuffix.pdf" "$clabel"
+      else
+        echo "    held: $jobname$csuffix.pdf -> $clabel (from $cdate)"
+      fi
+    done < <(copies_for_file "$base")
   )
 }
+
+# Ship one source's due copies without building anything. Runs in a subshell so
+# the cd stays local, exactly as build_file does -- resolve_label and
+# read_mirrordir both answer relative to $PWD.
+#   $1 source file (absolute)  $2 non-empty for a dry run
+release_file() {
+  local src=$1 dry=$2
+  (
+    cd "$(dirname -- "$src")" || exit 0
+    local base jobname mode pdfdir outdir outinfo
+    local csuffix clabel cdate pdf from to
+    base=${src##*/}
+    jobname=${base%.tex}
+
+    # Where the last build left this document's PDFs: the mirror in MOVE mode,
+    # else beside the source. `check' so a sweep never creates anything.
+    pdfdir="."
+    outinfo=$(read_mirrordir check)
+    if [[ -n $outinfo ]]; then
+      { read -r mode; read -r outdir; } <<<"$outinfo"
+      [[ $mode == BOTH ]] || pdfdir=$outdir
+    fi
+
+    while IFS='|' read -r csuffix clabel cdate; do
+      copy_is_due "$cdate" || continue
+      pdf="$jobname$csuffix.pdf"
+      from="$pdfdir/$pdf"
+      # Due, but there is nothing to send. Loud: this is the one failure the
+      # sweep cannot fix by itself, and silence would look like success.
+      if [[ ! -f $from ]]; then
+        echo "build-pdfs: $base: '$pdf' is due for '$clabel' but not built" >&2
+        continue
+      fi
+      to=$(resolve_label "$clabel") || continue
+      [[ -n $to ]] || continue
+      # Idempotent: only an absent or stale copy is worth sending. This is what
+      # lets the sweep run on every build and every ppush without churning
+      # OneDrive, and what makes an undated entry self-heal too.
+      [[ -f $to/$pdf && ! $from -nt $to/$pdf ]] && continue
+      if [[ -n $dry ]]; then
+        echo "    would send: $pdf -> $clabel"
+      elif cp -- "$from" "$to/"; then
+        echo "    released: $pdf -> $clabel"
+      else
+        echo "build-pdfs: could not copy $pdf to '$to' for label '$clabel'" >&2
+      fi
+    done < <(copies_for_file "$base")
+  )
+}
+
+# Sweep the whole repo for copies that have come due, and send them.
+#
+# This is the half that makes an embargo work. A build-time gate alone only
+# SUPPRESSES: nothing rebuilds a document that is finished, so a copy dated for
+# October would sit unsent for ever while looking automatic. Publication has to
+# be driven by something that runs on a clock, so the sweep covers the whole
+# repo rather than the file being built -- then any build releases everything
+# due, and someone with no ppush is at most one working session behind.
+#   $1 non-empty for a dry run
+release_sweep() {
+  local dry=${1:-} finfo f root src
+  finfo=$(find_mirrordir_file)
+  [[ -n $finfo ]] || return 0        # no .MIRRORDIR, so no labels to ship to
+  { read -r f; read -r root; } <<<"$finfo"
+
+  # ONE grep to find candidates rather than opening every .tex in the repo:
+  # a fork per file is not free on a machine with an EDR stack in the way (the
+  # reason list-repos walks in bash instead of calling find).
+  while IFS= read -r src; do
+    [[ -n $src ]] || continue
+    release_file "$src" "$dry"
+  done < <(grep -rl --include='*.tex' -e '^%![[:space:]]*copies[[:space:]]*:' "$root" 2>/dev/null)
+}
+
+# Flags, then files. A plain loop rather than getopts: the options are few and
+# long-only, and anything unrecognised must stay a filename so the existing
+# "every argument is a source" rule is undisturbed.
+release_only=""; dry=""; auto_release=1
+args=()
+for arg in "$@"; do
+  case $arg in
+    --release)    release_only=1 ;;
+    --dry-run)    dry=1 ;;
+    --no-release) auto_release=0 ;;
+    *)            args+=("$arg") ;;
+  esac
+done
+set -- ${args[@]+"${args[@]}"}
+
+# --release is the sweep on its own, for a caller with a clock (ppush) rather
+# than a document to build.
+if [[ -n $release_only ]]; then
+  release_sweep "$dry"
+  exit 0
+fi
 
 # Collect the files to build: explicit arguments, or every *.tex in cwd.
 if [[ $# -gt 0 ]]; then
@@ -609,6 +914,13 @@ for src in "${files[@]}"; do
     failed+=("$src")
   fi
 done
+
+# Release whatever has come due, regardless of what was built just now. Placed
+# before the failure summary deliberately: one document failing to compile is no
+# reason to hold another document's copy past its date.
+if (( auto_release )); then
+  release_sweep "$dry"
+fi
 
 if [[ ${#failed[@]} -gt 0 ]]; then
   echo "build-pdfs: ${#failed[@]} of ${#files[@]} failed: ${failed[*]}" >&2

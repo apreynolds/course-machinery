@@ -8,15 +8,26 @@ full header with \texttt{-{}-help}.
 
 \begin{manexsource}
 build-pdfs [FILE.tex ...]    # no args: every .tex in the cwd
+build-pdfs --release         # send due copies, build nothing
+build-pdfs --release --dry-run   # ...and report instead of sending
+build-pdfs --no-release FILE.tex # build without the end-of-run sweep
 \end{manexsource}
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 views & \texttt{\%!\ views: solutions, hints, projector, instructor} in
   the leading comment block; each produces \file{FILE-VIEW.pdf} by
-  injecting its layer definition(s). Unknown views warn and skip. A
-  \texttt{:LABEL} suffix also drops that view, flat, into the named
-  \file{.MIRRORDIR} destination (\env{default} = the base PDF).\\
+  injecting its layer definition(s). Unknown views warn and skip. Says
+  which PDFs a document has, never where they go.\\
+copies & \texttt{\%!\ copies: default-->TAs, instructor-->TA-dir(from
+  2026-10-01)} in the same block drops those PDFs, flat, into the named
+  \file{.MIRRORDIR} destinations, on top of the mirror. \env{default} is
+  the base PDF; any other name must also be on the views line.
+  \texttt{(from \emph{date})} holds a copy until that day (inclusive):
+  the build will not send it early, and the end-of-run sweep sends it
+  once the date arrives. Anything malformed warns and sends nothing. A
+  legacy \texttt{:LABEL} suffix on the views line warns and does not
+  copy.\\
 coverpage & \texttt{\%!\ coverpage: yes} in the same block also writes
   \file{FILE_COVERPAGE.pdf}, page~1 of the finished PDF on its own. From
   the base build only, never a view; same mirror handling as that PDF.
@@ -26,8 +37,8 @@ coverpage & \texttt{\%!\ coverpage: yes} in the same block also writes
 output & nearest ancestor \file{.MIRRORDIR} (bare base path $+$ optional
   \texttt{BOTH}) tree-mirrors the repo under the base $\to$ else local.
   Base must exist; missing $\to$ warn and fall back to local.
-  \texttt{LABEL: path} lines name flat per-view destinations (must exist).
-  \file{SAMPLE-MIRRORDIR} is the template.\\
+  \texttt{LABEL: path} lines are the address book the \texttt{copies} row
+  draws on (each must exist). \file{SAMPLE-MIRRORDIR} is the template.\\
 aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
   key}$\rangle$-$\langle$\emph{job}$\rangle$.\\
 \file{.latexmkrc} & installed in each source's directory from
