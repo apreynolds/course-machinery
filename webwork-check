@@ -5,9 +5,10 @@
 #
 # Two independent checks. With no flags, both run.
 #
-#   --paths   Every `source_file` line in every .def file under
-#             _assessments/webwork-assignments/ points at a problem that
-#             actually exists. This is the check that would have caught the
+#   --paths   Every `source_file` line in every .def file under the course's
+#             WEBWORK/ directory points at a problem that actually exists.
+#             (_assessments/webwork-assignments/ is the old name for it, still
+#             honoured.) This is the check that would have caught the
 #             Module 6 renumbering hazards, where a set referenced a problem
 #             upstream had quietly renumbered away. Finding NO .def files is
 #             itself a failure -- see the note above the check.
@@ -65,7 +66,21 @@ fi
 # which module number -- while a topic repo owns the problems themselves and is
 # meant to be reusable in another course that will write its own .def files.
 # Must come after REPO, which it reads.
-SETS_DIR=${WEBWORK_SETS_DIR:-$REPO/_assessments/webwork-assignments}
+#
+# WEBWORK/ is the current name. It replaced _assessments/webwork-assignments/
+# on 2026-09-10: math1003 organises its top-level directories by AUDIENCE
+# (SYLLABUS/, TAs/, ADMIN/, TESTS/), and a lowercase _assessments/ with a
+# nested second level fits neither that scheme nor the TESTS/ sibling it sits
+# beside. The old path is still honoured so a course that has not moved yet
+# keeps working -- math3503 is the one that has not. Drop the fallback once it
+# has, and this becomes a single line again.
+if [ -n "${WEBWORK_SETS_DIR:-}" ]; then
+    SETS_DIR=$WEBWORK_SETS_DIR
+elif [ -d "$REPO/WEBWORK" ]; then
+    SETS_DIR=$REPO/WEBWORK
+else
+    SETS_DIR=$REPO/_assessments/webwork-assignments
+fi
 
 # Fail loudly on a missing reference clone. Without this a moved or renamed
 # clone is silently indistinguishable from upstream having deleted every file
