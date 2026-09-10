@@ -9,12 +9,12 @@
 #
 #     \section{Webwork Tips}\label{sec:webwork_tips}
 #
-#     \import{../teaching/passages/}{webwork-tips.tex}
+#     \import{../PASSAGES/passages/}{webwork-tips.tex}
 #
 # The heading is a starting point, not an answer: the title is derived
 # mechanically and will want editing (`Well Written' for `Well-written'), and a
 # passage imported under an existing heading wants the \section line deleted.
 #
-# A PATH is required -- name the bank (`pick-passages teaching/passages'), never
+# A PATH is required -- name the bank (`pick-passages PASSAGES/passages'), never
 # a course root. There is no metadata block to filter on.
 exec "$(dirname -- "$0")/pick-meta" --kind passage --as pick-passages "$@"

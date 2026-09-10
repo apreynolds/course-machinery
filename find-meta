@@ -122,7 +122,7 @@ case $kind in
     # its only build-time reader. Every key it ever held had restated something:
     # `topics' the file name, `audience' the import graph, `depth' a check the
     # compiler already performs -- and finally `title' the file name again. What
-    # a passage bank needed was never a search; it was ../teaching/passages/
+    # a passage bank needed was never a search; it was the passage submodule itself
     # computed for you, which is --import --from, and a picker feed, which is
     # --tsv.
     noun="passage"; block_macro=""; emit_macro="import"
@@ -173,7 +173,7 @@ usage() {
     echo "Lists every .tex file under each PATH: a ${noun} bank has no metadata"
     echo "block, so the DIRECTORY IS THE BANK and each file in it is an entry."
     echo "PATH is REQUIRED for that reason -- give the bank itself"
-    echo "(\`$prog teaching/passages'), never a course root, or every lecture and"
+    echo "(\`$prog PASSAGES/passages'), never a course root, or every lecture and"
     echo "assessment in the course is reported as a ${noun}."
     echo
     echo "A ${noun}'s title and label come from its FILE NAME:"
@@ -362,7 +362,7 @@ fi
 if [[ ${#paths[@]} -eq 0 ]]; then
   if [[ -z $block_macro ]]; then
     printf '%s: a PATH is required -- name the %s bank itself\n' "$prog" "$noun" >&2
-    echo "       e.g. \`$prog teaching/passages'. The bank is a sibling submodule," >&2
+    echo "       e.g. \`$prog PASSAGES/passages'. The bank is a sibling submodule," >&2
     echo "       not a directory of the course, and there is no metadata block to" >&2
     echo "       tell its files from any other .tex -- so a bare run from a course" >&2
     echo "       root would report every lecture and assessment as a $noun." >&2

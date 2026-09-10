@@ -149,7 +149,7 @@ done
 # just its length.
 if [[ -z $inject_keys && $kind == passage && ${#feed_args[@]} -eq 0 ]]; then
   printf '%s: a PATH is required -- name the %s bank itself\n' "$prog" "$noun" >&2
-  echo "       e.g. \`$prog teaching/passages'. A $noun bank has no metadata" >&2
+  echo "       e.g. \`$prog PASSAGES/passages'. A $noun bank has no metadata" >&2
   echo "       block, so the directory IS the bank; run from a course root and" >&2
   echo "       every lecture and assessment would be offered as a $noun." >&2
   exit 2

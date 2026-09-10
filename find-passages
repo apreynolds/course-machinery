@@ -9,8 +9,8 @@
 # directory, worked out for you) and --tsv (the picker feed).
 #
 # A PATH IS REQUIRED, and that is enforced rather than advised. The bank is a
-# SIBLING SUBMODULE (teaching/passages/), not a directory inside the course, so
-# name it: `find-passages teaching/passages'. With no block to tell a passage
+# SIBLING SUBMODULE whose checkout name is the course's own choice, not a
+# directory inside the course, so name it: `find-passages PASSAGES/passages'.
 # from any other .tex, a bare run from a course root would report every lecture
 # and assessment as a passage -- so it is refused instead.
 #

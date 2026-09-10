@@ -169,17 +169,22 @@ longer exists) and \texttt{-{}-vocab} (there are no tags).
 
 \textbf{It also requires a \env{PATH}}, where the other two default to the
 current directory. The bank is a sibling submodule rather than a directory of
-the course, so name it --- \texttt{find-passages teaching/passages}. With no
+the course, so name it --- \texttt{find-passages PASSAGES/passages}. With no
 block to tell a passage from any other \file{.tex}, a bare run from a course
 root would report every lecture and assessment as a passage, so it is refused.
+
+Throughout this manual \texttt{PASSAGES} stands for whatever your course checks
+the passage submodule out as, and \texttt{SYLLABUS} for the directory you are
+importing into. Neither can be written concretely here: both are the course's
+own choice, and courses differ.
 
 What it emits is a heading and an import, the shape a call site writes by hand:
 
 \begin{manexsource}
-$ find-passages --import --from _admin teaching/passages
+$ find-passages --import --from SYLLABUS PASSAGES/passages
 \section{Webwork Tips}\label{sec:webwork_tips}
 
-\import{../teaching/passages/}{webwork-tips.tex}
+\import{../PASSAGES/passages/}{webwork-tips.tex}
 \end{manexsource}
 
 \noindent The label is exact; the title is mechanical and worth reading before
@@ -246,7 +251,7 @@ problem while writing an assessment drops in a ready line, needing only its
 \env{points}, and picking a passage drops in a heading and an import.
 
 Two things about picking \emph{passages} in particular. \textbf{Give the bank as
-the operand} --- \texttt{pick-passages teaching/passages} --- because a passage
+the operand} --- \texttt{pick-passages PASSAGES/passages} --- because a passage
 bank has no metadata block and a bare run is refused rather than offering every
 \file{.tex} in the course; \texttt{<Space>ig} does this for you. Second, the
 blocks come out separated by a blank line, which makes each one two paragraph

@@ -153,7 +153,7 @@ difficulty), and \texttt{-{}-tsv} columns are
 \subsection*{find-passages and pick-passages (the passage-bank twins)}
 
 The passage bank (section~\ref{sec:ch5-passages}) --- prose shared across
-courses, living in the \file{teaching/} submodule --- is the one bank with
+courses, living in a submodule of its own --- is the one bank with
 \emph{no metadata block}. The directory is the bank: every \file{.tex} in it is
 a passage, and its title and label are derived from its file name rather than
 read out of the file. \texttt{-{}-tsv} columns are therefore (path, title), and
@@ -167,11 +167,15 @@ to invert, so no \texttt{-{}-untagged}; and no tags, so no \texttt{-{}-vocab}.
 All four are refused with a message rather than accepted uselessly.
 
 It is also the one command that \emph{requires} an operand. The bank is a
-sibling submodule rather than a directory of the course, so name it
-(\texttt{find-passages teaching/passages}). Run bare from a course root, with
-no block to tell a passage from any other \file{.tex}, it would report every
-lecture and assessment as a passage --- so it refuses instead of defaulting to
-the current directory the way the other four do.
+sibling submodule rather than a directory of the course, so name it ---
+\texttt{find-passages PASSAGES/passages}, where \texttt{PASSAGES} stands for
+whatever your course checks that submodule out as. \emph{The manual cannot name
+it for you}: the checkout directory is the course's own choice, and courses
+differ (\file{teaching/} and \file{reusable-teaching-stuff/} are both in use).
+Run bare from a course root, with no block to tell a passage from any other
+\file{.tex}, it would report every lecture and assessment as a passage --- so it
+refuses instead of defaulting to the current directory the way the other four
+do.
 
 Under the hood all six commands are thin shims over one shared engine,
 \file{find-meta} (\file{find-problems}/\file{find-facts}/\file{find-passages})
