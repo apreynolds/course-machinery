@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # build-pdfs — compile course .tex files into PDFs with latexmk
-# Usage: build-pdfs [FILE.tex ...]
+# Usage: build-pdfs [--release [--dry-run]] [--no-release] [FILE.tex ...]
 #
 # With no arguments, compiles every *.tex file in the current directory.
 # Each source FILE.tex produces FILE.pdf.
+#
+#   --release     ship copies that have come due and build nothing (see
+#                 `%! copies:' below). What a scheduler or sync script calls.
+#   --dry-run     with --release, report what would be sent and send nothing.
+#   --no-release  skip the due-check that otherwise ends every run.
 #
 # Output mirror via a top-level .MIRRORDIR file: build-pdfs looks upward from the
 # build directory for a .MIRRORDIR (at the repo top level, found the way .latexmkrc
@@ -63,10 +68,24 @@
 # directory through a `LABEL: path' line in the governing .MIRRORDIR.
 #
 # `(from YYYY-MM-DD)' embargoes a copy: the destination is inert before that
-# date and an ordinary destination on and after it, so no rebuild before the
-# date can leak the PDF. A held copy is announced by the build that skipped it.
-# Dates are compared as text, which is why they must be ISO; it needs no date(1)
-# arithmetic and so behaves the same on macOS, Linux and Git for Windows.
+# date and an ordinary destination on and after it. Dates are compared as text,
+# which is why they must be ISO; it needs no date(1) arithmetic and so behaves
+# the same on macOS, Linux and Git for Windows.
+#
+# That one rule has TWO readers, and it needs both. The build consults it, so no
+# rebuild before the date can leak the PDF and a held copy is announced rather
+# than passed over. But a build-time gate alone would only ever suppress:
+# nothing rebuilds a document that is finished, so a copy dated for October
+# would sit unsent for ever while looking automatic. So every run also ends by
+# sweeping the whole repo for copies that have come due (--no-release opts out),
+# and --release does that sweep on its own for a caller with a clock. Building
+# ANY document therefore releases EVERY document that is due, which is what
+# makes this work for someone with no scheduler of their own.
+#
+# The sweep is idempotent -- it sends only what is absent or stale at the
+# destination -- and keeps no record of what it has done. Everything it needs is
+# re-derived from the sources each run, so deleting a `%! copies:' line is how
+# you cancel a standing order, and there is no state file to drift.
 #
 # Everything here fails CLOSED. A malformed entry, an out-of-range date, an
 # unknown view, a view that is not built, a label that does not resolve -- each
@@ -250,7 +269,16 @@ find_mirrordir_file() {
 # directory is created if missing, but the base itself must exist — if it doesn't,
 # warn and build locally rather than materialising a stray tree. Echoes two lines
 # (mode, dest) on success, or nothing when the caller should build locally.
+#
+# $1 is `create' (the default, for a build that is about to write there) or
+# `check' (for the --release sweep, which only reads). A sweep must never
+# materialise a directory tree: it runs over the whole repo, including sources
+# whose PDF was never built, and a stray mirror branch is exactly what the
+# base-must-exist rule above is there to prevent. In `check' mode a missing
+# mirror sub-directory simply means "nothing was built there", and the caller
+# falls back to the local build directory.
 read_mirrordir() {
+  local create=${1:-create}
   local finfo f root info base mode rel dest
   finfo=$(find_mirrordir_file)
   [[ -n $finfo ]] || return 0          # no .MIRRORDIR anywhere above -> build locally
@@ -267,8 +295,12 @@ read_mirrordir() {
   # Mirror the cwd's path relative to the .MIRRORDIR's directory under the base.
   rel=${PWD#"$root"}; rel=${rel#/}
   dest=$base${rel:+/$rel}
-  if ! mkdir -p -- "$dest"; then
-    echo "build-pdfs: could not create .MIRRORDIR path '$dest', building locally" >&2
+  if [[ $create == create ]]; then
+    if ! mkdir -p -- "$dest"; then
+      echo "build-pdfs: could not create .MIRRORDIR path '$dest', building locally" >&2
+      return 0
+    fi
+  elif [[ ! -d $dest ]]; then
     return 0
   fi
   printf '%s\n%s\n' "$mode" "$dest"
@@ -760,6 +792,101 @@ build_file() {
   )
 }
 
+# Ship one source's due copies without building anything. Runs in a subshell so
+# the cd stays local, exactly as build_file does -- resolve_label and
+# read_mirrordir both answer relative to $PWD.
+#   $1 source file (absolute)  $2 non-empty for a dry run
+release_file() {
+  local src=$1 dry=$2
+  (
+    cd "$(dirname -- "$src")" || exit 0
+    local base jobname mode pdfdir outdir outinfo
+    local csuffix clabel cdate pdf from to
+    base=${src##*/}
+    jobname=${base%.tex}
+
+    # Where the last build left this document's PDFs: the mirror in MOVE mode,
+    # else beside the source. `check' so a sweep never creates anything.
+    pdfdir="."
+    outinfo=$(read_mirrordir check)
+    if [[ -n $outinfo ]]; then
+      { read -r mode; read -r outdir; } <<<"$outinfo"
+      [[ $mode == BOTH ]] || pdfdir=$outdir
+    fi
+
+    while IFS='|' read -r csuffix clabel cdate; do
+      copy_is_due "$cdate" || continue
+      pdf="$jobname$csuffix.pdf"
+      from="$pdfdir/$pdf"
+      # Due, but there is nothing to send. Loud: this is the one failure the
+      # sweep cannot fix by itself, and silence would look like success.
+      if [[ ! -f $from ]]; then
+        echo "build-pdfs: $base: '$pdf' is due for '$clabel' but not built" >&2
+        continue
+      fi
+      to=$(resolve_label "$clabel") || continue
+      [[ -n $to ]] || continue
+      # Idempotent: only an absent or stale copy is worth sending. This is what
+      # lets the sweep run on every build and every ppush without churning
+      # OneDrive, and what makes an undated entry self-heal too.
+      [[ -f $to/$pdf && ! $from -nt $to/$pdf ]] && continue
+      if [[ -n $dry ]]; then
+        echo "    would send: $pdf -> $clabel"
+      elif cp -- "$from" "$to/"; then
+        echo "    released: $pdf -> $clabel"
+      else
+        echo "build-pdfs: could not copy $pdf to '$to' for label '$clabel'" >&2
+      fi
+    done < <(copies_for_file "$base")
+  )
+}
+
+# Sweep the whole repo for copies that have come due, and send them.
+#
+# This is the half that makes an embargo work. A build-time gate alone only
+# SUPPRESSES: nothing rebuilds a document that is finished, so a copy dated for
+# October would sit unsent for ever while looking automatic. Publication has to
+# be driven by something that runs on a clock, so the sweep covers the whole
+# repo rather than the file being built -- then any build releases everything
+# due, and someone with no ppush is at most one working session behind.
+#   $1 non-empty for a dry run
+release_sweep() {
+  local dry=${1:-} finfo f root src
+  finfo=$(find_mirrordir_file)
+  [[ -n $finfo ]] || return 0        # no .MIRRORDIR, so no labels to ship to
+  { read -r f; read -r root; } <<<"$finfo"
+
+  # ONE grep to find candidates rather than opening every .tex in the repo:
+  # a fork per file is not free on a machine with an EDR stack in the way (the
+  # reason list-repos walks in bash instead of calling find).
+  while IFS= read -r src; do
+    [[ -n $src ]] || continue
+    release_file "$src" "$dry"
+  done < <(grep -rl --include='*.tex' -e '^%![[:space:]]*copies[[:space:]]*:' "$root" 2>/dev/null)
+}
+
+# Flags, then files. A plain loop rather than getopts: the options are few and
+# long-only, and anything unrecognised must stay a filename so the existing
+# "every argument is a source" rule is undisturbed.
+release_only=""; dry=""; auto_release=1
+args=()
+for arg in "$@"; do
+  case $arg in
+    --release)    release_only=1 ;;
+    --dry-run)    dry=1 ;;
+    --no-release) auto_release=0 ;;
+    *)            args+=("$arg") ;;
+  esac
+done
+set -- ${args[@]+"${args[@]}"}
+
+# --release is the sweep on its own, for a caller with a clock (ppush) rather
+# than a document to build.
+if [[ -n $release_only ]]; then
+  release_sweep "$dry"
+  exit 0
+fi
+
 # Collect the files to build: explicit arguments, or every *.tex in cwd.
 if [[ $# -gt 0 ]]; then
   files=("$@")
@@ -787,6 +914,13 @@ for src in "${files[@]}"; do
     failed+=("$src")
   fi
 done
+
+# Release whatever has come due, regardless of what was built just now. Placed
+# before the failure summary deliberately: one document failing to compile is no
+# reason to hold another document's copy past its date.
+if (( auto_release )); then
+  release_sweep "$dry"
+fi
 
 if [[ ${#failed[@]} -gt 0 ]]; then
   echo "build-pdfs: ${#failed[@]} of ${#files[@]} failed: ${failed[*]}" >&2
