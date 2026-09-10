@@ -53,8 +53,16 @@ fi
 
 # Set definitions live at COURSE level, not inside a topic repo -- a .def file
 # is course curation, while the topic repo owns the problems. Kept in step with
-# webwork-check, which reads the same variable.
-SETS_DIR=${WEBWORK_SETS_DIR:-$REPO/_assessments/webwork-assignments}
+# webwork-check, which resolves this the same way: WEBWORK/ is the current name,
+# _assessments/webwork-assignments/ the pre-2026-09-10 one, honoured until every
+# course has moved. If you change this, change it there too.
+if [ -n "${WEBWORK_SETS_DIR:-}" ]; then
+    SETS_DIR=$WEBWORK_SETS_DIR
+elif [ -d "$REPO/WEBWORK" ]; then
+    SETS_DIR=$REPO/WEBWORK
+else
+    SETS_DIR=$REPO/_assessments/webwork-assignments
+fi
 
 OUTDIR="$REPO/_deploy"
 dryrun=0

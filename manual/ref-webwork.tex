@@ -1,0 +1,131 @@
+\section{webwork-check and webwork-deploy}\label{sec:ref-webwork}
+
+The two WeBWorK scripts moved into the machinery on 2026-09-06 and were not
+documented at the time. This entry is written retrospectively, so it records
+what they do \emph{now} rather than how they got here.
+
+Both take the course repo to be the \emph{parent} of the machinery directory,
+overridable with \env{COURSE\_ROOT}, and both refuse to run if that parent has
+no \file{.course-machinery/} in it.
+
+\subsection*{Where a course keeps its set definitions}
+
+A \file{.def} file is course curation --- which problems, in which order, for
+which course --- while a topic repo owns the problems themselves and is meant
+to be reusable by a second course that writes its own sets. So the
+\file{.def} files sit at \emph{course} level, and both scripts resolve that
+directory the same way:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\env{WEBWORK\_SETS\_DIR} & wins outright if set.\\
+\file{WEBWORK/} & the current name, used when the directory exists.\\
+\file{\_assessments/webwork-assignments/} & the pre-2026-09-10 name, still
+  honoured so a course that has not moved keeps working.\\
+\end{tabularx}
+\end{center}
+
+The rename followed the audience-first scheme the course roots already use
+(\file{SYLLABUS/}, \file{TAs/}, \file{ADMIN/}, \file{TESTS/}), which a
+lowercase \file{\_assessments/} with a nested second level fitted badly.
+\emph{The fallback is temporary}: drop it once every course has moved, and the
+lookup collapses back to one line. MATH1003 has moved; MATH3503 has not.
+
+\subsection*{webwork-check}
+
+\begin{manexsource}
+webwork-check [--paths] [--drift] [TOPIC ...]
+\end{manexsource}
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{-{}-paths} & every \texttt{source\_file} line in every \file{.def}
+  points at a problem that exists. Finding \emph{no} \file{.def} files is
+  itself a failure --- a check that cannot find its input must say so.\\
+\texttt{-{}-drift} & every \file{.pg} under a topic's \file{webwork/diffyqs/}
+  and \file{webwork/opl/} either matches the clone it was copied from, or
+  records the blob it was copied from and is checked against that.\\
+\end{tabularx}
+\end{center}
+
+With no flag, both run. A \env{TOPIC} operand narrows \texttt{-{}-drift} only:
+the sets live in one course-level directory and each names its own topic, so
+there is nothing per-topic for \texttt{-{}-paths} to select.
+
+\paragraph{The OPL has two problem trees.}
+This is the trap worth knowing. The Open Problem Library clone holds
+\file{OpenProblemLibrary/} (the curated library, served at
+\file{templates/Library/}) and \file{Contrib/} (contributed collections, served
+at \file{templates/Contrib/}) as \emph{siblings}. A single clone variable
+pointing at \file{OpenProblemLibrary/} therefore cannot see \file{Contrib/} at
+all, which reported every contributed problem as \texttt{GONE} and every
+\texttt{source\_file = Contrib/\ldots} line as \texttt{UNKNOWN SOURCE}. Fixed
+2026-09-10, when MATH1003 began harvesting the CCCS collection.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\env{OPL\_ROOT} & the clone root; moves the two below together.\\
+\env{OPL\_CLONE} & \file{OpenProblemLibrary/} within it. Unchanged in meaning,
+  so existing overrides still work.\\
+\env{OPL\_CONTRIB} & \file{Contrib/} within it.\\
+\env{DIFFYQS\_CLONE} & Lebl's \file{diffyqs-webwork} clone.\\
+\end{tabularx}
+\end{center}
+
+A copy kept under \file{opl/Contrib/} mirrors \file{Contrib/};
+anything else under \file{opl/} mirrors \file{OpenProblemLibrary/}.
+Post-flip \file{.def} paths need no special case either way, being
+topic-rooted already.
+
+\paragraph{Drift outcomes.}
+\texttt{DIFFERS} (differs from upstream with no blob recorded --- unexpected),
+\texttt{MOVED} (upstream changed a file we deliberately modified --- news, not
+failure), \texttt{GONE} (upstream deleted or renamed it), \texttt{AHEAD}
+(upstream has problems in these sections that we do not, reported as a count).
+
+An edited problem \emph{stays where it is} and records its origin in a header
+line:
+
+\begin{manexsource}
+# UPSTREAM-BLOB: 02b6a97499f4a05af144116dacfc0835c9bcc0ec
+\end{manexsource}
+
+That separates the two questions drift bundles together --- ``have I edited
+this?'' and ``has upstream moved?'' --- and keeps the second answerable on
+exactly the files where an upstream fix is most expensive to absorb by hand.
+Filing edited problems away under \file{local/} would give that up;
+\file{local/} is for problems that are ours outright.
+
+\subsection*{webwork-deploy}
+
+\begin{manexsource}
+webwork-deploy [-o DIR] [-n] [TOPIC ...]
+\end{manexsource}
+
+Builds one uploadable \file{.tgz} per topic, to be unpacked inside the
+course's \file{templates/} on the server, producing a topic-rooted tree:
+
+\begin{manexsource}
+templates/<topic>/opl/Contrib/CCCS/CollegeAlgebra/3.1/x.pg
+templates/<topic>/local/...
+templates/<topic>/LICENSE.md
+\end{manexsource}
+
+The \file{.def} files go in at the top level of \file{templates/} separately.
+The tarball root is named for the \emph{topic}, not the repo directory, which
+is why it stages into a temporary directory rather than tarring in place.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{-o DIR} & write tarballs here (default \file{./\_deploy}, gitignored).\\
+\texttt{-n} & dry run: report what would go in, build nothing.\\
+\end{tabularx}
+\end{center}
+
+\emph{Upload the tarball before importing the sets.} Post-flip paths point
+inside \file{templates/<topic>/}, so importing first leaves every problem in
+the set unresolvable.
+
+\texttt{webwork-deploy} runs \texttt{webwork-check} first and refuses to build
+if it fails --- shipping a set whose paths do not resolve is the failure mode
+this layout exists to prevent.
