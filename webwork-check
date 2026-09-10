@@ -24,8 +24,9 @@
 # It does NOT restrict --paths: the sets live in one course-level directory and
 # each names its own topic, so there is nothing per-topic to narrow.
 #
-# WEBWORK_SETS_DIR overrides where the .def files are looked for; DIFFYQS_CLONE
-# and OPL_CLONE override the reference clones.
+# WEBWORK_SETS_DIR overrides where the .def files are looked for; DIFFYQS_CLONE,
+# OPL_CLONE and OPL_CONTRIB override the reference clones, and OPL_ROOT moves
+# the last two together.
 #
 # Expected steady state: paths all resolve, drift reports nothing but counts.
 # A file you have edited STAYS where it is and records an UPSTREAM-BLOB line;
@@ -37,8 +38,21 @@
 set -uo pipefail
 
 # Reference clones. These are read-only upstreams, never edited in place.
+#
+# The OPL clone has TWO problem trees side by side, and the distinction matters
+# because a course can draw on either:
+#
+#   OpenProblemLibrary/  the curated library, served at templates/Library/
+#   Contrib/             contributed collections, served at templates/Contrib/
+#
+# They are siblings, so a single OPL_CLONE pointing at OpenProblemLibrary/
+# cannot see Contrib/ at all -- which is why every Contrib problem used to be
+# reported GONE, and every `source_file = Contrib/...' line as UNKNOWN SOURCE.
+# OPL_CLONE keeps its old meaning so existing overrides still work.
 DIFFYQS_CLONE=${DIFFYQS_CLONE:-$HOME/2teach/diffyqs-webwork-clone}
-OPL_CLONE=${OPL_CLONE:-$HOME/2teach/webwork-open-problem-library-clone/OpenProblemLibrary}
+OPL_ROOT=${OPL_ROOT:-$HOME/2teach/webwork-open-problem-library-clone}
+OPL_CLONE=${OPL_CLONE:-$OPL_ROOT/OpenProblemLibrary}
+OPL_CONTRIB=${OPL_CONTRIB:-$OPL_ROOT/Contrib}
 
 # This script lives in the MACHINERY, which is mounted at
 # <course>/.course-machinery/ -- so the course repo is its parent, not its own
@@ -87,10 +101,11 @@ fi
 # it holds, and the run buries the real cause under a screen of GONE lines --
 # which is exactly what happened when the OPL clone was renamed to
 # -clone (2026-09-02).
-for _c in "$DIFFYQS_CLONE" "$OPL_CLONE"; do
+for _c in "$DIFFYQS_CLONE" "$OPL_CLONE" "$OPL_CONTRIB"; do
     if [ ! -d "$_c" ]; then
         echo "webwork-check: reference clone not found: $_c" >&2
-        echo "  Set DIFFYQS_CLONE / OPL_CLONE, or fix the defaults at the top" >&2
+        echo "  Set DIFFYQS_CLONE / OPL_ROOT / OPL_CLONE / OPL_CONTRIB, or fix" >&2
+        echo "  the defaults at the top" >&2
         echo "  of this script if a clone has moved." >&2
         exit 2
     fi
@@ -131,16 +146,21 @@ failed=0
 # ---------------------------------------------------------------------------
 # --paths
 #
-# A source_file line can point at one of four places, and the script has to
-# understand all four because the sets are mid-migration: they currently
+# A source_file line can point at one of several places, and the script has to
+# understand all of them because the sets are mid-migration: they currently
 # reference the upstream trees on the server, and will later reference this
 # repo's own trees. Both forms must verify.
 #
 #   diffyqs-webwork/sec_2.1/prob01.pg   → the diffyqs clone   (pre-flip)
 #   Library/Rochester/.../ur_de_1_1.pg  → the OPL clone       (pre-flip)
+#   Contrib/CCCS/CollegeAlgebra/3.1/x.pg → the OPL's Contrib/ (pre-flip)
 #   <topic>/diffyqs/sec_2.1/prob01.pg   → this repo           (post-flip)
 #   <topic>/opl/Rochester/.../x.pg      → this repo           (post-flip)
+#   <topic>/opl/Contrib/CCCS/.../x.pg   → this repo           (post-flip)
 #   <topic>/local/whatever.pg           → this repo           (post-flip)
+#
+# The post-flip Contrib form needs no case of its own: it is topic-rooted, so
+# */opl/* already matches it and resolves inside this repo.
 # ---------------------------------------------------------------------------
 check_paths() {
     local def base rel src files=0 bad=0 dn dbad
@@ -156,6 +176,7 @@ check_paths() {
             case "$rel" in
                 diffyqs-webwork/*) src="$DIFFYQS_CLONE/${rel#diffyqs-webwork/}" ;;
                 Library/*)         src="$OPL_CLONE/${rel#Library/}" ;;
+                Contrib/*)         src="$OPL_CONTRIB/${rel#Contrib/}" ;;
                 */diffyqs/*|*/opl/*|*/local/*)
                     # Topic-rooted: strip the leading topic name, which is the
                     # server-side directory, and look inside this repo.
@@ -238,7 +259,7 @@ recorded_blob() {
 }
 
 check_drift() {
-    local topic=$1 kind clone dir f rel blob upstream n=0 differs=0 gone=0 ahead=0 moved=0 kept=0
+    local topic=$1 kind clone dir f rel up blob upstream n=0 differs=0 gone=0 ahead=0 moved=0 kept=0
 
     for kind in diffyqs opl; do
         dir="$REPO/$topic/webwork/$kind"
@@ -251,7 +272,18 @@ check_drift() {
         while IFS= read -r f; do
             rel=${f#"$dir/"}
             n=$((n + 1))
-            if [ ! -f "$clone/$rel" ]; then
+
+            # Which upstream tree this file mirrors. Everything under opl/ maps
+            # into the OPL clone, but the clone has two roots -- Contrib/ is a
+            # SIBLING of OpenProblemLibrary/, not inside it -- so opl/Contrib/x
+            # must resolve against Contrib/, not against OpenProblemLibrary/.
+            # Getting this wrong reports every contributed problem as GONE.
+            case "$kind/$rel" in
+                opl/Contrib/*) up="$OPL_CONTRIB/${rel#Contrib/}" ;;
+                *)             up="$clone/$rel" ;;
+            esac
+
+            if [ ! -f "$up" ]; then
                 echo "  - GONE     $kind/$rel"
                 gone=$((gone + 1))
                 continue
@@ -262,13 +294,13 @@ check_drift() {
                 # Deliberately modified. Ask only whether upstream has moved
                 # since we copied it; our own divergence is the point.
                 kept=$((kept + 1))
-                upstream=$(git hash-object "$clone/$rel")
+                upstream=$(git hash-object "$up")
                 if [ "$upstream" != "$blob" ]; then
                     echo "  ! MOVED    $kind/$rel  (upstream changed since we forked it)"
-                    echo "             diff $f $clone/$rel"
+                    echo "             diff $f $up"
                     moved=$((moved + 1))
                 fi
-            elif ! cmp -s "$f" "$clone/$rel"; then
+            elif ! cmp -s "$f" "$up"; then
                 echo "  ~ DIFFERS  $kind/$rel  (no UPSTREAM-BLOB recorded)"
                 differs=$((differs + 1))
             fi
