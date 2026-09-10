@@ -192,6 +192,16 @@ widens what a bare name can resolve to. When a file's readership changes,
 it changes tier: that is a move, not a rewrite, since nothing anywhere
 names it by path.
 
+\paragraph{Tier two is searched before tier one.} \file{latexmkrc-shared}
+adds \file{.course-machinery/} first and \file{.course-machinery-local/}
+second, but \texttt{latexmk}'s \texttt{ensure\_path} \emph{prepends}, so the
+second one ends up in front. A course can therefore shadow a vendored
+machinery file with a same-named copy of its own, which is how a course
+overrides one package without forking this submodule. The cost is that a
+basename colliding by accident resolves to the local copy silently, for that
+course only --- so treat the names in \file{.course-machinery-local/} as
+sharing a namespace with everything vendored here.
+
 \subsubsection*{A passage bank is content, not a tier}
 
 The rule above answers a question that otherwise recurs every time something

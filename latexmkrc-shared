@@ -19,11 +19,21 @@
 # Only the first two are search paths, and that is the whole content of this
 # file. Tier three needs no help: TeX looks in the cwd, and we are already there.
 #
-# .course-machinery/ goes on FIRST so its vendored .sty/.cls/.tex win over any
-# same-named copies elsewhere; trailing // is recursive. .course-machinery-local/
-# is the FOLDER, not the repo root, so only what is deposited there is exposed;
-# no trailing //, it is flat. Its usual tenant is the text layer, found BY NAME --
-# which is what frees a lecture to sit at any depth, no ../.. baked into a master.
+# .course-machinery/ is added first and gets a trailing // so every file under it
+# is findable. .course-machinery-local/ is the FOLDER, not the repo root, so only
+# what is deposited there is exposed; no trailing //, it is flat. Its usual tenant
+# is the text layer, found BY NAME -- which is what frees a lecture to sit at any
+# depth, no ../.. baked into a master.
+#
+# THE LOCAL TIER IS SEARCHED FIRST, which is the opposite of the order these two
+# lines are written in. latexmk's ensure_path PREPENDS (latexmk.pl, `Ensure the
+# values are in it, prepending them if not'), so the SECOND call ends up in front.
+# A course can therefore shadow a vendored machinery file with a same-named copy
+# of its own. That is deliberate and occasionally useful -- it is how a course
+# overrides one package without forking the submodule -- but it is the reason a
+# basename must never collide here by accident: nothing warns, and the local copy
+# simply wins, for that course only. Verified by putting the same .sty in both
+# directories and seeing which one a document got.
 #
 # TWO TESTS find the machinery: in a course repo it is an ancestor's
 # .course-machinery/; inside the machinery (its manual/) it IS an ancestor. Each
