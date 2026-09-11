@@ -172,7 +172,16 @@ for topic in "${topics[@]}"; do
 
     # Stage under a directory named for the topic so the tarball unpacks to
     # templates/<topic>/ rather than templates/webwork/.
-    stage=$(mktemp -d)
+    # A failed mktemp used to sail straight past: $stage became empty, every
+    # cp wrote to "/$topic" and failed, and the script still printed a normal
+    # "N problems -> tarball" line for a tarball it had not written. That is
+    # precisely the "shipped something broken" outcome this script exists to
+    # prevent, so it is a hard stop.
+    if ! stage=$(mktemp -d); then
+        echo "webwork-deploy: could not create a staging directory." >&2
+        echo "                TMPDIR=${TMPDIR:-unset}" >&2
+        exit 1
+    fi
     mkdir -p "$stage/$topic"
 
     for part in diffyqs opl local; do
@@ -193,7 +202,11 @@ for topic in "${topics[@]}"; do
     rm -f "$tarball"
     # --exclude '.*' keeps .DS_Store and friends out. No --sort=name here:
     # that is a GNU tar option and this runs on BSD tar under macOS.
-    ( cd "$stage" && GZIP=-9 tar czf "$tarball" --exclude '.*' "$topic" )
+    if ! ( cd "$stage" && GZIP=-9 tar czf "$tarball" --exclude '.*' "$topic" ); then
+        echo "webwork-deploy: tar failed; $tarball was not written." >&2
+        rm -rf "$stage"
+        exit 1
+    fi
     rm -rf "$stage"
 
     printf '%-24s %3s problems, %s sets  →  %s (%s)\n' \
