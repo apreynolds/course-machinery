@@ -162,6 +162,17 @@ def scaffold(pg, seed):
               "% Carried over from the .pg, where it was written by Claude (Opus 5).\n"
               if "CLAUDE-GENERATED SOLUTION" in src else "")
 
+    # COURSE-DIFFICULTY is ours and now exists on tagged problems, so transcribe
+    # it rather than asking for it again. The vocabulary is basic / moderate /
+    # challenging -- NOT "advanced", which this scaffold used to suggest. The
+    # distinction is deliberate (WEBWORK/README.md section 9): "advanced" implies
+    # both skippable and later material, and neither is true of a problem that is
+    # merely hard to start.
+    m = re.search(r'^#\s*COURSE-DIFFICULTY:\s*(basic|moderate|challenging)\s*$',
+                  src, re.M)
+    difficulty = (f"{{{m.group(1)}}},"
+                  if m else "{TODO},   % TODO  basic / moderate / challenging")
+
     author = tag(src, "Author")
     inst = tag(src, "Institution")
     attrib = f"% Upstream author: {author}" + (f" ({inst})" if inst else "") + "\n" if author else ""
@@ -169,7 +180,7 @@ def scaffold(pg, seed):
     return f"""\\ProblemMeta{{
   topics     = {{TODO}},   % TODO
   type       = {{TODO}},   % TODO  routine / multi-part / conceptual / applied ...
-  difficulty = {{TODO}},   % TODO  basic / moderate / advanced
+  difficulty = {difficulty}
   source     = {{{source}}},
   number     = {{{number}}},
 }}
