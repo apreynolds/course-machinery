@@ -91,7 +91,11 @@ fi
 # Refuse to ship a broken tree.
 if [ "$dryrun" -eq 0 ]; then
     echo "Verifying before build..."
-    if ! "$REPO/webwork-check" "${topics[@]}" > /dev/null; then
+    # $MACHINERY, not $REPO: webwork-check moved in here on 2026-09-06 and
+    # this call was left behind pointing at the course root, so every real
+    # build died on "No such file or directory". The dry run never noticed,
+    # because it does not verify.
+    if ! "$MACHINERY/webwork-check" "${topics[@]}" > /dev/null; then
         echo "webwork-deploy: webwork-check failed — run it to see what, and fix" >&2
         echo "                before building. Nothing was written." >&2
         exit 1

@@ -130,9 +130,17 @@ templates/<topic>/local/...
 templates/<topic>/LICENSE.md
 \end{manexsource}
 
-The \file{.def} files go in at the top level of \file{templates/} separately.
+The \file{.def} files go in at the top level of \file{templates/}
+separately, and are deliberately \emph{not} in the tarball: the import scan
+searches \file{templates/} four levels deep, so a copy shipped inside the
+topic tree as well would put two identically named set definitions in front
+of it. The script shipped them until 2026-09-11, against what this page
+already said.
+
 The tarball root is named for the \emph{topic}, not the repo directory, which
 is why it stages into a temporary directory rather than tarring in place.
+It still \emph{reports} how many \file{.def} files belong to the topic, so the
+count of what to upload separately is not left to memory.
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
