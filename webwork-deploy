@@ -144,6 +144,16 @@ defs_for_topic() {
     done
 }
 
+# Make OUTDIR absolute before anything uses it. The tarball is written from
+# inside the staging directory -- that is how the archive gets a topic-rooted
+# path -- so a RELATIVE -o would be resolved against the staging directory and
+# fail to open. The default is absolute already, which is why "-o WEBWORK"
+# was the first invocation ever to hit this.
+case "$OUTDIR" in
+    /*) ;;
+    *)  OUTDIR="$PWD/$OUTDIR" ;;
+esac
+
 mkdir -p "$OUTDIR"
 
 for topic in "${topics[@]}"; do
