@@ -156,11 +156,15 @@ failed=0
 #   Contrib/CCCS/CollegeAlgebra/3.1/x.pg → the OPL's Contrib/ (pre-flip)
 #   <topic>/diffyqs/sec_2.1/prob01.pg   → this repo           (post-flip)
 #   <topic>/opl/Rochester/.../x.pg      → this repo           (post-flip)
-#   <topic>/opl/Contrib/CCCS/.../x.pg   → this repo           (post-flip)
+#   <topic>/contrib/CCCS/.../x.pg       → this repo           (post-flip)
 #   <topic>/local/whatever.pg           → this repo           (post-flip)
 #
-# The post-flip Contrib form needs no case of its own: it is topic-rooted, so
-# */opl/* already matches it and resolves inside this repo.
+# The four post-flip forms all resolve the same way, by stripping the topic
+# name. What the second level says is WHERE THE PROBLEM CAME FROM, and the
+# names match the upstream trees one for one: opl/ is OpenProblemLibrary/,
+# contrib/ is its SIBLING Contrib/, diffyqs/ is Lebl's repo, local/ is ours.
+# Contrib used to sit under opl/, which read as "the Contrib part of the OPL"
+# -- a tree that does not exist. Moved to a sibling 2026-09-11.
 # ---------------------------------------------------------------------------
 check_paths() {
     local def base rel src files=0 bad=0 dn dbad
@@ -177,7 +181,7 @@ check_paths() {
                 diffyqs-webwork/*) src="$DIFFYQS_CLONE/${rel#diffyqs-webwork/}" ;;
                 Library/*)         src="$OPL_CLONE/${rel#Library/}" ;;
                 Contrib/*)         src="$OPL_CONTRIB/${rel#Contrib/}" ;;
-                */diffyqs/*|*/opl/*|*/local/*)
+                */diffyqs/*|*/opl/*|*/contrib/*|*/local/*)
                     # Topic-rooted: strip the leading topic name, which is the
                     # server-side directory, and look inside this repo.
                     src="$REPO/${rel%%/*}/webwork/${rel#*/}" ;;
@@ -261,27 +265,24 @@ recorded_blob() {
 check_drift() {
     local topic=$1 kind clone dir f rel up blob upstream n=0 differs=0 gone=0 ahead=0 moved=0 kept=0
 
-    for kind in diffyqs opl; do
+    for kind in diffyqs opl contrib; do
         dir="$REPO/$topic/webwork/$kind"
         [ -d "$dir" ] || continue
         case "$kind" in
             diffyqs) clone=$DIFFYQS_CLONE ;;
             opl)     clone=$OPL_CLONE ;;
+            contrib) clone=$OPL_CONTRIB ;;
         esac
 
         while IFS= read -r f; do
             rel=${f#"$dir/"}
             n=$((n + 1))
 
-            # Which upstream tree this file mirrors. Everything under opl/ maps
-            # into the OPL clone, but the clone has two roots -- Contrib/ is a
-            # SIBLING of OpenProblemLibrary/, not inside it -- so opl/Contrib/x
-            # must resolve against Contrib/, not against OpenProblemLibrary/.
-            # Getting this wrong reports every contributed problem as GONE.
-            case "$kind/$rel" in
-                opl/Contrib/*) up="$OPL_CONTRIB/${rel#Contrib/}" ;;
-                *)             up="$clone/$rel" ;;
-            esac
+            # Each kind names its own clone root, chosen above, so the path
+            # within it is just the relative path. This used to need a special
+            # case, because Contrib/ lived under opl/ while being a SIBLING of
+            # OpenProblemLibrary/ upstream; the sibling layout removes it.
+            up="$clone/$rel"
 
             if [ ! -f "$up" ]; then
                 echo "  - GONE     $kind/$rel"
