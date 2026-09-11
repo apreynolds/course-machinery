@@ -115,13 +115,35 @@ def tag(text, key):
     return m.group(1).strip() if m else None
 
 
+# Warnings a perfectly good problem emits locally because webwork2 is not here
+# to set them. WEBWORK/README.md section 7 lists these as local-render
+# artefacts, not breakage. pr-pg-render exits non-zero on any warning, which is
+# right for a gate and wrong for a scaffold: three of MATH1003's OS1.1 problems
+# load PeriodicRerandomization.pl and so could not be converted at all
+# otherwise. webwork-check is the gate; this is not.
+SERVER_ARTEFACTS = (
+    "numOfAttempts",
+    "PeriodicRerandomization.pl",
+    "formattedDueDate",
+    "studentName",
+    "setNumber",
+)
+
+
 def render(pg, seed):
     """The problem's TeX at one seed, statement and solution together."""
     out = subprocess.run(
         ["pr-pg-render", "--tex", "--solution", "--seed", str(seed), str(pg)],
         capture_output=True, text=True)
     if out.returncode != 0:
-        sys.exit(f"pg-to-latex: pr-pg-render failed on {pg}\n{out.stderr}{out.stdout}")
+        noise = out.stderr + out.stdout
+        complaints = [ln for ln in noise.splitlines()
+                      if ("WARNING" in ln or "uninitialized" in ln or "ERROR" in ln)
+                      and not any(a in ln for a in SERVER_ARTEFACTS)]
+        if complaints:
+            sys.exit(f"pg-to-latex: pr-pg-render failed on {pg}\n{noise}")
+        print(f"pg-to-latex: {pg.name} warns only about server-supplied values "
+              f"that are empty locally; scaffolding anyway.", file=sys.stderr)
     return out.stdout
 
 
@@ -162,6 +184,17 @@ def scaffold(pg, seed):
               "% Carried over from the .pg, where it was written by Claude (Opus 5).\n"
               if "CLAUDE-GENERATED SOLUTION" in src else "")
 
+    # COURSE-DIFFICULTY is ours and now exists on tagged problems, so transcribe
+    # it rather than asking for it again. The vocabulary is basic / moderate /
+    # challenging -- NOT "advanced", which this scaffold used to suggest. The
+    # distinction is deliberate (WEBWORK/README.md section 9): "advanced" implies
+    # both skippable and later material, and neither is true of a problem that is
+    # merely hard to start.
+    m = re.search(r'^#\s*COURSE-DIFFICULTY:\s*(basic|moderate|challenging)\s*$',
+                  src, re.M)
+    difficulty = (f"{{{m.group(1)}}},"
+                  if m else "{TODO},   % TODO  basic / moderate / challenging")
+
     author = tag(src, "Author")
     inst = tag(src, "Institution")
     attrib = f"% Upstream author: {author}" + (f" ({inst})" if inst else "") + "\n" if author else ""
@@ -169,7 +202,7 @@ def scaffold(pg, seed):
     return f"""\\ProblemMeta{{
   topics     = {{TODO}},   % TODO
   type       = {{TODO}},   % TODO  routine / multi-part / conceptual / applied ...
-  difficulty = {{TODO}},   % TODO  basic / moderate / advanced
+  difficulty = {difficulty}
   source     = {{{source}}},
   number     = {{{number}}},
 }}
