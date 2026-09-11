@@ -12,13 +12,23 @@
 #
 #     templates/<topic>/diffyqs/sec_2.1/prob01.pg
 #     templates/<topic>/opl/Rochester/setDiffEQ1/ur_de_1_1.pg
+#     templates/<topic>/contrib/CCCS/CollegeAlgebra/3.1/x.pg
 #     templates/<topic>/local/...
-#     templates/<topic>/setM1_1_Homogeneous.def
 #     templates/<topic>/LICENSE.md
 #
-# then import the sets from those .def files. The tree is TOPIC-rooted and
-# carries no course name, so a second course reusing this topic needs only its
-# own .def files, not a second copy of the problems.
+# The second level says where each problem CAME FROM, and the names match the
+# upstream trees one for one -- opl/ is OpenProblemLibrary/, contrib/ is its
+# SIBLING Contrib/, local/ is ours outright.
+#
+# The .def files are NOT in the tarball; they are uploaded to the top level of
+# templates/ separately, which is what the manual has always said and what the
+# script did not do until 2026-09-11. Shipping a copy inside the topic tree as
+# well put two identically named .def files in front of the import scan, which
+# searches templates/ four levels deep.
+#
+# The tree is TOPIC-rooted and carries no course name, so a second course
+# reusing this topic needs only its own .def files, not a second copy of the
+# problems.
 #
 # The tarball root is named for the topic, not for the repo directory, which is
 # why this stages into a temporary directory rather than tarring in place.
@@ -91,7 +101,11 @@ fi
 # Refuse to ship a broken tree.
 if [ "$dryrun" -eq 0 ]; then
     echo "Verifying before build..."
-    if ! "$REPO/webwork-check" "${topics[@]}" > /dev/null; then
+    # $MACHINERY, not $REPO: webwork-check moved in here on 2026-09-06 and
+    # this call was left behind pointing at the course root, so every real
+    # build died on "No such file or directory". The dry run never noticed,
+    # because it does not verify.
+    if ! "$MACHINERY/webwork-check" "${topics[@]}" > /dev/null; then
         echo "webwork-deploy: webwork-check failed — run it to see what, and fix" >&2
         echo "                before building. Nothing was written." >&2
         exit 1
@@ -123,7 +137,7 @@ defs_for_topic() {
         [ -e "$def" ] || continue
         owners=$(grep -h '^source_file' "$def" \
                  | sed 's|.*= *||' \
-                 | grep -E '^[^/]+/(diffyqs|opl|local)/' \
+                 | grep -E '^[^/]+/(diffyqs|opl|contrib|local)/' \
                  | cut -d/ -f1 | sort -u)
         if [ -z "$owners" ]; then
             echo "webwork-deploy: $(basename "$def") names no topic (pre-flip paths?)" \
@@ -139,6 +153,16 @@ defs_for_topic() {
         [ "$owners" = "$want" ] && echo "$def"
     done
 }
+
+# Make OUTDIR absolute before anything uses it. The tarball is written from
+# inside the staging directory -- that is how the archive gets a topic-rooted
+# path -- so a RELATIVE -o would be resolved against the staging directory and
+# fail to open. The default is absolute already, which is why "-o WEBWORK"
+# was the first invocation ever to hit this.
+case "$OUTDIR" in
+    /*) ;;
+    *)  OUTDIR="$PWD/$OUTDIR" ;;
+esac
 
 mkdir -p "$OUTDIR"
 
@@ -161,20 +185,28 @@ for topic in "${topics[@]}"; do
     defs=${#topic_defs[@]}
 
     if [ "$dryrun" -eq 1 ]; then
-        printf '%-24s would package %3s problems, %s set definitions\n' \
+        printf '%-24s would package %3s problems (%s .def to upload separately)\n' \
                "$topic" "$pg" "$defs"
         continue
     fi
 
     # Stage under a directory named for the topic so the tarball unpacks to
     # templates/<topic>/ rather than templates/webwork/.
-    stage=$(mktemp -d)
+    # A failed mktemp used to sail straight past: $stage became empty, every
+    # cp wrote to "/$topic" and failed, and the script still printed a normal
+    # "N problems -> tarball" line for a tarball it had not written. That is
+    # precisely the "shipped something broken" outcome this script exists to
+    # prevent, so it is a hard stop.
+    if ! stage=$(mktemp -d); then
+        echo "webwork-deploy: could not create a staging directory." >&2
+        echo "                TMPDIR=${TMPDIR:-unset}" >&2
+        exit 1
+    fi
     mkdir -p "$stage/$topic"
 
-    for part in diffyqs opl local; do
+    for part in diffyqs opl contrib local; do
         [ -d "$src/$part" ] && cp -R "$src/$part" "$stage/$topic/"
     done
-    [ "$defs" -gt 0 ] && cp "${topic_defs[@]}" "$stage/$topic/"
 
     # LICENSE.md travels with the problems. These are CC BY-NC-SA files being
     # redistributed onto another machine, and while each .pg keeps its own
@@ -189,10 +221,14 @@ for topic in "${topics[@]}"; do
     rm -f "$tarball"
     # --exclude '.*' keeps .DS_Store and friends out. No --sort=name here:
     # that is a GNU tar option and this runs on BSD tar under macOS.
-    ( cd "$stage" && GZIP=-9 tar czf "$tarball" --exclude '.*' "$topic" )
+    if ! ( cd "$stage" && GZIP=-9 tar czf "$tarball" --exclude '.*' "$topic" ); then
+        echo "webwork-deploy: tar failed; $tarball was not written." >&2
+        rm -rf "$stage"
+        exit 1
+    fi
     rm -rf "$stage"
 
-    printf '%-24s %3s problems, %s sets  →  %s (%s)\n' \
-           "$topic" "$pg" "$defs" "${tarball#"$REPO"/}" \
-           "$(du -h "$tarball" | cut -f1 | tr -d ' ')"
+    printf '%-24s %3s problems  →  %s (%s); %s .def to upload separately\n' \
+           "$topic" "$pg" "${tarball#"$REPO"/}" \
+           "$(du -h "$tarball" | cut -f1 | tr -d ' ')" "$defs"
 done

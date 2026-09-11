@@ -72,8 +72,26 @@ all, which reported every contributed problem as \texttt{GONE} and every
 \end{tabularx}
 \end{center}
 
-A copy kept under \file{opl/Contrib/} mirrors \file{Contrib/};
-anything else under \file{opl/} mirrors \file{OpenProblemLibrary/}.
+\paragraph{Provenance is the second path level.}
+A topic's \file{webwork/} has one subdirectory per upstream, named for it:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\file{opl/} & from \file{OpenProblemLibrary/}, the curated tree.\\
+\file{contrib/} & from \file{Contrib/}, its \emph{sibling} upstream --- not
+  part of the OPL proper, and not reviewed.\\
+\file{diffyqs/} & from Lebl's \file{diffyqs-webwork}.\\
+\file{local/} & ours outright.\\
+\end{tabularx}
+\end{center}
+
+Until 2026-09-11 the contributed copies sat under \file{opl/Contrib/}, which
+reads as ``the Contrib part of the OPL'' --- a tree that does not exist ---
+and which flattened away \file{OpenProblemLibrary/} for one upstream while
+keeping \file{Contrib/} for the other. The sibling layout matches the clone,
+matches \file{templates/Library} and \file{templates/Contrib} on the server,
+and removes the special case drift-checking needed to undo the nesting.
+
 Post-flip \file{.def} paths need no special case either way, being
 topic-rooted already.
 
@@ -106,14 +124,23 @@ Builds one uploadable \file{.tgz} per topic, to be unpacked inside the
 course's \file{templates/} on the server, producing a topic-rooted tree:
 
 \begin{manexsource}
-templates/<topic>/opl/Contrib/CCCS/CollegeAlgebra/3.1/x.pg
+templates/<topic>/opl/Rochester/setAlgebra15Functions/x.pg
+templates/<topic>/contrib/CCCS/CollegeAlgebra/3.1/x.pg
 templates/<topic>/local/...
 templates/<topic>/LICENSE.md
 \end{manexsource}
 
-The \file{.def} files go in at the top level of \file{templates/} separately.
+The \file{.def} files go in at the top level of \file{templates/}
+separately, and are deliberately \emph{not} in the tarball: the import scan
+searches \file{templates/} four levels deep, so a copy shipped inside the
+topic tree as well would put two identically named set definitions in front
+of it. The script shipped them until 2026-09-11, against what this page
+already said.
+
 The tarball root is named for the \emph{topic}, not the repo directory, which
 is why it stages into a temporary directory rather than tarring in place.
+It still \emph{reports} how many \file{.def} files belong to the topic, so the
+count of what to upload separately is not left to memory.
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
