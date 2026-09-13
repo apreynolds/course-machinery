@@ -34,8 +34,10 @@
 # conversion, <its name>__alt1, __alt2, ... — with a warning if this seed gives
 # the same answer key, or the very same problem, as one already there, since an
 # alternate (a second version of a test) exists to differ. A conversion with no
-# `seed' line blocks the problem until one is added. An existing file is never
-# overwritten, and generated upload copies under `_for-upload/' are never read.
+# `seed' line might be any seed: at the default seed that problem is skipped, so
+# walking a directory never mints alternates of it, but an explicit -s converts
+# one anyway, with a warning. An existing file is never overwritten, and
+# generated upload copies under `_for-upload/' are never read.
 #
 # What it does:
 #   - runs `pr-pg-render --tex --solution' at a frozen seed, so every $var is
@@ -691,9 +693,15 @@ def convert(pg, args):
     for tex, seed in existing:
         if seed == args.seed:
             raise Skip(f"already converted at seed {seed}, as {tex.name}; -s picks another seed")
-        if seed is None:
-            raise Skip(f"{tex.name} is a conversion of this problem with no `seed = {{...}}' "
-                       f"line, so a second seed cannot be told from it; add one to it first")
+    # A conversion with no seed line -- frozen by hand before the key existed,
+    # perhaps at values no seed reproduces -- might BE this seed. A run at the
+    # default seed stops there, so walking a directory never quietly mints
+    # alternates; naming a seed with -s says an alternate is what you want.
+    seedless = [tex for tex, seed in existing if seed is None]
+    if seedless and not args.explicit_seed:
+        raise Skip(f"{seedless[0].name} converts this problem but records no seed, so seed "
+                   f"{args.seed} may repeat it; add `seed = {{...}}' to it, or give -s to "
+                   f"convert an alternate anyway")
 
     if args.name:
         name = args.name
@@ -705,8 +713,12 @@ def convert(pg, args):
     if dest.exists():
         raise Skip(f"refusing to overwrite {dest}")
 
-    if existing:
-        warn_if_repeats(pg, args.seed, existing)
+    for tex in seedless:
+        print(f"pg-to-latex: warning: {tex.name} records no seed, so whether seed "
+              f"{args.seed} repeats it was not checked", file=sys.stderr)
+    seeded = [(tex, seed) for tex, seed in existing if seed is not None]
+    if seeded:
+        warn_if_repeats(pg, args.seed, seeded)
     text = scaffold(pg, args.seed)
     directory.mkdir(parents=True, exist_ok=True)
     dest.write_text(text, encoding="utf-8")
@@ -716,12 +728,16 @@ def convert(pg, args):
 def main():
     ap = argparse.ArgumentParser(add_help=False)
     ap.add_argument("paths", nargs="*")
-    ap.add_argument("-s", "--seed", type=int, default=1234)
+    ap.add_argument("-s", "--seed", type=int)
     ap.add_argument("-o", "--out")
     ap.add_argument("-n", "--name")
     ap.add_argument("--any", action="store_true")
     ap.add_argument("-h", "--help", action="store_true")
     args = ap.parse_args()
+    # Whether a seed was ASKED for matters, not just its value: see convert().
+    args.explicit_seed = args.seed is not None
+    if args.seed is None:
+        args.seed = 1234
 
     if args.help or not args.paths:
         # Echo the header block, so -h cannot drift from the comment above.
