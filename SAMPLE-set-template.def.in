@@ -1,0 +1,60 @@
+# SAMPLE-set-template.def.in — template for the .def files webwork-build writes
+#
+# To use: copy this file to set-template.def.in in the course's WeBWorK directory
+# (WEBWORK/, or _assessments/webwork-assignments/ in a course that has not moved)
+# and fill it in. webwork-build reads it from there by default; -t names another,
+# so a course can keep one template per kind of set -- practice, review, gateway.
+#
+# WHY A TEMPLATE. A topic repo records only which problems are in a set and in
+# what order, so that another course can reuse it. Everything else in a .def
+# belongs to a course and a term -- the dates, the set header, whether attempts
+# are limited, what a problem is worth -- and lives here instead.
+#
+# Format: an ordinary .def, with three differences.
+#
+#   - Exactly ONE problem_start ... problem_end block. It is repeated once per
+#     problem, in order, with {PROBLEM_ID} and {SOURCE_FILE} filled in. Any
+#     field you add to it is repeated too.
+#   - {PLACEHOLDERS}, filled in anywhere:
+#       {SETID}        the set ID, e.g. OS1.1_Review_of_Functions
+#       {SECTION}      the section prefix, e.g. OS1.1
+#       {TITLE}        the title from the directory names, underscores as spaces
+#       {HEADER}       the set header's path on the server, once copied in
+#       {PROBLEM_ID}   1, 2, 3, ...                     (problem block only)
+#       {SOURCE_FILE}  the problem's path on the server (problem block only)
+#   - A `#! header: PATH' line names the set header, relative to the course
+#     repo. It is COPIED into the set as 00-setHeader.pg, so a header kept in one
+#     topic serves a set from any other. Leave it out, and write defaultHeader
+#     instead of {HEADER}, to use the server's default.
+#
+# Every other #-comment line (like these) is dropped from the generated .def.
+# Blank lines are kept.
+#
+# The fields below are those of MATH1003's OS1.2 practice set, written by hand
+# before this script existed. The dates are EXAMPLES: replace every one.
+
+#! header: 0-functions/webwork/local/set-headers/practice-setHeader.pg
+
+assignmentType          = default
+openDate                = 09/01/2026 at 01:00pm ADT
+dueDate                 = 12/09/2026 at 05:00pm AST
+answerDate              = 12/09/2026 at 07:00pm AST
+enableReducedScoring    = N
+paperHeaderFile         = {HEADER}
+screenHeaderFile        = {HEADER}
+description             = Practice for {SECTION} -- {TITLE}
+restrictProbProgression = 0
+emailInstructor         = 0
+
+problemListV2
+problem_start
+problem_id           = {PROBLEM_ID}
+source_file          = {SOURCE_FILE}
+value                = 1
+max_attempts         = -1
+showMeAnother        = -1
+showHintsAfter       = -2
+prPeriod             = -1
+counts_parent_grade  = 0
+att_to_open_children = 0
+problem_end

@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+#
+# pg-answer-variation — check that a .pg problem's ANSWERS change with the seed
+# Usage: pg-answer-variation [-n SEEDS] [-q] FILE.pg|DIR ...
+#
+#   -n SEEDS   how many seeds to try, starting at 1 (default 8)
+#   -q         print only the problems that fail
+#   -h         this text
+#
+# WHY THIS EXISTS. A harvested problem can look randomised and not be. The
+# coefficients move, the graph is redrawn, and the correct answer is a literal
+# that never changes -- so a student scores full marks by always giving the same
+# response, and learns nothing. Nothing errors, so `pr-pg-render' is clean and a
+# seed sweep reports 40/40 passing. Only comparing the ANSWERS across seeds finds
+# it. Found 2026-09-10 in the CCCS collection, building MATH1003's practice sets.
+#
+# TWO CLASSES, reported separately, because they are not equally bad:
+#
+#   CONSTANT-CHOICE  a multiple-choice blank (PopUp, radio buttons, ...) whose
+#                    correct option never changes. Almost always a defect: the
+#                    problem is guessable and the skill it claims to assess --
+#                    usually a classification, "is it a function", "even or odd"
+#                    -- is not being assessed at all. This sets the exit status.
+#
+#   CONSTANT         every blank is the same on every seed. Sometimes legitimate:
+#                    a problem can randomise its wording while its domain and
+#                    range genuinely do not depend on the draw. It is still a
+#                    one-shot problem, so it is reported, but it does not fail.
+#
+# Checking the two separately is essential. A problem can vary in a formula blank
+# while its classification popup never moves, which makes a whole-answer check
+# report "varies" on exactly the problem most worth catching.
+#
+# Exit status is 1 if any problem has a constant multiple-choice answer, so this
+# is usable as a gate before a candidate goes into a .def.
+#
+# This does NOT prove a problem is good. It proves the answers move. Read the
+# rendered output as well.
+
+set -uo pipefail
+
+seeds=8
+quiet=0
+targets=()
+
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        -n) shift; seeds=$1 ;;
+        -q) quiet=1 ;;
+        -*) echo "pg-answer-variation: unknown option $1" >&2; exit 2 ;;
+        *)  targets+=("$1") ;;
+    esac
+    shift
+done
+
+if [ ${#targets[@]} -eq 0 ]; then
+    echo "pg-answer-variation: nothing to check. Give a .pg file or a directory." >&2
+    exit 2
+fi
+
+if ! command -v pr-pg-render > /dev/null; then
+    echo "pg-answer-variation: pr-pg-render not found on PATH." >&2
+    exit 2
+fi
+
+# The answer-type strings pr-pg-render prints for a blank the student CHOOSES
+# from rather than types into. Matched case-insensitively on the type column.
+CHOICE_TYPES='popup|radio|checkbox|select|multiple'
+
+# Collect the files first, so a directory and a file can be mixed freely.
+files=()
+for t in "${targets[@]}"; do
+    if [ -d "$t" ]; then
+        while IFS= read -r f; do files+=("$f"); done < <(find "$t" -name '*.pg' | sort)
+    elif [ -f "$t" ]; then
+        files+=("$t")
+    else
+        echo "pg-answer-variation: no such file or directory: $t" >&2
+        exit 2
+    fi
+done
+
+failed=0
+n_const=0
+n_choice=0
+n_ok=0
+
+for f in "${files[@]}"; do
+    all_seen=""
+    choice_seen=""
+    has_choice=0
+
+    for s in $(seq 1 "$seeds"); do
+        # One render per seed. The answer lines look like
+        #   AnSwEr0001   Value (PopUp)  Yes, it's a function.
+        lines=$(pr-pg-render -s "$s" "$f" 2>/dev/null | grep -a '^ *AnSwEr')
+
+        all_seen+="$(printf '%s' "$lines" | sed 's/^ *AnSwEr[0-9]*  *//' | tr '\n' '|')"$'\n'
+
+        choice=$(printf '%s' "$lines" | grep -aiE "\((${CHOICE_TYPES})[^)]*\)")
+        if [ -n "$choice" ]; then
+            has_choice=1
+            choice_seen+="$(printf '%s' "$choice" | sed 's/^ *AnSwEr[0-9]*  *//' | tr '\n' '|')"$'\n'
+        fi
+    done
+
+    name=$(basename "$f" .pg)
+    d_all=$(printf '%s' "$all_seen" | sort -u | grep -c . || true)
+    d_choice=$(printf '%s' "$choice_seen" | sort -u | grep -c . || true)
+
+    if [ "$d_all" -eq 0 ]; then
+        printf '  NO ANSWERS      %s\n' "$name"
+        continue
+    fi
+
+    if [ "$has_choice" -eq 1 ] && [ "$d_choice" -le 1 ]; then
+        printf '  CONSTANT-CHOICE %s\n' "$name"
+        printf '                  the multiple-choice answer is the same on all %s seeds\n' "$seeds"
+        failed=1
+        n_choice=$((n_choice + 1))
+    elif [ "$d_all" -le 1 ]; then
+        printf '  CONSTANT        %s\n' "$name"
+        printf '                  every blank identical on all %s seeds -- check whether that is legitimate\n' "$seeds"
+        n_const=$((n_const + 1))
+    else
+        [ "$quiet" -eq 0 ] && printf '  varies          %-58s %s distinct\n' "$name" "$d_all"
+        n_ok=$((n_ok + 1))
+    fi
+done
+
+echo
+printf '%s problems: %s vary, %s constant, %s with a constant multiple choice\n' \
+       "${#files[@]}" "$n_ok" "$n_const" "$n_choice"
+
+exit "$failed"
