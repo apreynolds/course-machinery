@@ -116,8 +116,8 @@ def tag(text, key):
 
 
 # Warnings a perfectly good problem emits locally because webwork2 is not here
-# to set them. WEBWORK/README.md section 7 lists these as local-render
-# artefacts, not breakage. pr-pg-render exits non-zero on any warning, which is
+# to set them. pg-profile's SERVER_ONLY_WARNINGS is the gate's version of this
+# list (it also has $WW): local-render artefacts, not breakage. pr-pg-render exits non-zero on any warning, which is
 # right for a gate and wrong for a scaffold: three of MATH1003's OS1.1 problems
 # load PeriodicRerandomization.pl and so could not be converted at all
 # otherwise. webwork-check is the gate; this is not.
@@ -187,7 +187,7 @@ def scaffold(pg, seed):
     # COURSE-DIFFICULTY is ours and now exists on tagged problems, so transcribe
     # it rather than asking for it again. The vocabulary is basic / moderate /
     # challenging -- NOT "advanced", which this scaffold used to suggest. The
-    # distinction is deliberate (WEBWORK/README.md section 9): "advanced" implies
+    # distinction is deliberate (the webwork skill, building-a-practice-set §9): "advanced" implies
     # both skippable and later material, and neither is true of a problem that is
     # merely hard to start.
     m = re.search(r'^#\s*COURSE-DIFFICULTY:\s*(basic|moderate|challenging)\s*$',
