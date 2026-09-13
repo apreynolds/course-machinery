@@ -17,6 +17,7 @@
 %     difficulty = {basic},
 %     source     = {stewart-8e},
 %     number     = {3.1.2},
+%     seed       = {1234},     (only for a problem frozen from a random original)
 %     name       = {},
 %   }
 %
@@ -55,6 +56,12 @@
 \define@key{ProblemMeta}{difficulty}{}
 \define@key{ProblemMeta}{source}    {}
 \define@key{ProblemMeta}{number}    {}
+% `seed' completes `source'/`number' for a problem frozen from a randomised
+% original (a WeBWorK .pg): which instance of that problem this file is. Written
+% by pg-to-latex, which reads number AND seed back to tell a problem already
+% converted from an alternate version of it at another seed. Absent for a
+% problem with no random original.
+\define@key{ProblemMeta}{seed}      {}
 \define@key{ProblemMeta}{name}      {}
 
 \newcommand{\ProblemMeta}[1]{\setkeys{ProblemMeta}{#1}\ignorespaces}

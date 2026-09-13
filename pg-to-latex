@@ -9,7 +9,8 @@
 #   -o, --out DIR   write <name>.tex into DIR (default: <topic>/problems/, worked
 #                   out from where the .pg lives); `-o -' prints to stdout
 #   -n, --name STR  basename for the .tex file (one .pg only; default: the .pg's
-#                   own name with _ turned into -)
+#                   own name with _ turned into -, or <name>__alt<n> for a
+#                   problem already converted at another seed)
 #   --any           convert problems that are not representatives too
 #   -h, --help      this text
 #
@@ -25,17 +26,23 @@
 # exactly a section's representatives. A skipped problem is an error only when
 # you named its file; one found by walking a directory is just reported.
 #
-# NEVER TWICE. A problem is skipped when a .tex in the output directory already
-# has its `number = {...}' — the converted files get descriptive names, so the
-# filename alone cannot tell — and an existing file is never overwritten.
-# Generated upload copies under `_for-upload/' are never read.
+# NEVER TWICE AT ONE SEED. A problem is identified by its \ProblemMeta `number'
+# (its path in the source library) and `seed', both read off the .tex files in
+# the output directory — the converted files get descriptive names, so the
+# filename alone cannot tell. Already converted at this seed: skipped. Converted
+# only at OTHER seeds: converted again, as an ALTERNATE named after the first
+# conversion, <its name>__alt1, __alt2, ... — with a warning if this seed gives
+# the same answer key, or the very same problem, as one already there, since an
+# alternate (a second version of a test) exists to differ. A conversion with no
+# `seed' line blocks the problem until one is added. An existing file is never
+# overwritten, and generated upload copies under `_for-upload/' are never read.
 #
 # What it does:
 #   - runs `pr-pg-render --tex --solution' at a frozen seed, so every $var is
 #     already substituted and the solution comes along with the statement
-#   - fills \ProblemMeta{} with source, number and difficulty from the .pg's
-#     path, its ## tags and its COURSE-DIFFICULTY line, and keeps the upstream
-#     author and the CLAUDE-GENERATED SOLUTION marker
+#   - fills \ProblemMeta{} with source, number, seed and difficulty from the
+#     .pg's path, its ## tags and its COURSE-DIFFICULTY line, and keeps the
+#     upstream author and the CLAUDE-GENERATED SOLUTION marker
 #   - strips what means nothing on paper: answer blanks and the labels left in
 #     front of them ("Domain:", "Answer (in interval notation):"), help links,
 #     the Book link, "You have 3 attempt(s) remaining", horizontal rules, and
@@ -199,7 +206,7 @@ def modernise(text):
 # Rendering and cleaning
 # ---------------------------------------------------------------------------
 
-def render(pg, seed):
+def render(pg, seed, quiet=False):
     """The problem's TeX at one seed, statement and solution together."""
     out = subprocess.run(
         ["pr-pg-render", "--tex", "--solution", "--seed", str(seed), str(pg)],
@@ -211,8 +218,9 @@ def render(pg, seed):
                       and not any(a in ln for a in SERVER_ARTEFACTS)]
         if complaints:
             raise Skip("pr-pg-render failed:\n" + noise.rstrip())
-        print(f"pg-to-latex: {pg.name} warns only about server-supplied values "
-              f"that are empty locally; scaffolding anyway.", file=sys.stderr)
+        if not quiet:
+            print(f"pg-to-latex: {pg.name} warns only about server-supplied values "
+                  f"that are empty locally; scaffolding anyway.", file=sys.stderr)
     return out.stdout
 
 
@@ -540,6 +548,7 @@ def scaffold(pg, seed):
   difficulty = {difficulty}
   source     = {{{source}}},
   number     = {{{number}}},
+  seed       = {{{seed}}},
 }}
 % Scaffolded by pg-to-latex from {tree}/{number} at seed {seed}.
 {attrib}%
@@ -596,15 +605,71 @@ def out_dir(pg, out):
     return pathlib.Path(*parts[:at]) / "problems"
 
 
-def already_converted(directory, number):
-    """The .tex in `directory` whose \\ProblemMeta number is `number`, or None."""
+def conversions(directory, number):
+    """[(tex, seed or None), ...]: every .tex in `directory` converted from `number`.
+
+    Both read from the \\ProblemMeta block, one key per line as ProblemMeta.sty
+    requires. The seed is None for a file converted before the `seed' key
+    existed and not backfilled since.
+    """
     if not directory.is_dir():
-        return None
+        return []
     want = re.compile(r"^\s*number\s*=\s*\{" + re.escape(number) + r"\}", re.M)
+    found = []
     for tex in sorted(directory.glob("*.tex")):
-        if want.search(tex.read_text(encoding="utf-8", errors="replace")):
-            return tex
-    return None
+        text = tex.read_text(encoding="utf-8", errors="replace")
+        if want.search(text):
+            m = re.search(r"^\s*seed\s*=\s*\{\s*(\d+)\s*\}", text, re.M)
+            found.append((tex, int(m.group(1)) if m else None))
+    return found
+
+
+def alternate_name(directory, existing):
+    """<name>__alt<n> after the first conversion's own name, n the first free."""
+    base = re.sub(r"__alt\d*$", "", existing[0][0].stem)
+    n = 1
+    while (directory / f"{base}__alt{n}.tex").exists():
+        n += 1
+    return f"{base}__alt{n}"
+
+
+def answer_key(pg, seed):
+    """The answer lines pr-pg-render prints at `seed`: its default report."""
+    out = subprocess.run(["pr-pg-render", "--seed", str(seed), str(pg)],
+                         capture_output=True, text=True).stdout
+    return [ln.split(None, 1)[1] for ln in out.splitlines()
+            if re.match(r"\s+AnSwEr\d+\s", ln)]
+
+
+def comparable_statement(pg, seed):
+    """The TeX statement at `seed`, minus what differs on every render (image paths)."""
+    try:
+        body = render(pg, seed, quiet=True)
+    except Skip:
+        return None
+    statement = body.partition(SOLUTION_MARK)[0]
+    return re.sub(r"\\includegraphics(\[[^\]]*\])?\{[^}]*\}", "", statement)
+
+
+def warn_if_repeats(pg, seed, existing):
+    """Warn when this seed repeats a conversion already made at another seed.
+
+    An alternate exists to be DIFFERENT -- a second version of a test -- and a
+    small random range can hand back the same numbers. Nothing is refused: the
+    same answers under a different statement (the equations reshuffled, say)
+    can be exactly what was wanted.
+    """
+    new_key, new_statement = answer_key(pg, seed), None
+    for tex, other in existing:
+        if answer_key(pg, other) != new_key:
+            continue
+        if new_statement is None:
+            new_statement = comparable_statement(pg, seed)
+        same = new_statement is not None and new_statement == comparable_statement(pg, other)
+        what = "the SAME PROBLEM" if same else "the same answer key"
+        print(f"pg-to-latex: warning: seed {seed} gives {what} as seed {other} "
+              f"({tex.name}){'' if same else '; check the two differ where it matters'}",
+              file=sys.stderr)
 
 
 def convert(pg, args):
@@ -622,14 +687,26 @@ def convert(pg, args):
 
     directory = out_dir(pg, args.out)
     _, number, _ = provenance(pg)
-    done = already_converted(directory, number)
-    if done:
-        raise Skip(f"already converted, as {done.name}")
-    name = args.name or pg.stem.replace("_", "-")
+    existing = conversions(directory, number)
+    for tex, seed in existing:
+        if seed == args.seed:
+            raise Skip(f"already converted at seed {seed}, as {tex.name}; -s picks another seed")
+        if seed is None:
+            raise Skip(f"{tex.name} is a conversion of this problem with no `seed = {{...}}' "
+                       f"line, so a second seed cannot be told from it; add one to it first")
+
+    if args.name:
+        name = args.name
+    elif existing:
+        name = alternate_name(directory, existing)
+    else:
+        name = pg.stem.replace("_", "-")
     dest = directory / f"{name}.tex"
     if dest.exists():
         raise Skip(f"refusing to overwrite {dest}")
 
+    if existing:
+        warn_if_repeats(pg, args.seed, existing)
     text = scaffold(pg, args.seed)
     directory.mkdir(parents=True, exist_ok=True)
     dest.write_text(text, encoding="utf-8")

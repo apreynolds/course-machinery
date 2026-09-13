@@ -81,7 +81,9 @@ which one:
 - `pg-to-latex` — scaffold `.tex` problem files from WeBWorK `.pg` problems at
   a frozen seed, into `<topic>/problems/`. Give it files or directories: it
   converts only the problems marked `COURSE-REPRESENTATIVE: R` or `r` (`--any`
-  for the rest) and skips any already converted. A scaffold, not a converter:
+  for the rest) and skips any already converted at that seed. Another seed
+  (`-s`) makes an alternate, `<name>__alt1`, recorded by the `seed` key of
+  `\ProblemMeta`. A scaffold, not a converter:
   it strips WeBWorK's furniture, builds `qparts` from the answer blanks, and
   marks the judgement it leaves behind `% TODO`.
 - `webwork-check` / `webwork-deploy` — verify a course's WeBWorK set
