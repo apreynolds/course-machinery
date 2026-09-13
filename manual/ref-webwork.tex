@@ -190,6 +190,33 @@ All the groups must come from one topic and share one title, since a mismatch is
 After writing, it checks that every file the \file{.def} names is in the set, and it opens its own tarball with Python's \texttt{tarfile} to confirm there are no AppleDouble members, because \texttt{tar tzf} hides them.
 It deliberately does not call \texttt{webwork-check}, which also examines every course-level \file{.def} and could fail for reasons unrelated to this set.
 
+\paragraph{Review sets.}
+\begin{manexsource}
+webwork-build --review [-r ROUND] [-n] [-t TEMPLATE] SECTION
+\end{manexsource}
+
+A \emph{draft} group directory, \file{\ldots{}-{}-CANDIDATES-CLAUDE}, holds links to candidates wherever they live, and reviewing one means reading it on the server.
+The server already has the upstream trees, so a review set needs no problem files, only a \file{.def}.
+\texttt{-{}-review} writes one into each draft directory of the section, as \file{set<draft name>-r<ROUND>.def}, and bundles them flat into \file{\_for-upload/<SECTION>-review-r<ROUND>.tgz}.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+link reaches & reviewed as\\
+\hline
+the OPL clone's \file{OpenProblemLibrary/X} & \file{Library/X}\\
+the OPL clone's \file{Contrib/X} & \file{Contrib/X}\\
+the diffyqs clone's \file{X} & \file{diffyqs-webwork/X}\\
+a fork at \file{<topic>/webwork/opl/X}, \ldots & its upstream path, flagged in the \file{.def}: the review shows upstream, not our edit\\
+anything else & nothing: listed in the \file{.def}'s header, to be read locally\\
+\end{tabularx}
+\end{center}
+
+The template supplies dates and per-problem settings; its header is replaced by \texttt{defaultHeader}, since nothing is uploaded for it to point at.
+Draft links may be absolute, but must resolve and must carry an \file{NN-} prefix, which is the review order.
+
+\emph{The round is part of the set ID}, because an import skips a set name that already exists: after culling links, build \texttt{-r 2}, and the culled round arrives as a new set.
+Rebuilding a round replaces the draft's earlier \file{.def} files; old rounds stay on the server until deleted there, which is harmless, since review sets carry no student data.
+
 \paragraph{The manifest.}
 \file{MANIFEST.tsv} records each copy's source path and git blob hash, and it travels to the server inside the set directory.
 Mid-term fixes happen on the server, so at the end of term the set directory is downloaded and the manifest says which file each copy came from and whether it was edited there.

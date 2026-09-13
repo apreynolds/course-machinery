@@ -87,7 +87,10 @@ which one:
 - `webwork-build` — turn one section's group directories of problem symlinks
   into an uploadable set: flat numbered copies, a set header, a `.def` filled
   from the course's template (`SAMPLE-set-template.def.in` is the annotated
-  reference), and one tarball holding both.
+  reference), and one tarball holding both. `--review` instead writes a review
+  `.def` into each draft directory, pointing at the server's own `Library/` and
+  `Contrib/` copies, so candidates can be read on the server before anything is
+  forked.
 - `pg-profile` / `pg-answer-variation` — judge a WeBWorK `.pg` candidate by
   rendering it: every answer blank, a seed sweep, whether its checker accepts its
   own answers, and whether the answers actually change with the seed. They need
