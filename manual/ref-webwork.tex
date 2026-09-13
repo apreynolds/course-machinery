@@ -275,5 +275,20 @@ pg-answer-variation [-n SEEDS] [-q] FILE.pg|DIR ...
 
 The narrower check, for a whole finished selection: do the answers change with the seed?
 A problem can redraw its graph and move its coefficients while its correct answer stays a literal, and nothing errors, so only comparing answers across seeds finds it.
-\texttt{CONSTANT-CHOICE} (a multiple-choice blank that never moves) sets the exit status; \texttt{CONSTANT} (every blank fixed) is reported but can be legitimate.
+A \emph{choice} blank is a drop-down, radio button, checkbox or typed word such as ``even'' or ``None'', since a constant one is guessable.
+The verdicts are graded exactly as \texttt{pg-profile} grades them, so the two tools cannot disagree about a problem:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{CONSTANT-CHOICE} & every blank, a choice blank included, never
+  changes: a giveaway. Sets the exit status.\\
+\texttt{CHOICE-FIXED} & a choice blank never changes while others do. One
+  skill goes free, which may or may not matter to the set, so it is reported,
+  not failed.\\
+\texttt{CONSTANT} & every blank is fixed and none is a choice. Reported; can
+  be legitimate.\\
+\end{tabularx}
+\end{center}
+
+Until 2026-09-13 typed words did not count as choices, and any fixed choice failed; the first let a problem answering ``even'' on every seed through, and the second was stricter than \texttt{pg-profile}.
 \texttt{-n} defaults to 8 seeds, and \texttt{-q} prints only the problems that fail.
