@@ -78,9 +78,12 @@ which one:
   both formats by default; `--no-question` / `--no-solutions` pick a variant and
   `--no-pdf` / `--no-png` pick a format, so any one of the four outputs can be
   asked for on its own.
-- `pg-to-latex` — scaffold a `.tex` problem file from a WeBWorK `.pg` at a
-  frozen seed. A scaffold, not a converter: it does the mechanical part and
-  marks its own gaps `% TODO`.
+- `pg-to-latex` — scaffold `.tex` problem files from WeBWorK `.pg` problems at
+  a frozen seed, into `<topic>/problems/`. Give it files or directories: it
+  converts only the problems marked `COURSE-REPRESENTATIVE: R` or `r` (`--any`
+  for the rest) and skips any already converted. A scaffold, not a converter:
+  it strips WeBWorK's furniture, builds `qparts` from the answer blanks, and
+  marks the judgement it leaves behind `% TODO`.
 - `webwork-check` / `webwork-deploy` — verify a course's WeBWorK set
   definitions and problem trees, and build one uploadable tarball per topic.
   Only useful to a course that assigns WeBWorK, but many do.

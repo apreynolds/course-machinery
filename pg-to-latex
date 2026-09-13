@@ -1,38 +1,69 @@
 #!/usr/bin/env python3
 #
-# pg-to-latex — scaffold a LaTeX problem file from a WeBWorK .pg problem
-# Usage: pg-to-latex [-s SEED] [-o DIR] FILE.pg
+# pg-to-latex — scaffold LaTeX problem files from WeBWorK .pg problems
+# Usage: pg-to-latex [-s SEED] [-o DIR] [-n NAME] [--any] PATH ...
 #
+#   PATH            a .pg file, or a directory: every .pg under it, following
+#                   the symlinks in a set's group directories
 #   -s, --seed N    freeze this problem seed (default 1234)
-#   -o, --out DIR   write <name>.tex here instead of stdout
-#   -n, --name STR  basename for the .tex file (default: derived, see below)
+#   -o, --out DIR   write <name>.tex into DIR (default: <topic>/problems/, worked
+#                   out from where the .pg lives); `-o -' prints to stdout
+#   -n, --name STR  basename for the .tex file (one .pg only; default: the .pg's
+#                   own name with _ turned into -)
+#   --any           convert problems that are not representatives too
 #   -h, --help      this text
 #
-# This is a SCAFFOLD, not a converter. It does the mechanical two thirds and
-# leaves the judgement to a human, marked with % TODO. Expect to rewrite the
-# body; expect not to have to retype the provenance.
+# This is a SCAFFOLD, not a converter. It does everything mechanical and leaves
+# the judgement to a human, marked with % TODO. Expect to edit the result;
+# expect not to have to retype the provenance or clean up after WeBWorK.
+#
+# REPRESENTATIVES ONLY, by default. The LaTeX bank takes the problems a set's
+# fork pass marked `# COURSE-REPRESENTATIVE: R' (representative) or `r' (one of
+# a representative set) — the webwork skill's building-a-practice-set §10. A
+# problem marked `-', or with no such line (not forked yet), is skipped; --any
+# converts it anyway. So `pg-to-latex 0-functions/webwork-sets/OS1.2_*' converts
+# exactly a section's representatives. A skipped problem is an error only when
+# you named its file; one found by walking a directory is just reported.
+#
+# NEVER TWICE. A problem is skipped when a .tex in the output directory already
+# has its `number = {...}' — the converted files get descriptive names, so the
+# filename alone cannot tell — and an existing file is never overwritten.
+# Generated upload copies under `_for-upload/' are never read.
 #
 # What it does:
 #   - runs `pr-pg-render --tex --solution' at a frozen seed, so every $var is
 #     already substituted and the solution comes along with the statement
-#   - fills \ProblemMeta{} with source and number read from the .pg's own path
-#     and its ## tag block
-#   - carries the CLAUDE-GENERATED SOLUTION marker across when the .pg has one
-#   - strips the WeBWorK furniture that means nothing on paper: answer rules,
-#     "help (formulas)", \vskip\baselineskip, and the Book link
-#   - splits statement from solution at PG's own `%%% BEGIN SOLUTION' marker and
-#     wraps them in problem/solution
+#   - fills \ProblemMeta{} with source, number and difficulty from the .pg's
+#     path, its ## tags and its COURSE-DIFFICULTY line, and keeps the upstream
+#     author and the CLAUDE-GENERATED SOLUTION marker
+#   - strips what means nothing on paper: answer blanks and the labels left in
+#     front of them ("Domain:", "Answer (in interval notation):"), help links,
+#     the Book link, "You have 3 attempt(s) remaining", horizontal rules, and
+#     PGML's {\pgmlSetup ... \par} wrapper, which only WeBWorK's preamble defines
+#   - turns PG's line breaks (\vskip\baselineskip, \leavevmode\\\relax) into
+#     paragraph breaks, and TeX 2.09 {\bf}/{\it} into \textbf/\emph
+#   - tidies the math: stray spaces, x^{2} to x^2, \left(-\infty ,7\right) to
+#     (-\infty, 7), and a comma or full stop moved out of \(...\)
+#   - builds \begin{qparts} from the answer blanks when they carry part labels
+#     ((a), a), 1., {\bf 1.}, or a numbered list), and splits the solution into
+#     the parts too when its own labels match them one for one
+#   - writes \begin{solution}[notitle]
 #
-# What it CANNOT do, and flags instead:
+# What it CANNOT do, and flags with % TODO instead:
 #   - choose which seed to freeze. A branching problem may have a case worth
 #     preferring: match-undetermined-coefficient-forms.tex deliberately takes
-#     the branch containing the resonant case, because the other branch
-#     exercises less. Render a few seeds and pick.
-#   - map PG widgets onto Exercises.sty. Several ans_rules usually want qparts;
-#     a PopUp set wants matching; a checkbox list wants choices. The scaffold
-#     emits the flattened text and marks the spot.
-#   - fill topics/type/difficulty. Those are judgements about the problem.
+#     the branch containing the resonant case. Render a few seeds and pick.
 #   - state the randomisation invariant, which needs reading the .pg's setup.
+#   - fill topics/type, or pick a descriptive filename.
+#   - judge the structure it built: several blanks may belong to one part, and
+#     a PopUp set usually wants matching, a checkbox list choices.
+#   - split a solution whose labels do not line up with the parts.
+#   - carry a figure. A graph drawn at render time has no file to take, so the
+#     scaffold leaves a placeholder; redraw it in TikZ.
+#   - convert a PGML table (tabular with booktabs rules) to tabularray.
+#   - spot every WeBWorK instruction. Lines mentioning entering, submitting or
+#     attempts are flagged, not removed; read them.
+#   - put the prose one sentence per line. Select it and run :SemBr in vim.
 #
 # Background: the `webwork' skill's topics/pg-to-latex.md.
 
@@ -42,20 +73,74 @@ import re
 import subprocess
 import sys
 
-# WeBWorK furniture, dropped whole. Each entry is a regex applied line-by-line;
-# a line that becomes empty is dropped unless it was already blank.
-FURNITURE = [
-    r"\{\\answerRule\[[^\]]*\]\{\d+\}\}",     # answer blanks
-    r"\{\\bf\\underline\{help \([^)]*\)\}\}", # AnswerFormatHelp
-    r"\\vskip\\baselineskip\s*",              # PG's $PAR
-    r"\\par\\medskip\s*",                     # PG's solution trailer
-    r"^%%% END SOLUTION\s*$",                 # PG's own delimiter
-    r"\{\\bf\\underline\{[^}]*\}\}\s*$",      # a bare underlined link remnant
-]
+# Stands in for an answer blank while the text is cleaned, so the structure
+# step can still see where the blanks were. Private-use characters cannot occur
+# in PG's output.
+BLANK = "\ue000"
 
 SOLUTION_MARK = "%%% BEGIN SOLUTION"
 SOLUTION_LEAD = re.compile(r"\\par\\smallskip\{\\bf Solution:\s*\}")
 
+# Whole phrases WeBWorK adds that mean nothing on paper. Regexes, removed
+# wherever they occur.
+WEBWORK_PHRASES = [
+    r"\{\\answerRule\[[^\]]*\]\{[\d.]+\}\}",           # a blank not yet marked (safety)
+    r"\{\\bf\\underline\{help \([^)]*\)\}\}",       # AnswerFormatHelp
+    r"\{\\bf\\underline\{[^}]*\}\}",                # helpLink's underlined link text
+    r"\{\\bf\s*Help\}:\s*",                         # ... and its label
+    r"You have \d+ attempt\(s\) remaining before you will receive a new version of this problem\.",
+    r"^%%% END SOLUTION\s*$",                       # PG's own delimiter
+    r"\\settoheight\{\\strutheight\}\{\\strut\}",   # image furniture
+]
+
+# PG's ways of breaking a line or a paragraph. Each becomes a blank line.
+BREAKS = [
+    r"\\vskip\\baselineskip",
+    r"\\leavevmode\\\\\\relax",
+    r"\\par\\hrulefill\\par",
+    r"\\par\\(?:small|med|big)skip",
+    r"\\(?:small|med|big)skip",
+    r"\\par(?=\\begin)",
+]
+
+# A line WeBWorK wrote for a student at a keyboard. Flagged, never removed:
+# "enter" is also ordinary English ("enter them all, separated by commas").
+INSTRUCTION = re.compile(
+    r"\b(enter(?:ing|ed)?|submit|attempts?|answer (?:box|space|blank)s?|click|"
+    r"in your answer|you will not be told|drop-?down)\b", re.I)
+
+# A part label at the start of a line: (a)  a)  1.  1)  \textbf{1.}  \textbf{(a)}.
+# The bold form is matched only whole, closing brace included, so a heading like
+# \textbf{(a) Domain.} is not cut in the middle of its braces.
+PART_LABEL = re.compile(
+    r"^\s*(?:\\textbf\{\s*\(?(?P<bold>[a-z]|\d{1,2})[.)]\s*\}"
+    r"|\(?(?P<plain>[a-z]|\d{1,2})[.)])(?=\s)")
+
+
+def label_key(m):
+    return m.group("bold") or m.group("plain")
+
+# Server-supplied values that are empty locally. pr-pg-render exits non-zero
+# on any warning, which is right for a gate and wrong for a scaffold: three of
+# MATH1003's OS1.1 problems load PeriodicRerandomization.pl and could not be
+# converted at all otherwise. pg-profile's SERVER_ONLY_WARNINGS is the gate's
+# version of this list. webwork-check is the gate; this is not.
+SERVER_ARTEFACTS = (
+    "numOfAttempts",
+    "PeriodicRerandomization.pl",
+    "formattedDueDate",
+    "studentName",
+    "setNumber",
+)
+
+
+class Skip(Exception):
+    """This problem is not converted, for a reason worth one line."""
+
+
+# ---------------------------------------------------------------------------
+# Brace groups
+# ---------------------------------------------------------------------------
 
 def match_brace(text, open_at):
     """Index just past the brace group starting at text[open_at] == '{'.
@@ -98,8 +183,9 @@ def drop_group_containing(text, needle):
 
 
 def modernise(text):
-    """{\\bf X} -> \\textbf{X}, {\\it X} -> \\emph{X}, innermost first."""
-    for old, new in (("{\\bf ", "\\textbf{"), ("{\\it ", "\\emph{"),
+    """{\\bf X} -> \\textbf{X}, {\\it X} -> \\emph{X}, PGML's too, innermost first."""
+    for old, new in (("{\\bfseries{}", "\\textbf{"), ("{\\itshape{}", "\\emph{"),
+                     ("{\\bf ", "\\textbf{"), ("{\\it ", "\\emph{"),
                      ("{\\bf\\", "\\textbf{\\"), ("{\\it\\", "\\emph{\\")):
         while old in text:
             at = text.find(old)
@@ -109,26 +195,9 @@ def modernise(text):
     return text
 
 
-def tag(text, key):
-    """Value of a ## Key(value) line from the .pg tag block, or None."""
-    m = re.search(rf"^##\s*{key}\((.*?)\)\s*$", text, re.M)
-    return m.group(1).strip() if m else None
-
-
-# Warnings a perfectly good problem emits locally because webwork2 is not here
-# to set them. pg-profile's SERVER_ONLY_WARNINGS is the gate's version of this
-# list (it also has $WW): local-render artefacts, not breakage. pr-pg-render exits non-zero on any warning, which is
-# right for a gate and wrong for a scaffold: three of MATH1003's OS1.1 problems
-# load PeriodicRerandomization.pl and so could not be converted at all
-# otherwise. webwork-check is the gate; this is not.
-SERVER_ARTEFACTS = (
-    "numOfAttempts",
-    "PeriodicRerandomization.pl",
-    "formattedDueDate",
-    "studentName",
-    "setNumber",
-)
-
+# ---------------------------------------------------------------------------
+# Rendering and cleaning
+# ---------------------------------------------------------------------------
 
 def render(pg, seed):
     """The problem's TeX at one seed, statement and solution together."""
@@ -141,59 +210,325 @@ def render(pg, seed):
                       if ("WARNING" in ln or "uninitialized" in ln or "ERROR" in ln)
                       and not any(a in ln for a in SERVER_ARTEFACTS)]
         if complaints:
-            sys.exit(f"pg-to-latex: pr-pg-render failed on {pg}\n{noise}")
+            raise Skip("pr-pg-render failed:\n" + noise.rstrip())
         print(f"pg-to-latex: {pg.name} warns only about server-supplied values "
               f"that are empty locally; scaffolding anyway.", file=sys.stderr)
     return out.stdout
 
 
-def strip_furniture(text):
-    text = drop_group_containing(text, "Book:")
-    for pat in FURNITURE:
-        text = re.sub(pat, "", text, flags=re.M)
-    text = modernise(text)
-    # Collapse the blank-line runs the removals leave behind.
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+def unwrap_pgml(text):
+    """{\\pgmlSetup ... \\par}% -> ... . PGML's wrapper; WeBWorK's PGML.tex defines it."""
+    return re.sub(r"\{\\pgmlSetup[ \t]*\n?(.*?)\\par\}%[ \t]*\n?", r"\1\n",
+                  text, flags=re.S)
 
+
+def replace_figures(text):
+    """An image line -> a TikZ placeholder.
+
+    A graph drawn with init_graph exists only as a file pr-pg-render wrote to
+    ~/.cache/pg-render, which no other machine has, and the bank's figures are
+    TikZ anyway. The render path stays in the comment, to look at while drawing.
+    """
+    out = []
+    for line in text.split("\n"):
+        m = re.search(r"\\includegraphics(?:\[[^\]]*\])?\{([^}]*)\}", line)
+        if m:
+            out.append("% TODO FIGURE: redraw in TikZ. The render to copy from is")
+            out.append(f"% {m.group(1)}")
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+def tidy_math(text):
+    """Stray spaces, single-character exponents and plain intervals, in math only."""
+    def inner(body):
+        body = re.sub(r"[ \t]{2,}", " ", body).strip()
+        body = re.sub(r"\^\{(\w)\}", r"^\1", body)
+        # \left(-\infty ,7\right) -> (-\infty, 7): a two-ended interval of plain
+        # numbers, letters or infinity needs no \left/\right sizing.
+        endpoint = r"-?(?:\\infty|[\w.]+)"
+        body = re.sub(rf"\\left([(\[])\s*({endpoint})\s*,\s*({endpoint})\s*\\right([)\]])",
+                      r"\1\2, \3\4", body)
+        return body
+
+    text = re.sub(r"\\\((.*?)\\\)", lambda m: "\\(" + inner(m.group(1)) + "\\)",
+                  text, flags=re.S)
+    text = re.sub(r"\\\[(.*?)\\\]", lambda m: "\\[" + inner(m.group(1)) + "\\]",
+                  text, flags=re.S)
+    # "\(g(x) = x.\)" -> "\(g(x) = x\)." -- punctuation belongs to the sentence.
+    # Not after a digit, where the full stop could be a decimal point.
+    text = re.sub(r"(?<=[^\d\s])\s*([,.])\\\)", r"\\)\1", text)
+    return text
+
+
+def clean(text):
+    """Everything mechanical, leaving BLANK where each answer blank was."""
+    text = unwrap_pgml(text)
+    text = re.sub(r"\{\\answerRule\[[^\]]*\]\{[\d.]+\}\}", BLANK, text)
+    text = drop_group_containing(text, "Book:")
+    for pat in WEBWORK_PHRASES:
+        text = re.sub(pat, "", text, flags=re.M)
+    for pat in BREAKS:
+        text = re.sub(pat, "\n\n", text)
+    text = modernise(text)
+    text = replace_figures(text)
+    text = tidy_math(text)
+    # A table wants tabularray, which is a rewrite rather than a substitution.
+    text = re.sub(r"^(.*\\begin\{tabular\})",
+                  r"% TODO TABLE: rewrite as a tblr (tabularray).\n\1", text, flags=re.M)
+
+    lines = []
+    for line in text.split("\n"):
+        # PG's indentation means nothing, and a break leaves the spaces that
+        # followed it at the start of the next line. The scaffold indents anew.
+        line = line.strip()
+        # Runs of spaces between words.
+        line = re.sub(r"(?<=\S)[ \t]{2,}(?=\S)", " ", line)
+        # "\(f + g\) ?" -> "\(f + g\)?"
+        line = re.sub(r"\\\)\s+([?!:;])", r"\\)\1", line)
+        lines.append(line)
+    text = "\n".join(lines)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def drop_blank_labels(text):
+    """What WeBWorK put in front of a blank, gone with the blank.
+
+    A line that is only a short label and a blank -- "Domain: _", "Answer (in
+    interval notation): _" -- goes entirely. Elsewhere the blank simply vanishes.
+    """
+    text = re.sub(r"Answer\s*\([^)]*\)\s*:\s*" + BLANK, BLANK, text)
+    lines = []
+    for line in text.split("\n"):
+        if BLANK in line and re.fullmatch(rf"\s*[^.?!{BLANK}]{{0,40}}:\s*[{BLANK}\s]*", line):
+            continue
+        lines.append(line.replace(BLANK, "").rstrip())
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def flag_instructions(text):
+    """Put one % TODO above each paragraph that talks to a student at a keyboard.
+
+    A paragraph, not a line: PG wraps its sentences, so "You will not be told
+    ... before you submit." would otherwise collect a flag per line.
+    """
+    paragraphs = text.split("\n\n")
+    for n, para in enumerate(paragraphs):
+        prose = "\n".join(ln for ln in para.split("\n") if not ln.lstrip().startswith("%"))
+        if INSTRUCTION.search(prose):
+            paragraphs[n] = "% TODO WeBWorK instruction? Reword or cut for paper.\n" + para
+    return "\n\n".join(paragraphs)
+
+
+# ---------------------------------------------------------------------------
+# Structure: qparts from the answer blanks
+# ---------------------------------------------------------------------------
+
+def numbered_list_to_labels(text):
+    """\\item[_1.] x -> 1. x _ , so a PG numbered list reads like labelled lines."""
+    def item(m):
+        label = m.group(1).replace(BLANK, "").strip()
+        blanks = BLANK * m.group(1).count(BLANK)
+        return f"{label} {m.group(2).strip()} {blanks}"
+    if not re.search(r"\\item\[[^\]]*" + BLANK, text):
+        return text
+    text = re.sub(r"\\item\[([^\]]*)\]\s*(.*)", item, text)
+    return re.sub(r"\\(?:begin|end)\{(?:enumerate|itemize)\}\s*", "", text)
+
+
+def split_labelled(text):
+    """(stem, [(key, body), ...]) at line-start part labels, or None."""
+    lines = text.split("\n")
+    starts = [(i, PART_LABEL.match(ln)) for i, ln in enumerate(lines)]
+    starts = [(i, m) for i, m in starts if m]
+    if len(starts) < 2:
+        return None
+    stem = "\n".join(lines[:starts[0][0]]).strip()
+    parts = []
+    for n, (i, m) in enumerate(starts):
+        end = starts[n + 1][0] if n + 1 < len(starts) else len(lines)
+        body = "\n".join([lines[i][m.end():]] + lines[i + 1:end]).strip()
+        parts.append((label_key(m), body))
+    return stem, parts
+
+
+def split_unlabelled(text):
+    """(stem, [(None, body), ...]) when consecutive paragraphs each hold a blank.
+
+    The unlabelled layout -- "Domain: _" then "Range: _", or one "f(0) = _" per
+    line -- where PG's own line breaks are the only sign of the parts. Two or
+    more such paragraphs, with nothing but blanks-bearing paragraphs between
+    them, or it is not treated as parts at all.
+    """
+    paragraphs = text.split("\n\n")
+    holding = [i for i, p in enumerate(paragraphs) if BLANK in p]
+    if len(holding) < 2 or holding != list(range(holding[0], holding[-1] + 1)):
+        return None
+    stem = "\n\n".join(paragraphs[:holding[0]]).strip()
+    rest = [(None, paragraphs[i]) for i in holding]
+    if paragraphs[holding[-1] + 1:]:
+        # Keep what follows the parts attached to the last one, for now;
+        # take_tail() separates it again, as it does for labelled parts.
+        key, last = rest[-1]
+        rest[-1] = (key, last + "\n\n" + "\n\n".join(paragraphs[holding[-1] + 1:]))
+    return stem, rest
+
+
+def take_tail(parts):
+    """([(key, body), ...], tail): what follows the last blank leaves the last part.
+
+    A "Note: see the help for entering intervals" after part (d) belongs to the
+    whole problem, not to (d).
+    """
+    key, last = parts[-1]
+    paragraphs = last.split("\n\n")
+    final = max(i for i, p in enumerate(paragraphs) if BLANK in p)
+    parts[-1] = (key, "\n\n".join(paragraphs[:final + 1]))
+    return parts, "\n\n".join(paragraphs[final + 1:]).strip()
+
+
+def build_parts(statement):
+    """(stem, [(key, text), ...], tail) when the blanks mark out parts, else None.
+
+    Labelled parts first: (a), 1., a numbered list. Only when there are at
+    least two and EVERY part holds a blank -- a numbered line with no blank is
+    more likely a list in the prose than a part. Failing that, consecutive
+    paragraphs holding blanks. The keys (None when unlabelled) come back too,
+    to match against the solution's.
+    """
+    statement = numbered_list_to_labels(statement)
+    split = split_labelled(statement)
+    if split and not all(BLANK in body for _, body in split[1]):
+        split = None
+    split = split or split_unlabelled(statement)
+    if not split:
+        return None
+    stem, parts = split
+    parts, tail = take_tail(parts)
+    tidied = []
+    for key, body in parts:
+        body = re.sub(r"Answer\s*\([^)]*\)\s*:\s*", "", body)
+        body = re.sub(BLANK + r"\s*,", BLANK, body)  # "= _," -> "= _"
+        body = body.replace(BLANK, "")
+        # Removing a blank can leave the spaces from both of its sides.
+        body = "\n".join(re.sub(r"(?<=\S)[ \t]{2,}(?=\S)", " ", ln).rstrip()
+                         for ln in body.split("\n"))
+        body = re.sub(r"\n{3,}", "\n\n", body).strip()
+        body = re.sub(r"\s*:\s*$", "", body)        # "Domain:" -> "Domain"
+        tidied.append((key, body))
+    return drop_blank_labels(stem), tidied, drop_blank_labels(tail)
+
+
+def split_solution(solution, keys):
+    """[part solution, ...] when the solution's labels are exactly `keys`, else None."""
+    split = split_labelled(solution)
+    if not split:
+        return None
+    lead, parts = split
+    if [k for k, _ in parts] != keys:
+        return None
+    bodies = [body for _, body in parts]
+    if lead:
+        bodies[0] = lead + "\n\n" + bodies[0]
+    return bodies
+
+
+# ---------------------------------------------------------------------------
+# Assembling the file
+# ---------------------------------------------------------------------------
 
 def indent(text, spaces):
     pad = " " * spaces
     return "\n".join(pad + ln if ln.strip() else "" for ln in text.split("\n"))
 
 
+def tag(text, key):
+    """Value of a ## Key(value) line from the .pg tag block, or None."""
+    m = re.search(rf"^##\s*{key}\((.*?)\)\s*$", text, re.M)
+    return m.group(1).strip() if m else None
+
+
+def representative(src):
+    """The COURSE-REPRESENTATIVE mark, or None when the file has none."""
+    m = re.search(r"^#\s*COURSE-REPRESENTATIVE:\s*(\S+)", src, re.M)
+    return m.group(1) if m else None
+
+
+def provenance(pg):
+    """(tree, number, source) from <topic>/webwork/<tree>/<rest>.pg."""
+    parts = pg.parts
+    if "webwork" in parts:
+        at = len(parts) - 1 - parts[::-1].index("webwork")
+        tree = parts[at + 1]
+        number = "/".join(parts[at + 2:])
+    else:
+        tree, number = "unknown", pg.name
+    number = re.sub(r"\.pg$", "", number)   # the hand-written files omit it
+    source = {"diffyqs": "diffyqs-webwork", "opl": "webwork-open-problem-library"}.get(tree, tree)
+    return tree, number, source
+
+
 def scaffold(pg, seed):
     src = pg.read_text(encoding="utf-8")
     body = render(pg, seed)
-
-    # <topic>/webwork/<tree>/<section>/<file>.pg -> tree and the rest
-    parts = pg.parts
-    tree = parts[parts.index("webwork") + 1] if "webwork" in parts else "unknown"
-    number = "/".join(parts[parts.index("webwork") + 2:]) if "webwork" in parts else pg.name
-    number = re.sub(r"\.pg$", "", number)   # the hand-written files omit it
-    source = {"diffyqs": "diffyqs-webwork", "opl": "webwork-open-problem-library"}.get(tree, tree)
+    tree, number, source = provenance(pg)
 
     statement, _, solution = body.partition(SOLUTION_MARK)
     solution = SOLUTION_LEAD.sub("", solution, count=1)
+    statement = clean(statement)
+    solution = clean(solution).replace(BLANK, "")
 
-    statement = strip_furniture(statement)
-    solution = strip_furniture(solution) if solution.strip() else \
-        "% TODO no solution in the .pg -- write one, or take it from the answer key."
+    blanks = statement.count(BLANK)
+    built = build_parts(statement)
+
+    if built:
+        stem, parts, tail = built
+        keys = [k for k, _ in parts]
+        labelled = None not in keys
+        per_part = split_solution(solution, keys) if solution and labelled else None
+        lines = [flag_instructions(stem), "\\begin{qparts}"]
+        for n, (_, text) in enumerate(parts):
+            lines.append(indent("\\qpart " + text, 2))
+            if per_part:
+                lines.append(indent("\\begin{solution}[notitle]", 2))
+                lines.append(indent(per_part[n], 4))
+                lines.append(indent("\\end{solution}", 2))
+        lines.append("\\end{qparts}")
+        if tail:
+            lines += ["", flag_instructions(tail)]
+        if solution and not per_part:
+            lines += ["", "% TODO split this solution into the parts above: one",
+                      "% TODO \\begin{solution}[notitle] inside each \\qpart.",
+                      "\\begin{solution}[notitle]", indent(solution, 2), "\\end{solution}"]
+        problem = "\n".join(lines)
+        structure = (f"% TODO Structure: {len(parts)} qparts, built from the answer blanks. Check the\n"
+                     f"% TODO grouping -- several blanks may belong to one part"
+                     + (", and the solution is\n% TODO still whole: split it.\n" if solution and not per_part
+                        else ".\n"))
+    else:
+        problem = flag_instructions(drop_blank_labels(statement))
+        if solution:
+            problem += "\n\n\\begin{solution}[notitle]\n" + indent(solution, 2) + "\n\\end{solution}"
+        structure = ("% TODO Check the structure. Several answer blanks usually want \\begin{qparts};\n"
+                     "% TODO a PopUp set wants \\begin{matching}; a checkbox list wants \\begin{choices}.\n"
+                     "% TODO This scaffold could not find part labels, so it flattened them.\n"
+                     if blanks >= 2 else "")
+
+    if not solution:
+        problem += "\n\n% TODO no solution in the .pg -- write one, or take it from the answer key."
 
     claude = ("%\n% CLAUDE-GENERATED SOLUTION\n"
               "% Carried over from the .pg, where it was written by Claude (Opus 5).\n"
               if "CLAUDE-GENERATED SOLUTION" in src else "")
 
-    # COURSE-DIFFICULTY is ours and now exists on tagged problems, so transcribe
-    # it rather than asking for it again. The vocabulary is basic / moderate /
-    # challenging -- NOT "advanced", which this scaffold used to suggest. The
-    # distinction is deliberate (the webwork skill, building-a-practice-set §9): "advanced" implies
-    # both skippable and later material, and neither is true of a problem that is
-    # merely hard to start.
-    m = re.search(r'^#\s*COURSE-DIFFICULTY:\s*(basic|moderate|challenging)\s*$',
-                  src, re.M)
-    difficulty = (f"{{{m.group(1)}}},"
-                  if m else "{TODO},   % TODO  basic / moderate / challenging")
+    # COURSE-DIFFICULTY is ours and exists on tagged problems, so transcribe it
+    # rather than asking for it again. The vocabulary is basic / moderate /
+    # challenging -- NOT "advanced": the distinction is deliberate (the webwork
+    # skill, building-a-practice-set §9). "advanced" implies both skippable and
+    # later material, and neither is true of a problem that is merely hard to start.
+    m = re.search(r'^#\s*COURSE-DIFFICULTY:\s*(basic|moderate|challenging)\s*$', src, re.M)
+    difficulty = f"{{{m.group(1)}}}," if m else "{TODO},   % TODO  basic / moderate / challenging"
 
     author = tag(src, "Author")
     inst = tag(src, "Institution")
@@ -212,29 +547,106 @@ def scaffold(pg, seed):
 % TODO the invariant checked across the WHOLE random range -- see the .pg's own
 % TODO header, which usually records it already.
 %
-% TODO Check the structure. Several answer blanks usually want \\begin{{qparts}};
-% TODO a PopUp set wants \\begin{{matching}}; a checkbox list wants \\begin{{choices}}.
-% TODO This scaffold flattens all of them.
-{claude}\\begin{{problem}}
-{indent(statement, 2)}
-
-  \\begin{{solution}}
-{indent(solution, 4)}
-  \\end{{solution}}
+{structure}{claude}\\begin{{problem}}
+{indent(problem, 2)}
 \\end{{problem}}
 """
 
 
+# ---------------------------------------------------------------------------
+# Finding the problems, and where they go
+# ---------------------------------------------------------------------------
+
+def gather(paths):
+    """[(resolved .pg, named explicitly?)], each problem once, in a stable order."""
+    found, seen = [], set()
+    for arg in paths:
+        p = pathlib.Path(arg).expanduser()
+        if p.is_dir():
+            # rglob lists the symlinks in a group directory as files; sorted,
+            # so a group's NN- order is the conversion order.
+            candidates = [(q, False) for q in sorted(p.rglob("*.pg"))]
+        elif p.suffix == ".pg":
+            candidates = [(p, True)]
+        else:
+            print(f"pg-to-latex: skipping {arg}: not a .pg file or a directory", file=sys.stderr)
+            continue
+        for q, explicit in candidates:
+            if "_for-upload" in q.parts:        # generated copies, not sources
+                continue
+            if not q.exists():
+                print(f"pg-to-latex: skipping {q}: broken link", file=sys.stderr)
+                continue
+            real = q.resolve()
+            if real not in seen:
+                seen.add(real)
+                found.append((real, explicit))
+    return found
+
+
+def out_dir(pg, out):
+    """Where this problem's .tex goes: -o, else <topic>/problems/."""
+    if out:
+        return pathlib.Path(out).expanduser()
+    parts = pg.parts
+    if "webwork" not in parts:
+        raise Skip("not under a <topic>/webwork/ tree, so there is no <topic>/problems/ "
+                   "to write to; give -o DIR")
+    at = len(parts) - 1 - parts[::-1].index("webwork")
+    return pathlib.Path(*parts[:at]) / "problems"
+
+
+def already_converted(directory, number):
+    """The .tex in `directory` whose \\ProblemMeta number is `number`, or None."""
+    if not directory.is_dir():
+        return None
+    want = re.compile(r"^\s*number\s*=\s*\{" + re.escape(number) + r"\}", re.M)
+    for tex in sorted(directory.glob("*.tex")):
+        if want.search(tex.read_text(encoding="utf-8", errors="replace")):
+            return tex
+    return None
+
+
+def convert(pg, args):
+    """Convert one problem; return the path written, or raise Skip."""
+    src = pg.read_text(encoding="utf-8")
+    mark = representative(src)
+    if not args.any and mark not in ("R", "r"):
+        raise Skip("not a representative (COURSE-REPRESENTATIVE: -); --any converts it"
+                   if mark else
+                   "no COURSE-REPRESENTATIVE line -- not forked, or not marked yet; --any converts it")
+
+    if args.out == "-":
+        print(scaffold(pg, args.seed), end="")
+        return None
+
+    directory = out_dir(pg, args.out)
+    _, number, _ = provenance(pg)
+    done = already_converted(directory, number)
+    if done:
+        raise Skip(f"already converted, as {done.name}")
+    name = args.name or pg.stem.replace("_", "-")
+    dest = directory / f"{name}.tex"
+    if dest.exists():
+        raise Skip(f"refusing to overwrite {dest}")
+
+    text = scaffold(pg, args.seed)
+    directory.mkdir(parents=True, exist_ok=True)
+    dest.write_text(text, encoding="utf-8")
+    return dest
+
+
 def main():
     ap = argparse.ArgumentParser(add_help=False)
-    ap.add_argument("pg", nargs="?")
+    ap.add_argument("paths", nargs="*")
     ap.add_argument("-s", "--seed", type=int, default=1234)
     ap.add_argument("-o", "--out")
     ap.add_argument("-n", "--name")
+    ap.add_argument("--any", action="store_true")
     ap.add_argument("-h", "--help", action="store_true")
     args = ap.parse_args()
 
-    if args.help or not args.pg:
+    if args.help or not args.paths:
         # Echo the header block, so -h cannot drift from the comment above.
         for i, line in enumerate(pathlib.Path(__file__).read_text().split("\n")):
             if i == 0:
@@ -244,24 +656,30 @@ def main():
             print(line[2:] if line.startswith("# ") else line[1:])
         return 0
 
-    pg = pathlib.Path(args.pg).resolve()
-    if not pg.is_file():
-        sys.exit(f"pg-to-latex: no such file: {pg}")
+    problems = gather(args.paths)
+    if not problems:
+        sys.exit("pg-to-latex: no .pg files found")
+    if len(problems) > 1 and (args.name or args.out == "-"):
+        sys.exit("pg-to-latex: -n and -o - take one problem, and these paths hold "
+                 f"{len(problems)}")
 
-    text = scaffold(pg, args.seed)
+    status, wrote, skipped = 0, 0, 0
+    for pg, explicit in problems:
+        try:
+            dest = convert(pg, args)
+        except Skip as why:
+            skipped += 1
+            print(f"skipped {pg.name}: {why}", file=sys.stderr)
+            if explicit or "pr-pg-render failed" in str(why):
+                status = 1
+            continue
+        if dest:
+            wrote += 1
+            print(f"wrote {dest}")
 
-    if not args.out:
-        print(text, end="")
-        return 0
-
-    name = args.name or pg.stem.replace("_", "-")
-    dest = pathlib.Path(args.out).expanduser() / f"{name}.tex"
-    if dest.exists():
-        sys.exit(f"pg-to-latex: refusing to overwrite {dest}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(text, encoding="utf-8")
-    print(f"wrote {dest}")
-    return 0
+    if len(problems) > 1:
+        print(f"pg-to-latex: {wrote} written, {skipped} skipped", file=sys.stderr)
+    return status
 
 
 if __name__ == "__main__":
