@@ -5,13 +5,24 @@
 #
 # Two independent checks. With no flags, both run.
 #
-#   --paths   Every `source_file` line in every .def file under the course's
-#             WEBWORK/ directory points at a problem that actually exists.
-#             (_assessments/webwork-assignments/ is the old name for it, still
-#             honoured.) This is the check that would have caught the
-#             Module 6 renumbering hazards, where a set referenced a problem
-#             upstream had quietly renumbered away. Finding NO .def files is
-#             itself a failure -- see the note above the check.
+#   --paths   Every reference to a problem resolves. There are two kinds:
+#
+#             - `source_file` lines, in the .def files in the course's WEBWORK/
+#               directory (_assessments/webwork-assignments/ is the old name for
+#               it, still honoured) and in any .def under a topic's
+#               webwork-sets/, except the generated webwork-sets/_for-upload/.
+#             - symlinks, in every group directory under a topic's
+#               webwork-sets/. Each must resolve to a file. In a SETTLED group
+#               directory it must also be relative and land inside that topic's
+#               own webwork/ -- a link still pointing at an upstream clone
+#               means the problem was never forked -- and a .pg there that is
+#               not a link is an error too. A draft directory, named
+#               *--CANDIDATES-CLAUDE, may link anywhere.
+#
+#             This is the check that would have caught the Module 6
+#             renumbering hazards, where a set referenced a problem upstream had
+#             quietly renumbered away. Finding NO references of either kind is
+#             itself a failure -- see the note at the end of the check.
 #
 #   --drift   Every .pg file under a topic's webwork/diffyqs/ and webwork/opl/
 #             either matches the reference clone it was copied from, or records
@@ -20,9 +31,10 @@
 #             upstream fix something I should look at, and have I accidentally
 #             edited a file I'm supposed to be tracking?"
 #
-# TOPIC restricts --drift to named topic directories; default is all of them.
-# It does NOT restrict --paths: the sets live in one course-level directory and
-# each names its own topic, so there is nothing per-topic to narrow.
+# TOPIC restricts --drift, and the topic half of --paths, to named topic
+# directories; default is every one with a webwork/ or webwork-sets/ in it. The
+# course-level .def files are always checked: each names its own topics, so
+# there is nothing per-topic to narrow.
 #
 # WEBWORK_SETS_DIR overrides where the .def files are looked for; DIFFYQS_CLONE,
 # OPL_CLONE and OPL_CONTRIB override the reference clones, and OPL_ROOT moves
@@ -34,6 +46,14 @@
 # rewritten far enough that upstream's author no longer belongs on them.
 #
 # Exit status is 1 if any check failed, so this is usable in a pre-push hook.
+#
+# KNOWN GAPS in --paths, both found on math1003's older sets:
+#
+#   - A server-flat `local/...' path, with no topic in front of it -- the form
+#     the diagnostic test's .def uses -- matches none of the source forms below
+#     and reports as UNKNOWN SOURCE, although it may be fine on the server.
+#   - A gateway quiz's `group:<name>' pool references are not modelled at all,
+#     so a gateway .def written that way can never pass.
 
 set -uo pipefail
 
@@ -75,10 +95,13 @@ if [ ! -d "$REPO/.course-machinery" ]; then
     exit 2
 fi
 
-# Where the set definitions live. They sit at COURSE level, not inside a topic
-# repo: a .def file is course curation -- which problems, in which order, under
-# which module number -- while a topic repo owns the problems themselves and is
-# meant to be reusable in another course that will write its own .def files.
+# Where the COURSE-LEVEL set definitions live. Since 2026-09-13 that is only the
+# sets that draw on several topics -- a gateway, a diagnostic, a review. A
+# single-section practice set is curated inside its topic, as group directories
+# of symlinks under <topic>/webwork-sets/, and its .def is generated from them.
+# That is safe for a topic repo meant to be reused by another course, because
+# what it commits is only membership and order; dates, headers and set type are
+# the generator's parameters. So this directory may now legitimately be absent.
 # Must come after REPO, which it reads.
 #
 # WEBWORK/ is the current name. It replaced _assessments/webwork-assignments/
@@ -133,11 +156,12 @@ if [ "$do_paths" -eq 0 ] && [ "$do_drift" -eq 0 ]; then
     do_drift=1
 fi
 
-# Default to every topic directory that actually has a webwork/ tree.
+# Default to every topic directory that has a webwork/ tree or set directories.
 if [ ${#topics[@]} -eq 0 ]; then
-    for d in "$REPO"/*/webwork; do
-        [ -d "$d" ] || continue
-        topics+=("$(basename "$(dirname "$d")")")
+    for d in "$REPO"/*/; do
+        d=${d%/}
+        [ -d "$d/webwork" ] || [ -d "$d/webwork-sets" ] || continue
+        topics+=("$(basename "$d")")
     done
 fi
 
@@ -166,42 +190,166 @@ failed=0
 # Contrib used to sit under opl/, which read as "the Contrib part of the OPL"
 # -- a tree that does not exist. Moved to a sibling 2026-09-11.
 # ---------------------------------------------------------------------------
-check_paths() {
-    local def base rel src files=0 bad=0 dn dbad
 
-    for def in "$SETS_DIR"/*.def; do
-        [ -e "$def" ] || continue
-        files=$((files + 1))
-        base=$(basename "$def" .def)
-        dn=0
-        dbad=0
-        while IFS= read -r rel; do
-            dn=$((dn + 1))
-            case "$rel" in
-                diffyqs-webwork/*) src="$DIFFYQS_CLONE/${rel#diffyqs-webwork/}" ;;
-                Library/*)         src="$OPL_CLONE/${rel#Library/}" ;;
-                Contrib/*)         src="$OPL_CONTRIB/${rel#Contrib/}" ;;
-                */diffyqs/*|*/opl/*|*/contrib/*|*/local/*)
-                    # Topic-rooted: strip the leading topic name, which is the
-                    # server-side directory, and look inside this repo.
-                    src="$REPO/${rel%%/*}/webwork/${rel#*/}" ;;
-                *)
-                    echo "  ? UNKNOWN SOURCE  $base: $rel"
-                    dbad=$((dbad + 1)); continue ;;
-            esac
-            if [ ! -f "$src" ]; then
-                echo "  ✗ MISSING  $base: $rel"
-                dbad=$((dbad + 1))
+# Running totals across both kinds of reference, for the verdict at the end.
+refs=0
+bad=0
+
+# One .def file, reported under LABEL.
+check_def() {
+    local def=$1 label=$2 rel src dn=0 dbad=0
+
+    while IFS= read -r rel; do
+        dn=$((dn + 1))
+        case "$rel" in
+            diffyqs-webwork/*) src="$DIFFYQS_CLONE/${rel#diffyqs-webwork/}" ;;
+            Library/*)         src="$OPL_CLONE/${rel#Library/}" ;;
+            Contrib/*)         src="$OPL_CONTRIB/${rel#Contrib/}" ;;
+            */diffyqs/*|*/opl/*|*/contrib/*|*/local/*)
+                # Topic-rooted: strip the leading topic name, which is the
+                # server-side directory, and look inside this repo.
+                src="$REPO/${rel%%/*}/webwork/${rel#*/}" ;;
+            *)
+                echo "  ? UNKNOWN SOURCE  $label: $rel"
+                dbad=$((dbad + 1)); continue ;;
+        esac
+        if [ ! -f "$src" ]; then
+            echo "  ✗ MISSING  $label: $rel"
+            dbad=$((dbad + 1))
+        fi
+    done < <(grep -h '^source_file' "$def" | sed 's|.*= *||')
+
+    refs=$((refs + dn))
+    bad=$((bad + dbad))
+    if [ "$dbad" -eq 0 ]; then
+        printf '  %-44s %3d references, all resolve\n' "$label" "$dn"
+    else
+        printf '  %-44s %3d references, %d BROKEN\n' "$label" "$dn" "$dbad"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Group directories
+#
+# A section's practice set is curated as a run of group directories under
+# <topic>/webwork-sets/, named <section>_<Title>-<nn>-<Group>, each holding
+# symlinks named NN-originalname.pg. The directory is the record of which
+# problems are in the set and in what order; the .def is generated from it.
+#
+# Two kinds, told apart by name:
+#
+#   ...-<nn>-<Group>                    SETTLED. Committed. Every link must be
+#                                       RELATIVE (../../webwork/...), so it
+#                                       works on every machine, and must land in
+#                                       this topic's own webwork/. A link into an
+#                                       upstream clone means the problem was
+#                                       never forked, and a link into another
+#                                       topic crosses a repo boundary.
+#   ...-<nn>-<Group>--CANDIDATES-CLAUDE A DRAFT for review. Gitignored. Links
+#                                       point into the upstream clones, because
+#                                       nothing has been forked yet, so only
+#                                       "does it resolve" applies.
+#
+# Other files in a group directory -- a README.md of notes -- are ignored. A
+# real .pg file in a settled one is not: the problem would then exist twice,
+# and the copy outside webwork/ escapes the drift check.
+# ---------------------------------------------------------------------------
+
+# One group directory in TOPIC.
+check_group() {
+    local dir=$1 topic=$2 name link shown target landed own inside n=0 gbad=0 settled=1
+
+    name=$(basename "$dir")
+    case "$name" in *--CANDIDATES-CLAUDE) settled=0 ;; esac
+
+    # Compare PHYSICAL paths (pwd -P), so a topic reached through a symlink
+    # still counts as itself. Empty if the topic has no webwork/ at all, and
+    # then no settled link can land in it.
+    own=$(cd "$REPO/$topic/webwork" 2> /dev/null && pwd -P)
+
+    for link in "$dir"/*; do
+        shown="$topic/webwork-sets/$name/$(basename "$link")"
+        if [ -L "$link" ]; then
+            n=$((n + 1))
+            target=$(readlink "$link")
+
+            # -f follows the link, so this is "does it reach a real file".
+            if [ ! -f "$link" ]; then
+                echo "  ✗ BROKEN     $shown -> $target"
+                gbad=$((gbad + 1))
+                continue
             fi
-        done < <(grep -h '^source_file' "$def" | sed 's|.*= *||')
+            [ "$settled" -eq 1 ] || continue
 
-        bad=$((bad + dbad))
-        if [ "$dbad" -eq 0 ]; then
-            printf '  %-26s %3d references, all resolve\n' "$base" "$dn"
-        else
-            printf '  %-26s %3d references, %d BROKEN\n' "$base" "$dn" "$dbad"
+            # Unforked before absolute: a link into an upstream clone is
+            # usually absolute too, and "never forked" is the finding that
+            # matters. The directory it lands in is resolved from the link's
+            # own directory, which is what a relative target is relative to.
+            landed=$(cd "$dir" && cd "$(dirname "$target")" && pwd -P)
+            # Test $own for empty first: as a pattern, an empty one is `/*',
+            # which matches every absolute path.
+            inside=0
+            if [ -n "$own" ]; then
+                case "$landed/" in "$own"/*) inside=1 ;; esac
+            fi
+            if [ "$inside" -eq 0 ]; then
+                echo "  ✗ NOT FORKED $shown -> $target"
+                gbad=$((gbad + 1))
+            elif [ "${target#/}" != "$target" ]; then
+                echo "  ✗ ABSOLUTE   $shown -> $target"
+                gbad=$((gbad + 1))
+            fi
+        elif [ "$settled" -eq 1 ] && [ -f "$link" ] && [ "${link%.pg}" != "$link" ]; then
+            echo "  ✗ NOT A LINK $shown"
+            gbad=$((gbad + 1))
         fi
     done
+
+    refs=$((refs + n))
+    bad=$((bad + gbad))
+    [ "$settled" -eq 1 ] || name="$name (draft)"
+    if [ "$n" -eq 0 ] && [ "$gbad" -eq 0 ]; then
+        printf '    %-60s no links\n' "$name"
+    elif [ "$gbad" -eq 0 ]; then
+        printf '    %-60s %3d links, all resolve\n' "$name" "$n"
+    else
+        printf '    %-60s %3d links, %d FINDINGS\n' "$name" "$n" "$gbad"
+    fi
+}
+
+check_paths() {
+    local def topic sets dir found_groups=0
+
+    echo "Set definition references"
+    for def in "$SETS_DIR"/*.def; do
+        [ -e "$def" ] || continue
+        check_def "$def" "$(basename "$def" .def)"
+    done
+    for topic in ${topics[@]+"${topics[@]}"}; do
+        sets="$REPO/$topic/webwork-sets"
+        [ -d "$sets" ] || continue
+        # A review .def may sit in a draft directory. The generated ones in
+        # _for-upload/ are build output, and are not the record of anything.
+        while IFS= read -r def; do
+            check_def "$def" "$topic/webwork-sets/${def#"$sets/"}"
+        done < <(find "$sets" -path "$sets/_for-upload" -prune -o -name '*.def' -print | sort)
+    done
+    echo
+
+    echo "Set group directories"
+    for topic in ${topics[@]+"${topics[@]}"}; do
+        sets="$REPO/$topic/webwork-sets"
+        [ -d "$sets" ] || continue
+        echo "  $topic/webwork-sets/"
+        for dir in "$sets"/*/; do
+            dir=${dir%/}
+            [ -d "$dir" ] || continue
+            [ "$(basename "$dir")" = _for-upload ] && continue
+            found_groups=1
+            check_group "$dir" "$topic"
+        done
+    done
+    [ "$found_groups" -eq 1 ] || echo "  none"
 
     # Finding nothing is a FAILURE, not a quiet "no .def files". This check
     # used to be per-topic and globbed <topic>/webwork/*.def; when the sets
@@ -209,10 +357,17 @@ check_paths() {
     # per topic and still exited 0, so --paths silently checked nothing and
     # webwork-deploy went on trusting it. A check that cannot find its input
     # must say so loudly -- that is the whole point of having it.
-    if [ "$files" -eq 0 ]; then
-        echo "  ✗ NO .def FILES FOUND in $SETS_DIR"
-        echo "    --paths checked nothing. If the sets have moved, point"
-        echo "    WEBWORK_SETS_DIR at them or fix SETS_DIR at the top of this script."
+    #
+    # Since the sets moved into the topics, the input is either kind of
+    # reference, so the condition is "neither kind": empty group directories
+    # and a .def with no source_file lines count as nothing too.
+    if [ "$refs" -eq 0 ]; then
+        echo "  ✗ NO PROBLEM REFERENCES FOUND"
+        echo "    --paths checked nothing. It looked for .def files in"
+        echo "      $SETS_DIR"
+        echo "    and for .def files and group directories in"
+        echo "      <topic>/webwork-sets/ for: ${topics[*]:-(no topics found)}"
+        echo "    If the sets have moved, point WEBWORK_SETS_DIR at them."
         failed=1
         return
     fi
@@ -343,7 +498,6 @@ check_drift() {
 }
 
 if [ "$do_paths" -eq 1 ]; then
-    echo "Set definition references"
     check_paths
     echo
 fi

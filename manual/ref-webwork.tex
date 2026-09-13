@@ -13,11 +13,9 @@ take no course at all.
 
 \subsection*{Where a course keeps its set definitions}
 
-A \file{.def} file is course curation --- which problems, in which order, for
-which course --- while a topic repo owns the problems themselves and is meant
-to be reusable by a second course that writes its own sets. So the
-\file{.def} files sit at \emph{course} level, and both scripts resolve that
-directory the same way:
+Since 2026-09-13 a single-section practice set is curated \emph{inside its topic}, as group directories of symlinks under \file{<topic>/webwork-sets/}, and its \file{.def} is generated from them.
+That is safe for a topic repo meant to be reused by a second course, because what it commits is only membership and order; dates, headers and set type are parameters of the generation.
+Only sets that draw on several topics --- a gateway, a diagnostic, a review --- still keep a hand-written \file{.def} at \emph{course} level, and both scripts resolve that directory the same way:
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
@@ -42,18 +40,42 @@ webwork-check [--paths] [--drift] [TOPIC ...]
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
-\texttt{-{}-paths} & every \texttt{source\_file} line in every \file{.def}
-  points at a problem that exists. Finding \emph{no} \file{.def} files is
-  itself a failure --- a check that cannot find its input must say so.\\
+\texttt{-{}-paths} & every reference to a problem resolves: each
+  \texttt{source\_file} line in a course-level \file{.def} or one under
+  \file{webwork-sets/}, and each symlink in a group directory. Finding
+  \emph{no} references of either kind is itself a failure --- a check that
+  cannot find its input must say so.\\
 \texttt{-{}-drift} & every \file{.pg} under a topic's \file{webwork/diffyqs/}
   and \file{webwork/opl/} either matches the clone it was copied from, or
   records the blob it was copied from and is checked against that.\\
 \end{tabularx}
 \end{center}
 
-With no flag, both run. A \env{TOPIC} operand narrows \texttt{-{}-drift} only:
-the sets live in one course-level directory and each names its own topic, so
-there is nothing per-topic for \texttt{-{}-paths} to select.
+With no flag, both run.
+A \env{TOPIC} operand narrows \texttt{-{}-drift} and the topic half of \texttt{-{}-paths}; the course-level \file{.def} files are always checked, since each names its own topics.
+
+\paragraph{Group directories.}
+A group directory is named \file{<section>\_<Title>-<nn>-<Group>} and holds symlinks named \file{NN-originalname.pg}.
+In a \emph{settled} one, which is committed, every link must be relative and land inside that topic's own \file{webwork/}.
+A \emph{draft} one, named \file{\ldots{}-{}-CANDIDATES-CLAUDE} and gitignored, links into the upstream clones because nothing has been forked yet, so only ``does it resolve'' applies.
+Other files, such as a \file{README.md} of notes, are ignored.
+The generated \file{webwork-sets/\_for-upload/} is skipped entirely.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{BROKEN} & the link does not reach a file. Any directory.\\
+\texttt{NOT FORKED} & a settled link lands outside the topic's
+  \file{webwork/} --- in an upstream clone, or in another topic's repo.\\
+\texttt{ABSOLUTE} & a settled link is forked but absolute, so it breaks on
+  any other machine.\\
+\texttt{NOT A LINK} & a real \file{.pg} in a settled directory: the problem
+  would exist twice, and the copy escapes the drift check.\\
+\end{tabularx}
+\end{center}
+
+\paragraph{Known gaps.}
+A server-flat \file{local/\ldots} path with no topic in front of it, as in MATH1003's diagnostic test, reports as \texttt{UNKNOWN SOURCE}.
+A gateway's \texttt{group:<name>} pool references are not modelled, so such a \file{.def} cannot pass.
 
 \paragraph{The OPL has two problem trees.}
 This is the trap worth knowing. The Open Problem Library clone holds
