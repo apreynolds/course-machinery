@@ -1,12 +1,15 @@
-\section{webwork-check and webwork-deploy}\label{sec:ref-webwork}
+\section{The WeBWorK scripts}\label{sec:ref-webwork}
 
-The two WeBWorK scripts moved into the machinery on 2026-09-06 and were not
-documented at the time. This entry is written retrospectively, so it records
-what they do \emph{now} rather than how they got here.
+\texttt{webwork-check} and \texttt{webwork-deploy} moved into the machinery on
+2026-09-06 and were not documented at the time. This entry is written
+retrospectively, so it records what they do \emph{now} rather than how they got
+here.
 
 Both take the course repo to be the \emph{parent} of the machinery directory,
 overridable with \env{COURSE\_ROOT}, and both refuse to run if that parent has
 no \file{.course-machinery/} in it.
+\texttt{pg-profile} and \texttt{pg-answer-variation}, at the end of this entry,
+take no course at all.
 
 \subsection*{Where a course keeps its set definitions}
 
@@ -156,3 +159,43 @@ the set unresolvable.
 \texttt{webwork-deploy} runs \texttt{webwork-check} first and refuses to build
 if it fails --- shipping a set whose paths do not resolve is the failure mode
 this layout exists to prevent.
+
+\subsection*{pg-profile and pg-answer-variation}
+
+Two gates for judging a candidate problem before it goes into a set.
+Both render the problem rather than reading its source, because a statement read from a slice of the source hides its later answer blanks exactly where the slice ends.
+They moved here from MATH1003's \file{.course-machinery-local/} on 2026-09-13: nothing in them is specific to a course, and a course with an empty overlay could not run them at all.
+
+Both need \texttt{pr-pg-render} on \env{PATH}, which renders a \file{.pg} locally through the pg library with no server.
+Both take any mix of \file{.pg} files and directories, searched recursively.
+
+\begin{manexsource}
+pg-profile [-n SEEDS] [--no-statement] [--tier1-only] FILE.pg|DIR ...
+\end{manexsource}
+
+Everything needed to judge one problem, on one screen: its OPL tags, the macros it loads, every answer blank, whether its checker accepts its own stated answers, a seed sweep, whether the answers vary, the state of its solution, and the full statement.
+Findings come in two tiers, and only the first is a veto.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+Tier 1 & \emph{buggy}: errors on some seeds, a checker that rejects its own
+  answer, a macro the pinned pg clone lacks, or a problem whose every blank ---
+  a multiple-choice one included --- is the same on every seed. Sets the exit
+  status.\\
+Tier 2 & \emph{editable}: a video embed, named software, a claimed attempt
+  limit, a cosmetic warning, a commented-out solution stub. A reason to fork and
+  edit the problem, not to reject it.\\
+\end{tabularx}
+\end{center}
+
+Macros are checked against the pg clone at \env{PG\_ROOT}, the same variable \texttt{pr-pg-render} reads.
+A clean profile means the problem \emph{works}, never that it is good: correctness of the answer, clarity, and fit to the course stay human work.
+
+\begin{manexsource}
+pg-answer-variation [-n SEEDS] [-q] FILE.pg|DIR ...
+\end{manexsource}
+
+The narrower check, for a whole finished selection: do the answers change with the seed?
+A problem can redraw its graph and move its coefficients while its correct answer stays a literal, and nothing errors, so only comparing answers across seeds finds it.
+\texttt{CONSTANT-CHOICE} (a multiple-choice blank that never moves) sets the exit status; \texttt{CONSTANT} (every blank fixed) is reported but can be legitimate.
+\texttt{-n} defaults to 8 seeds, and \texttt{-q} prints only the problems that fail.

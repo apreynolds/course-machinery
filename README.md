@@ -84,6 +84,10 @@ which one:
 - `webwork-check` / `webwork-deploy` — verify a course's WeBWorK set
   definitions and problem trees, and build one uploadable tarball per topic.
   Only useful to a course that assigns WeBWorK, but many do.
+- `pg-profile` / `pg-answer-variation` — judge a WeBWorK `.pg` candidate by
+  rendering it: every answer blank, a seed sweep, whether its checker accepts its
+  own answers, and whether the answers actually change with the seed. They need
+  `pr-pg-render` on `PATH`, and nothing from the course.
 - `build-d2l-import.py` — read a quiz's pool `.tex` files and emit a D2L
   question-import CSV, plus a paste sheet for entering the questions by hand.
 - `find-problems` / `find-facts` — search a bank by its metadata blocks,

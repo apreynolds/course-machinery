@@ -1,0 +1,417 @@
+#!/usr/bin/env python3
+#
+# pg-profile — everything needed to judge a .pg candidate, on one screen
+# Usage: pg-profile [-n SEEDS] [--no-statement] [--tier1-only] FILE.pg|DIR ...
+#
+#   -n SEEDS         seeds to sweep for breakage (default 30)
+#   --no-statement   omit the full statement (keep the profile)
+#   --tier1-only     print only problems with a blocking finding
+#   -h, --help       this text
+#
+# WHY THIS EXISTS. A candidate cannot be judged from its source by eye. It was
+# tried for the OS1.1 set and it failed in a specific, repeatable way: statements
+# were read truncated to their first few lines, so a THIRD answer blank went
+# unseen on two problems, both of which turned out to be difference-quotient
+# problems -- one of them TAGGED as such. A multi-part problem hides its later
+# parts exactly where a `head' cuts.
+#
+# So: never summarise a problem from a slice of its source. Render it, read every
+# answer blank, and read the whole statement. That is all this does, plus the
+# mechanical checks that are easy to forget.
+#
+# TWO TIERS, and only one of them is a veto. This is the rubric:
+#
+#   TIER 1 -- BUGGY. The problem does not work. This is the only blocking class,
+#            and it sets the exit status. Breakage on some seeds, a checker that
+#            rejects its own stated answer, a missing macro, an answer that never
+#            changes.
+#
+#   TIER 2 -- EDITABLE. Context that belongs to someone else's course: a video
+#            embed, instructions about attempts that contradict the set, a
+#            solution written for Maple, institutional branding. NONE of this
+#            disqualifies a problem. It is a text edit, and it is the REASON a
+#            problem gets copied into <topic>/webwork/opl/ and given an
+#            UPSTREAM-BLOB line. Tier 2 findings populate an edit queue; they do
+#            not shrink the candidate pool.
+#
+# WHAT THIS CANNOT CHECK, and must not be read as having checked: whether the
+# answer is mathematically RIGHT, whether the wording is clear, whether a problem
+# assumes context a student here lacks, and whether a video is any good. Those
+# stay human work. A clean profile means "it works", never "it is good".
+
+import argparse
+import pathlib
+import re
+import subprocess
+import sys
+
+# Warnings that only webwork2 can satisfy. They fire on every local render of an
+# otherwise perfect problem, and reading them as breakage produces false
+# rejections -- Mizzou's FracSqrt.pg looked broken for exactly this reason.
+SERVER_ONLY_WARNINGS = [
+    "numOfAttempts",
+    "formattedDueDate",
+    "PeriodicRerandomization",
+    "$WW",
+    "studentName",
+    "setNumber",
+]
+
+# Answer types drawn from a small closed vocabulary, where a constant answer is
+# gameable in a way a constant Formula is not.
+#
+# `String' belongs here even though the student types it rather than picking it.
+# In this corpus str_cmp is used for classification words -- even/odd/neither,
+# yes/no, increasing/decreasing -- so a constant String answer is the same defect
+# as a constant PopUp. Found 2026-09-11 on Determine_EOO_Abs_Even.pg, which is
+# "even" on every seed and was missed while PopUp-only.
+CHOICE_TYPES = re.compile(r"\((popup|radio|checkbox|select|multiple|string)", re.I)
+
+# Tier 2 patterns, applied to the WHOLE file body, not just the statement: a
+# YouTube embed is usually assembled in the Perl above the statement and reaches
+# the page as an interpolated variable, so a statement-only sweep misses it.
+TIER2_PATTERNS = [
+    (r"youtube\.com|youtu\.be", "embeds a YouTube video"),
+    (r"\b(maple|mathematica|matlab|geogebra|excel)\b",
+     "names specific software (solution or instructions may assume it)"),
+    (r"\bTI-?8[0-9]", "names a specific calculator model"),
+    (r"(only have|you have)\s+\w+\s+(chances|attempts|tries)",
+     "text claims a limit on attempts -- will contradict an unlimited set"),
+    (r"your instructor|this course|your teacher|our class",
+     "refers to a specific course or instructor"),
+    (r"click here", "says 'click here' (usually an external link)"),
+]
+
+
+def run(cmd):
+    """Run a command, returning (stdout+stderr, returncode)."""
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    return p.stdout + p.stderr, p.returncode
+
+
+def deprecated_macros(pg_root):
+    """The set of macro filenames pg currently files under deprecated/."""
+    d = pg_root / "macros" / "deprecated"
+    return {f.name for f in d.glob("*.pl")} if d.is_dir() else set()
+
+
+def known_macros(pg_root):
+    """Every macro filename the pinned pg clone provides, at any depth."""
+    m = pg_root / "macros"
+    return {f.name for f in m.rglob("*.pl")} if m.is_dir() else set()
+
+
+def tag(text, name):
+    """The value of an OPL `## Name(value)' header, or None."""
+    m = re.search(rf"^## {name}\((.*)\)\s*$", text, re.M)
+    return m.group(1).strip() if m else None
+
+
+def loaded_macros(text):
+    """Macro filenames from the loadMacros() call."""
+    m = re.search(r"loadMacros\s*\((.*?)\)\s*;", text, re.S)
+    if not m:
+        return []
+    return re.findall(r"[\"']([^\"']+\.pl)[\"']", m.group(1))
+
+
+def has_live_solution(text):
+    """Distinguish a real solution from the commented placeholder stub.
+
+    A BEGIN_*SOLUTION marker proves nothing: the whole CCCS collection ships its
+    solution block commented out around '#Solution explanation goes here.'
+    """
+    if re.search(r"^\s*BEGIN_(PGML_)?SOLUTION", text, re.M):
+        return "stub" if re.search(r"goes here", text, re.I) else "present"
+    if re.search(r"SOLUTION\s*\(", text):
+        return "present"
+    if re.search(r"^\s*#\s*BEGIN_(PGML_)?SOLUTION", text, re.M):
+        return "stub"
+    return "none"
+
+
+def parse_answers(render):
+    """[(label, type, value)] from a pr-pg-render listing."""
+    out = []
+    for line in render.splitlines():
+        m = re.match(r"\s*(AnSwEr\d+)\s+Value\s+\(([^)]*)\)\s*(.*)", line)
+        if m:
+            out.append((m.group(1), m.group(2), m.group(3).strip()))
+    return out
+
+
+def real_problems(render):
+    """(errors, warnings), each minus the ones only a server can satisfy.
+
+    The distinction matters and conflating them was wrong. An ERROR means the
+    problem did not render -- blocking. A WARNING usually means it rendered fine
+    and grumbled: a missing width on an image(), an uninitialised option. That is
+    a fixable blemish, not a broken problem, so it belongs in tier 2.
+
+    Found 2026-09-11 on Inc_Dec_Const_Dom_Range_01.pg, which computes all seven
+    of its answers correctly on every seed and was being rejected outright for
+    two cosmetic warnings out of PGbasicmacros.
+    """
+    errors, warnings = [], []
+    for line in render.splitlines():
+        is_warn = "WARNING" in line or "Use of uninitialized" in line
+        is_err = "ERROR" in line
+        if not (is_warn or is_err):
+            continue
+        if any(s in line for s in SERVER_ONLY_WARNINGS):
+            continue
+        (errors if is_err else warnings).append(line.strip())
+    return errors, warnings
+
+
+def statement(text):
+    """The problem statement: PGML, BEGIN_TEXT, or an EV2 heredoc."""
+    chunks = []
+    for pat in (r"BEGIN_PGML(.*?)END_PGML",
+                r"BEGIN_TEXT(.*?)END_TEXT",
+                r"TEXT\(EV2\(<<(\w+)\)\);(.*?)^\1\s*$"):
+        for m in re.finditer(pat, text, re.S | re.M):
+            chunks.append(m.group(len(m.groups())))
+    return "\n".join(c.strip() for c in chunks if c.strip())
+
+
+def profile(path, seeds, show_statement, pg_root):
+    text = path.read_text(errors="replace")
+    findings1, findings2 = [], []
+
+    # --- what the author says it is -------------------------------------
+    subject = tag(text, "DBsubject") or "-"
+    chapter = tag(text, "DBchapter") or "-"
+    section = tag(text, "DBsection") or "-"
+    mlt = tag(text, "MLT")
+    level = tag(text, "Level")
+    book = tag(text, "TitleText1")
+    bsec, bprob = tag(text, "Section1"), tag(text, "Problem1")
+
+    tree = "local"
+    for part in path.parts:
+        if part in ("OpenProblemLibrary", "Contrib", "Pending"):
+            tree = part
+    # Contrib has not been through the OPL Editorial Board; say so once, here,
+    # rather than leaving it to be rediscovered.
+    tree_note = {
+        "Contrib": "  (contributed as-written, NOT reviewed by the OPL board)",
+        "Pending": "  (under review; files come and go -- do not depend on it)",
+        "OpenProblemLibrary": "  (curated)",
+    }.get(tree, "")
+
+    # --- macros ---------------------------------------------------------
+    macros = loaded_macros(text)
+    dep, unknown = deprecated_macros(pg_root), known_macros(pg_root)
+    macro_parts = []
+    for m in macros:
+        if m in dep:
+            macro_parts.append(f"{m}[DEPRECATED]")
+            findings2.append(f"loads deprecated {m}")
+        elif m not in unknown and m != "PGcourse.pl":
+            # PGcourse.pl is supplied per-course, so its absence is normal.
+            macro_parts.append(f"{m}[NOT IN CLONE]")
+            findings1.append(
+                f"loads {m}, which the pinned pg clone does not have -- "
+                "will fail unless the server provides it")
+        else:
+            macro_parts.append(m)
+
+    # --- render at the default seed -------------------------------------
+    render, _ = run(["pr-pg-render", str(path)])
+    answers = parse_answers(render)
+    errors, warnings = real_problems(render)
+    if errors:
+        findings1.extend(errors[:4])
+    if warnings:
+        findings2.append(
+            f"renders but emits {len(warnings)} warning(s) — cosmetic, still worth "
+            f"fixing before the set ships: {warnings[0][:90]}")
+
+    # --- does its own checker accept its own stated answer? -------------
+    # A checker that rejects the answer it just printed is broken in the way
+    # that generates student email.
+    self_check = "-"
+    if answers and not errors:
+        cmd = ["pr-pg-render"]
+        for _, _, val in answers:
+            cmd += ["-a", val]
+        cmd.append(str(path))
+        out, _ = run(cmd)
+        verdicts = re.findall(r"AnSwEr\d+\s+'.*?'\s+(correct|incorrect)", out)
+        if verdicts and all(v == "correct" for v in verdicts):
+            self_check = f"all {len(verdicts)} accepted"
+        elif verdicts:
+            bad = sum(1 for v in verdicts if v != "correct")
+            self_check = f"{bad} of {len(verdicts)} REJECTED"
+            findings1.append(
+                f"the checker rejects {bad} of its own stated answers")
+        else:
+            self_check = "could not submit"
+
+    # --- seed sweep: the most reliable breakage detector ----------------
+    sweep, _ = run(["pr-pg-render", "--seeds", f"1-{seeds}", str(path)])
+    # pr-pg-render exits non-zero on a WARNING as well as an ERROR, so a sweep
+    # "failure" is only a break if the problem actually errors. When the default
+    # render merely warns, EVERY seed "fails" for that same reason and the count
+    # means nothing -- reporting it as breakage is how a good problem gets thrown
+    # away. Inc_Dec_Const_Dom_Range_01.pg computes all seven of its answers on
+    # every seed and read as 0/10.
+    m = re.search(r"(\d+)/(\d+) seeds clean", sweep)
+    failed = [] if m else re.findall(r"seed (\d+)", sweep)
+    if m and m.group(1) == m.group(2):
+        sweep_line = f"{m.group(1)}/{m.group(2)} clean"
+    elif m and errors:
+        sweep_line = f"{m.group(1)}/{m.group(2)} clean"
+        findings1.append(f"breaks on some seeds ({sweep_line})")
+    elif m:
+        sweep_line = f"{m.group(1)}/{m.group(2)} error-free; the rest warn only"
+    elif failed and errors:
+        sweep_line = f"FAILURES on seeds {', '.join(failed[:8])}"
+        findings1.append(f"breaks on seeds {', '.join(failed[:8])}")
+    elif failed:
+        sweep_line = f"warns (no errors) on seeds {', '.join(failed[:8])}"
+    else:
+        sweep_line = "inconclusive"
+
+    # --- do the answers change with the seed? --------------------------
+    seen_all, seen_choice, has_choice = set(), set(), False
+    for s in (1, 2, 3, 4, 5, 6):
+        out, _ = run(["pr-pg-render", "-s", str(s), str(path)])
+        rows = parse_answers(out)
+        seen_all.add("|".join(v for _, _, v in rows))
+        choice = "|".join(v for _, t, v in rows if CHOICE_TYPES.search(f"({t}"))
+        if choice:
+            has_choice = True
+            seen_choice.add(choice)
+    # Severity depends on whether the constant choice is the problem's whole
+    # demand. If every blank is constant, the problem is a giveaway and blocks.
+    # If other blanks vary, only ONE skill is going free -- which matters if that
+    # skill is one the set is relying on this problem for, and not otherwise. That
+    # is a judgement, so it is reported rather than used as a veto.
+    #
+    # The looser rule over-fired on Wiley/setAnton_Section_0.1/Question2.pg: 7 of
+    # its 8 blanks vary, and the constant one is "enter None if there is no
+    # answer", which is not a classification at all.
+    if has_choice and len(seen_choice) <= 1 and len(seen_all) <= 1:
+        variation = "CONSTANT-CHOICE (and every other blank too)"
+        findings1.append(
+            "every blank, including a multiple-choice one, is the same on every "
+            "seed -- the problem is a giveaway")
+    elif has_choice and len(seen_choice) <= 1:
+        variation = f"{len(seen_all)} distinct, but the CHOICE blank never varies"
+        findings2.append(
+            "a multiple-choice/classification blank is the same on every seed "
+            "while the others vary -- that one skill is free marks. Blocking only "
+            "if the set relies on this problem for that skill; check which")
+    elif len(seen_all) <= 1:
+        variation = "constant (all blanks)"
+        findings2.append(
+            "every blank is identical on all seeds -- a one-shot problem; check "
+            "whether that is inherent (it sometimes is)")
+    else:
+        variation = f"{len(seen_all)} distinct over 6 seeds"
+
+    # --- solution -------------------------------------------------------
+    sol = has_live_solution(text)
+    if sol == "stub":
+        findings2.append("solution block is the commented placeholder, not a solution")
+
+    # --- Tier 2 text scan, over the WHOLE body -------------------------
+    for pat, msg in TIER2_PATTERNS:
+        if re.search(pat, text, re.I):
+            findings2.append(msg)
+    if re.search(r'image\s*\(\s*["\'][^"\']+\.(gif|png|jpg)', text, re.I):
+        findings2.append("uses a static image file (must be redrawn for the LaTeX bank)")
+    if re.search(r"init_graph|insertGraph", text):
+        findings2.append("generates its graph at render time (redraw in TikZ for LaTeX)")
+
+    # --- print ----------------------------------------------------------
+    print("=" * 78)
+    print(path.name)
+    print(f"  path       {path}")
+    print(f"  tree       {tree}{tree_note}")
+    print(f"  tags       {subject} > {chapter} > {section}")
+    if mlt:
+        print(f"  MLT        {mlt}" + ("  (leader)" if tag(text, "MLTleader") else ""))
+    if level:
+        print(f"  level      {level}   (OPL's own 1-6; applied inconsistently)")
+    if book:
+        ref = f"{book}" + (f", section {bsec}" if bsec else "") + (f", problem {bprob}" if bprob else "")
+        print(f"  book       {ref}")
+    print(f"  macros     {', '.join(macro_parts) or '-'}")
+    print(f"  answers    {len(answers)} blank(s)")
+    for label, typ, val in answers:
+        print(f"               [{label[-2:]}] ({typ}) {val}")
+    print(f"  self-check {self_check}")
+    print(f"  seeds      {sweep_line}")
+    print(f"  variation  {variation}")
+    print(f"  solution   {sol}")
+
+    if findings1:
+        print("\n  TIER 1 -- BLOCKING (buggy)")
+        for f in findings1:
+            print(f"    ! {f}")
+    if findings2:
+        print("\n  TIER 2 -- editable, NOT a disqualifier")
+        for f in findings2:
+            print(f"    - {f}")
+    if not findings1 and not findings2:
+        print("\n  no findings")
+
+    if show_statement:
+        body = statement(text)
+        print("\n  STATEMENT")
+        for line in (body or "(could not extract -- read the file)").splitlines():
+            print(f"    {line}")
+    print()
+    return bool(findings1)
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        prog="pg-profile",
+        description="Everything needed to judge a .pg candidate, on one screen.")
+    ap.add_argument("targets", nargs="+", help=".pg files or directories")
+    ap.add_argument("-n", "--seeds", type=int, default=30,
+                    help="seeds to sweep for breakage (default 30)")
+    ap.add_argument("--no-statement", action="store_true",
+                    help="omit the full statement")
+    ap.add_argument("--tier1-only", action="store_true",
+                    help="print only problems with a blocking finding")
+    args = ap.parse_args()
+
+    pg_root = pathlib.Path(
+        subprocess.run(["sh", "-c", 'echo ${PG_ROOT:-$HOME/Documents/1sys/tools/.pg-clone}'],
+                       capture_output=True, text=True).stdout.strip())
+
+    files = []
+    for t in args.targets:
+        p = pathlib.Path(t).expanduser()
+        if p.is_dir():
+            files.extend(sorted(p.rglob("*.pg")))
+        elif p.is_file():
+            files.append(p)
+        else:
+            sys.exit(f"pg-profile: no such file or directory: {t}")
+
+    blocking = 0
+    for f in files:
+        if args.tier1_only:
+            # Still has to do the work; just suppresses the clean ones.
+            import io, contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                bad = profile(f, args.seeds, not args.no_statement, pg_root)
+            if bad:
+                print(buf.getvalue(), end="")
+        else:
+            bad = profile(f, args.seeds, not args.no_statement, pg_root)
+        blocking += bool(bad)
+
+    print(f"{len(files)} problem(s), {blocking} with a blocking finding")
+    sys.exit(1 if blocking else 0)
+
+
+if __name__ == "__main__":
+    main()
