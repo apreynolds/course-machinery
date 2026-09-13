@@ -139,6 +139,62 @@ exactly the files where an upstream fix is most expensive to absorb by hand.
 Filing edited problems away under \file{local/} would give that up;
 \file{local/} is for problems that are ours outright.
 
+\subsection*{webwork-build}
+
+\begin{manexsource}
+webwork-build [-n] [-t TEMPLATE] [-s SETID] SECTION
+\end{manexsource}
+
+Generates one set, ready to upload, from a section's settled group directories.
+\texttt{webwork-build OS1.1} takes every \file{<topic>/webwork-sets/OS1.1\_<Title>-<nn>-<Group>/} in group-number order, and every \file{NN-name.pg} link inside each in \file{NN} order.
+Drafts are never included, and \texttt{OS1.1} does not match \texttt{OS1.10}, because the underscore is part of the match.
+
+It writes, under the gitignored \file{<topic>/webwork-sets/\_for-upload/}:
+
+\begin{manexsource}
+setOS1.1_Review_of_Functions/00-setHeader.pg
+setOS1.1_Review_of_Functions/01-sw4_7_33.pg   ...
+setOS1.1_Review_of_Functions/LICENSE.md
+setOS1.1_Review_of_Functions/MANIFEST.tsv
+setOS1.1_Review_of_Functions.def
+setOS1.1_Review_of_Functions.tgz
+\end{manexsource}
+
+The problems are flat \emph{copies}, renumbered continuously across groups: if group 01 holds four links, the first problem of group 02 becomes \file{05-}.
+The number is what makes flattening safe, since basenames collide across the problem library, and it keeps the reviewed order visible on the server.
+Delete a link and build again, and the set renumbers.
+Upload the tarball into \file{templates/} and unpack it there; that gives \file{templates/setOS1.1\_\ldots/} beside its \file{.def}, the layout of the \file{setDemo/} webwork2 ships.
+
+\paragraph{The template.}
+Dates, the set header, set type and per-problem settings belong to a course and a term, not to a topic, so they come from a template the course keeps: \file{set-template.def.in} in its WeBWorK directory, or whatever \texttt{-t} names.
+It is an ordinary \file{.def} with exactly one \texttt{problem\_start}~\ldots~\texttt{problem\_end} block, repeated once per problem, and placeholders filled in anywhere:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{\{SETID\}} & the set ID, \texttt{<SECTION>\_<Title>} unless \texttt{-s} gives one.\\
+\texttt{\{SECTION\}}, \texttt{\{TITLE\}} & from the directory names; the title
+  with underscores as spaces.\\
+\texttt{\{HEADER\}} & the copied set header's path on the server.\\
+\texttt{\{PROBLEM\_ID\}}, \texttt{\{SOURCE\_FILE\}} & per problem, in the
+  problem block.\\
+\end{tabularx}
+\end{center}
+
+A \texttt{\#! header: PATH} line names the set header, relative to the course repo.
+It is copied into the set, so a header kept in one topic serves a set from any other without a cross-topic reference.
+\file{SAMPLE-set-template.def.in} in the machinery is the annotated reference.
+
+\paragraph{What it checks.}
+Nothing is written unless every link resolves, is relative and lands inside the topic's own \file{webwork/} --- the rules \texttt{webwork-check} applies to a settled directory --- and has an \file{NN-} prefix.
+All the groups must come from one topic and share one title, since a mismatch is almost always a typo in a directory name.
+After writing, it checks that every file the \file{.def} names is in the set, and it opens its own tarball with Python's \texttt{tarfile} to confirm there are no AppleDouble members, because \texttt{tar tzf} hides them.
+It deliberately does not call \texttt{webwork-check}, which also examines every course-level \file{.def} and could fail for reasons unrelated to this set.
+
+\paragraph{The manifest.}
+\file{MANIFEST.tsv} records each copy's source path and git blob hash, and it travels to the server inside the set directory.
+Mid-term fixes happen on the server, so at the end of term the set directory is downloaded and the manifest says which file each copy came from and whether it was edited there.
+That merge back into \file{<topic>/webwork/} is load-bearing: a skipped one silently loses the fixes next year.
+
 \subsection*{webwork-deploy}
 
 \begin{manexsource}

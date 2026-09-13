@@ -1,0 +1,479 @@
+#!/usr/bin/env bash
+#
+# webwork-build — generate one uploadable WeBWorK set from a section's group directories
+# Usage: webwork-build [-n] [-t TEMPLATE] [-s SETID] SECTION
+#
+#   SECTION      the prefix a section's group directories share, before the
+#                underscore: OS1.1 finds <topic>/webwork-sets/OS1.1_<Title>-<nn>-<Group>/
+#   -n           dry run: list the problems in their final order, write nothing
+#   -t TEMPLATE  the .def template (default: set-template.def.in in the course's
+#                WEBWORK/ directory; SAMPLE-set-template.def.in is annotated)
+#   -s SETID     the set's ID on the server (default: <SECTION>_<Title>, read off
+#                the directory names)
+#   -h, --help   this text
+#
+# Writes, under <topic>/webwork-sets/_for-upload/, which is gitignored:
+#
+#     set<SETID>/00-setHeader.pg   the template's `#! header:' file, if it names one
+#     set<SETID>/01-<name>.pg ...  flat COPIES of the linked problems
+#     set<SETID>/LICENSE.md        from <topic>/webwork/
+#     set<SETID>/MANIFEST.tsv      where each copy came from, with its blob hash
+#     set<SETID>.def
+#     set<SETID>.tgz               the directory and the .def, together
+#
+# Upload the .tgz into templates/ with the File Manager and unpack it there. That
+# gives templates/set<SETID>/ beside templates/set<SETID>.def -- the layout of the
+# setDemo/ that webwork2 ships -- and the set is then ready to import.
+#
+# WHAT IT READS. The group directories are the record of which problems are in a
+# set and in what order; nothing else is. Every settled directory for SECTION is
+# taken, in group-number order, and every NN-name.pg link inside one, in NN
+# order. Culling a problem is deleting its link, and the next build renumbers.
+# Draft directories (*--CANDIDATES-CLAUDE) are never included.
+#
+# WHY FLAT COPIES, RENUMBERED. The server needs real files, and a directory per
+# set is the simplest thing that keeps one term's set apart from another's. The
+# number prefix is what makes flattening safe -- basenames collide (di3.pg exists
+# twice in 0-functions/webwork, as different files) -- and it keeps the reviewed
+# order visible in the File Manager. Numbering runs continuously across groups:
+# if group 01 has four links, the first problem of group 02 becomes 05-.
+#
+# Provenance leaves the PATH but not the FILE: `## Author', `## Institution' and
+# `UPSTREAM-BLOB' travel inside every copy, and MANIFEST.tsv records the source
+# path. That manifest is what makes the end-of-term merge mechanical -- download
+# the set directory from the server, and each file's blob tells you whether it
+# was edited there.
+#
+# THE TEMPLATE holds everything that belongs to a course and a term rather than to
+# a topic: dates, the set header, set type, per-problem attempts and values. It is
+# an ordinary .def with one problem block, which is repeated for each problem, and
+# a few {PLACEHOLDERS}. SAMPLE-set-template.def.in in the machinery documents it.
+#
+# THE TARBALL is built with COPYFILE_DISABLE=1. macOS tar otherwise adds a `._'
+# AppleDouble twin for every file carrying extended attributes, after path
+# matching, so --exclude never sees them; `tar tzf' then hides them again when
+# listing. So the build checks its own tarball with Python's tarfile, which does
+# not. (Upgrading tar does not help: current libarchive behaves identically.)
+#
+# It checks its own inputs and outputs rather than calling webwork-check, which
+# also examines every course-level .def -- one of which may fail for reasons that
+# have nothing to do with this set.
+#
+# Nothing is written unless every link resolves, is relative, and lands inside
+# the topic's own webwork/. Exit status is 1 on any error.
+
+set -uo pipefail
+
+# This script lives in the MACHINERY, which is mounted at
+# <course>/.course-machinery/ -- so the course repo is its parent, not its own
+# directory.
+MACHINERY=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=${COURSE_ROOT:-$(dirname "$MACHINERY")}
+
+if [ ! -d "$REPO/.course-machinery" ]; then
+    echo "$(basename "${BASH_SOURCE[0]}"): cannot find the course repo." >&2
+    echo "  Looked in: $REPO" >&2
+    if [ -n "${COURSE_ROOT:-}" ]; then
+        echo "  (from COURSE_ROOT)" >&2
+    else
+        echo "  (the parent of $MACHINERY)" >&2
+    fi
+    echo "  That has no .course-machinery/ in it, so it is not a course repo." >&2
+    echo "  Set COURSE_ROOT if the machinery is mounted somewhere unusual." >&2
+    exit 2
+fi
+
+# The course-level WeBWorK directory, which is where the template lives by
+# default. Resolved exactly as webwork-check and webwork-deploy resolve it; if
+# you change this, change it there too.
+if [ -n "${WEBWORK_SETS_DIR:-}" ]; then
+    SETS_DIR=$WEBWORK_SETS_DIR
+elif [ -d "$REPO/WEBWORK" ]; then
+    SETS_DIR=$REPO/WEBWORK
+else
+    SETS_DIR=$REPO/_assessments/webwork-assignments
+fi
+
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+die()   { echo "webwork-build: $*" >&2; exit 1; }
+
+dryrun=0
+template=""
+setid=""
+section=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        -n) dryrun=1 ;;
+        -t) shift; template=${1:-} ;;
+        -s) shift; setid=${1:-} ;;
+        -*) echo "webwork-build: unknown option $1" >&2; exit 2 ;;
+        *)
+            [ -z "$section" ] || { echo "webwork-build: one SECTION at a time" >&2; exit 2; }
+            section=$1 ;;
+    esac
+    shift
+done
+
+[ -n "$section" ] || { usage >&2; exit 2; }
+template=${template:-$SETS_DIR/set-template.def.in}
+
+# A set ID is what webwork2 reads out of the .def's filename, and it accepts only
+# these characters (File/SetDef.pm: m|set([.\w-]+)\.def$|). Anything else would
+# make a .def the server silently fails to name.
+valid_setid() { [[ $1 =~ ^[.A-Za-z0-9_-]+$ ]]; }
+
+# ---------------------------------------------------------------------------
+# 1. Find the group directories.
+#
+# The name is <SECTION>_<Title>-<nn>-<Group>. Matching on SECTION plus the
+# underscore is deliberate: OS1.1 must not also find OS1.10. The title may
+# contain hyphens; the group name may too, but not a hyphen-number-hyphen run,
+# since the LAST such run is taken as the group number.
+# ---------------------------------------------------------------------------
+errors=0
+err() { echo "  ✗ $*" >&2; errors=$((errors + 1)); }
+
+group_rows=""     # "<nn>\t<dir>" lines, sorted below
+topic=""
+title=""
+drafts=0
+
+for sets in "$REPO"/*/webwork-sets; do
+    [ -d "$sets" ] || continue
+    for dir in "$sets/${section}_"*/; do
+        dir=${dir%/}
+        [ -d "$dir" ] || continue
+        name=$(basename "$dir")
+        case "$name" in *--CANDIDATES-CLAUDE) drafts=$((drafts + 1)); continue ;; esac
+
+        rest=${name#"${section}_"}
+        if [[ ! $rest =~ ^(.+)-([0-9]+)-(.+)$ ]]; then
+            err "$name: not a group directory name (want ${section}_<Title>-<nn>-<Group>)"
+            continue
+        fi
+        this_title=${BASH_REMATCH[1]}
+        nn=$((10#${BASH_REMATCH[2]}))
+        this_topic=$(basename "$(dirname "$sets")")
+
+        # One set comes from one topic and has one title. Either mismatch is
+        # almost certainly a typo in a directory name, and guessing which
+        # spelling is right would build a set missing a group.
+        if [ -z "$topic" ]; then
+            topic=$this_topic
+            title=$this_title
+        elif [ "$this_topic" != "$topic" ]; then
+            err "$name is in $this_topic, but other groups for $section are in $topic"
+        elif [ "$this_title" != "$title" ]; then
+            err "$name has title '$this_title', but other groups have '$title'"
+        fi
+        group_rows+="$nn"$'\t'"$dir"$'\n'
+    done
+done
+
+if [ -z "$group_rows" ]; then
+    echo "webwork-build: no settled group directories for $section." >&2
+    echo "  Looked for $REPO/*/webwork-sets/${section}_<Title>-<nn>-<Group>/" >&2
+    [ "$drafts" -gt 0 ] && echo "  Found $drafts draft (--CANDIDATES-CLAUDE) directories, which are never built." >&2
+    exit 1
+fi
+
+group_rows=$(printf '%s' "$group_rows" | sort -t $'\t' -k1,1n)
+
+# Two groups with the same number have no defined order between them.
+dup=$(printf '%s\n' "$group_rows" | cut -f1 | uniq -d | head -1)
+[ -z "$dup" ] || err "two group directories are both numbered $dup"
+
+setid=${setid:-${section}_$title}
+valid_setid "$setid" || err "set ID '$setid' has characters webwork2 will not accept in a .def name (use -s)"
+
+sets_dir="$REPO/$topic/webwork-sets"
+own=$(cd "$REPO/$topic/webwork" 2> /dev/null && pwd -P)
+[ -n "$own" ] || err "$topic has no webwork/ directory, so nothing in it can have been forked"
+
+# ---------------------------------------------------------------------------
+# 2. Read and check every link, in order.
+#
+# The same rules webwork-check applies to a settled directory: resolves to a
+# file, relative, lands in this topic's webwork/. Plus one of its own: the link
+# must have an NN- prefix, because that prefix IS the order.
+# ---------------------------------------------------------------------------
+sources=()        # the link paths, in final order
+stems=()          # the name after the NN- prefix
+targets=()        # the file each link reaches, relative to the course repo
+group_nums=()     # per group, in order: its number, name, directory, link count
+group_names=()
+group_dirs=()
+group_counts=()
+repo_physical=$(cd "$REPO" && pwd -P)
+
+while IFS=$'\t' read -r nn dir; do
+    name=$(basename "$dir")
+    rows=""
+    for link in "$dir"/*.pg; do
+        [ -e "$link" ] || [ -L "$link" ] || continue
+        lname=$(basename "$link")
+        shown="$topic/webwork-sets/$name/$lname"
+
+        if [ ! -L "$link" ]; then
+            err "$shown is a real file, not a link -- a set directory holds only links into webwork/"
+            continue
+        fi
+        if [[ ! $lname =~ ^([0-9]+)-(.+)$ ]]; then
+            err "$shown has no NN- prefix, so it has no place in the order"
+            continue
+        fi
+        lnum=$((10#${BASH_REMATCH[1]}))
+        stem=${BASH_REMATCH[2]}
+
+        target=$(readlink "$link")
+        if [ ! -f "$link" ]; then
+            err "$shown -> $target does not resolve"
+            continue
+        fi
+        landed=$(cd "$dir" && cd "$(dirname "$target")" && pwd -P)
+        inside=0
+        if [ -n "$own" ]; then
+            case "$landed/" in "$own"/*) inside=1 ;; esac
+        fi
+        if [ "$inside" -eq 0 ]; then
+            err "$shown -> $target is outside $topic/webwork/ (never forked?)"
+            continue
+        fi
+        case "$target" in
+            /*) err "$shown -> $target is absolute; make it relative (../../webwork/...)"; continue ;;
+        esac
+        # The TARGET, not the link, is what the manifest and dry run name: it is
+        # the file an end-of-term merge has to update.
+        rows+="$lnum"$'\t'"$stem"$'\t'"$link"$'\t'"${landed#"$repo_physical/"}/$(basename "$target")"$'\n'
+    done
+
+    count=0
+    if [ -n "$rows" ]; then
+        rows=$(printf '%s' "$rows" | sort -t $'\t' -k1,1n)
+        dup=$(printf '%s\n' "$rows" | cut -f1 | uniq -d | head -1)
+        [ -z "$dup" ] || err "$topic/webwork-sets/$name has two links numbered $dup"
+        while IFS=$'\t' read -r _ stem link source_path; do
+            stems+=("$stem")
+            sources+=("$link")
+            targets+=("$source_path")
+            count=$((count + 1))
+        done <<< "$rows"
+    fi
+    group=${name#"${section}_$title-"}
+    group_nums+=("$nn")
+    group_names+=("${group#*-}")
+    group_dirs+=("$topic/webwork-sets/$name")
+    group_counts+=("$count")
+done <<< "$group_rows"
+
+total=${#sources[@]}
+[ "$total" -gt 0 ] || err "the group directories for $section hold no links at all"
+
+# ---------------------------------------------------------------------------
+# 3. Read the template.
+#
+# Three parts: the set-level lines before `problem_start', one problem block
+# repeated per problem, and anything after `problem_end'. Comment lines are
+# the template's own documentation and are dropped; a `#! header:' line names
+# the set header to copy in.
+# ---------------------------------------------------------------------------
+[ -f "$template" ] || die "no template at $template
+  Copy .course-machinery/SAMPLE-set-template.def.in there and fill it in, or use -t."
+
+header_src=""
+pre=()
+block=()
+post=()
+part=pre
+starts=0
+
+while IFS= read -r line || [ -n "$line" ]; do
+    if [[ $line =~ ^#![[:space:]]*header:[[:space:]]*(.*[^[:space:]])[[:space:]]*$ ]]; then
+        header_src=${BASH_REMATCH[1]}
+        continue
+    fi
+    [[ $line =~ ^[[:space:]]*# ]] && continue
+    # Blank lines that only separated the template's own comments
+    [ "$part" = pre ] && [ ${#pre[@]} -eq 0 ] && [[ ! $line =~ [^[:space:]] ]] && continue
+    case "$line" in
+        *problem_start*) part=block; starts=$((starts + 1)) ;;
+    esac
+    case "$part" in
+        pre)   pre+=("$line") ;;
+        block) block+=("$line") ;;
+        post)  post+=("$line") ;;
+    esac
+    case "$line" in
+        *problem_end*) part=post ;;
+    esac
+done < "$template"
+
+[ "$starts" -eq 1 ] || err "template $template must have exactly one problem_start ... problem_end block (found $starts)"
+printf '%s\n' "${block[@]+"${block[@]}"}" | grep -q '{SOURCE_FILE}' \
+    || err "the template's problem block has no {SOURCE_FILE}"
+
+# A header path is relative to the course repo, so a topic can use a header
+# kept in another topic: it is COPIED into the set, never referenced across.
+if [ -n "$header_src" ]; then
+    case "$header_src" in /*) ;; *) header_src="$REPO/$header_src" ;; esac
+    [ -f "$header_src" ] || err "the template's header does not exist: $header_src"
+elif printf '%s\n' "${pre[@]+"${pre[@]}"}" | grep -q '{HEADER}'; then
+    err "the template uses {HEADER} but has no '#! header: PATH' line"
+fi
+
+if [ "$errors" -gt 0 ]; then
+    echo "webwork-build: $errors error(s) above; nothing was written." >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Name everything.
+# ---------------------------------------------------------------------------
+width=${#total}
+[ "$width" -ge 2 ] || width=2
+flat=()
+for i in "${!sources[@]}"; do
+    flat+=("$(printf '%0*d-%s' "$width" $((i + 1)) "${stems[$i]}")")
+done
+header_name="$(printf '%0*d' "$width" 0)-setHeader.pg"
+
+# One line per group, for the report and the .def banner. The range is what
+# the problems are numbered on the server, so "drop 17" can be traced back to
+# its group directory.
+summary=()
+first=1
+for g in "${!group_nums[@]}"; do
+    last=$((first + group_counts[g] - 1))
+    if [ "${group_counts[$g]}" -eq 0 ]; then
+        range="(empty)"
+    else
+        range=$(printf '%0*d-%0*d' "$width" "$first" "$width" "$last")
+    fi
+    summary+=("$(printf '%02d %-26s %3d  %-7s  %s' "${group_nums[$g]}" "${group_names[$g]}" \
+        "${group_counts[$g]}" "$range" "${group_dirs[$g]}")")
+    first=$((last + 1))
+done
+
+out="$sets_dir/_for-upload"
+setdir="set$setid"
+
+echo "webwork-build: $section from $topic, as set $setid"
+printf '  %s\n' "${summary[@]}"
+[ "$drafts" -gt 0 ] && echo "  (ignored: $drafts draft directories)"
+
+if [ "$dryrun" -eq 1 ]; then
+    echo
+    for i in "${!sources[@]}"; do
+        printf '  %s  <-  %s\n' "${flat[$i]}" "${targets[$i]}"
+    done
+    echo
+    echo "Dry run: would write $out/$setdir{/,.def,.tgz}"
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# 5. Write the set directory.
+#
+# Rebuilt from nothing every time, so a culled problem cannot linger. Files are
+# written with `cat', not `cp', so no extended attributes come along to be
+# turned into AppleDouble members later.
+# ---------------------------------------------------------------------------
+mkdir -p "$out" || die "cannot create $out"
+rm -rf "${out:?}/$setdir" "$out/$setdir.def" "$out/$setdir.tgz"
+mkdir "$out/$setdir" || die "cannot create $out/$setdir"
+
+manifest="$out/$setdir/MANIFEST.tsv"
+printf 'file\tblob\tsource\n' > "$manifest"
+
+if [ -n "$header_src" ]; then
+    cat "$header_src" > "$out/$setdir/$header_name"
+    printf '%s\t%s\t%s\n' "$header_name" "$(git hash-object "$header_src")" "${header_src#"$REPO/"}" >> "$manifest"
+fi
+
+for i in "${!sources[@]}"; do
+    cat "${sources[$i]}" > "$out/$setdir/${flat[$i]}" || die "could not copy ${sources[$i]}"
+    printf '%s\t%s\t%s\n' "${flat[$i]}" "$(git hash-object "$out/$setdir/${flat[$i]}")" \
+        "${targets[$i]}" >> "$manifest"
+done
+
+# The copies are a redistribution, and OPL material is CC BY-NC-SA, so the
+# licence travels with them.
+if [ -f "$REPO/$topic/webwork/LICENSE.md" ]; then
+    cat "$REPO/$topic/webwork/LICENSE.md" > "$out/$setdir/LICENSE.md"
+else
+    echo "webwork-build: warning: $topic/webwork/LICENSE.md not found; the set ships without one" >&2
+fi
+
+# ---------------------------------------------------------------------------
+# 6. Write the .def.
+# ---------------------------------------------------------------------------
+# Replace {KEY} with a value. The replacement is quoted so a `&' in it stays a
+# literal ampersand under bash 5.2's patsub_replacement.
+fill() {
+    local s=$1
+    s=${s//"{SETID}"/"$setid"}
+    s=${s//"{SECTION}"/"$section"}
+    s=${s//"{TITLE}"/"${title//_/ }"}
+    s=${s//"{HEADER}"/"$setdir/$header_name"}
+    s=${s//"{PROBLEM_ID}"/"$2"}
+    s=${s//"{SOURCE_FILE}"/"$3"}
+    printf '%s\n' "$s"
+}
+
+def="$out/$setdir.def"
+{
+    echo "# $setdir.def -- GENERATED by webwork-build on $(date +%Y-%m-%d). Do not edit:"
+    echo "# change the group directories or the template, and build again."
+    echo "#"
+    echo "# Template: ${template#"$REPO/"}"
+    echo "# Groups, in order:"
+    printf '#   %s\n' "${summary[@]}"
+    echo
+    for line in "${pre[@]+"${pre[@]}"}"; do fill "$line" "" ""; done
+    for i in "${!sources[@]}"; do
+        for line in "${block[@]}"; do fill "$line" $((i + 1)) "$setdir/${flat[$i]}"; done
+    done
+    for line in "${post[@]+"${post[@]}"}"; do fill "$line" "" ""; done
+} > "$def"
+
+# Every file the .def names must be in the set directory. True by construction,
+# which is exactly why it is worth checking: a template typo would break it.
+while IFS= read -r ref; do
+    [ -n "$ref" ] && [ "$ref" != defaultHeader ] || continue
+    [ -f "$out/$ref" ] || err "the .def names $ref, which is not in the set"
+done < <(sed -E -n 's/#.*//; s/^[[:space:]]*(source_file|screenHeaderFile|paperHeaderFile)[[:space:]]*=[[:space:]]*([^[:space:]]*).*/\2/p' "$def")
+[ "$errors" -eq 0 ] || die "the generated .def is inconsistent; check the template"
+
+# ---------------------------------------------------------------------------
+# 7. Build and verify the tarball.
+# ---------------------------------------------------------------------------
+tgz="$out/$setdir.tgz"
+if ! COPYFILE_DISABLE=1 tar -czf "$tgz" --exclude '.*' -C "$out" "$setdir" "$setdir.def"; then
+    die "tar failed; $tgz was not written"
+fi
+
+expected=$(( $(find "$out/$setdir" -type f | wc -l) + 1 ))
+if ! python3 -c '
+import sys, tarfile
+names = [m.name for m in tarfile.open(sys.argv[1]).getmembers() if m.isfile()]
+twins = [n for n in names if n.rsplit("/", 1)[-1].startswith("._")]
+if twins:
+    sys.exit("AppleDouble members in the tarball: " + ", ".join(twins[:3]))
+if len(names) != int(sys.argv[2]):
+    sys.exit("tarball holds %d files, expected %s" % (len(names), sys.argv[2]))
+' "$tgz" "$expected"; then
+    rm -f "$tgz"
+    die "the tarball failed its own check and was deleted"
+fi
+
+# _for-upload/ must be gitignored in the topic repo; say so if it is not.
+# (check-ignore exits 1 for "not ignored", 128 for "not a git repo".)
+git -C "$REPO/$topic" check-ignore -q "$tgz" 2> /dev/null
+[ $? -eq 1 ] && echo "webwork-build: warning: $topic/webwork-sets/_for-upload/ is not gitignored in $topic" >&2
+
+echo
+echo "Wrote ${tgz#"$REPO/"} ($(du -h "$tgz" | cut -f1 | tr -d ' '))"
+echo "  $total problems$([ -n "$header_src" ] && echo ", set header")$([ -f "$out/$setdir/LICENSE.md" ] && echo ", LICENSE.md"), MANIFEST.tsv, $setdir.def"
+echo "Upload it into templates/ in the File Manager, unpack it there, then import $setdir.def."
