@@ -39,10 +39,8 @@
 # skipped the same way, and passed with a warning under -s. An existing file is
 # never overwritten.
 #
-# A COPY IN _for-upload/ STANDS FOR ITS SOURCE. webwork-build's flat copies are
-# never converted themselves -- the next build deletes them -- so each is looked
-# up in the MANIFEST.tsv beside it and its source converted instead, with a line
-# saying so. Every path that yields nothing says why; none is dropped silently.
+# Copies under _for-upload/ are refused: webwork-build made them and the next
+# build deletes them. Every path that yields nothing says why.
 #
 # What it does:
 #   - runs `pr-pg-render --tex --solution' at a frozen seed, so every $var is
@@ -573,29 +571,6 @@ def scaffold(pg, seed):
 # Finding the problems, and where they go
 # ---------------------------------------------------------------------------
 
-def upload_source(copy):
-    """The source .pg a flat copy in _for-upload/set<ID>/ was made from, or a Skip.
-
-    webwork-build writes MANIFEST.tsv beside the copies -- file, blob, source,
-    the source relative to the course repo, which is five levels up:
-    <course>/<topic>/webwork-sets/_for-upload/set<ID>/NN-name.pg. A copy is
-    never converted itself: it carries no path to read `number' from, and the
-    next build deletes it.
-    """
-    manifest = copy.parent / "MANIFEST.tsv"
-    if not manifest.is_file():
-        raise Skip("a generated copy in _for-upload/ with no MANIFEST.tsv beside it "
-                   "to say where it came from; convert its source instead")
-    for row in manifest.read_text(encoding="utf-8").splitlines()[1:]:
-        cols = row.split("\t")
-        if len(cols) == 3 and cols[0] == copy.name:
-            source = copy.parents[4] / cols[2]
-            if not source.is_file():
-                raise Skip(f"a generated copy whose source, {cols[2]}, no longer exists")
-            return source
-    raise Skip("a generated copy in _for-upload/ that MANIFEST.tsv does not list")
-
-
 def gather(paths):
     """[(resolved .pg, named explicitly?)], each problem once, in a stable order.
 
@@ -615,17 +590,13 @@ def gather(paths):
         else:
             print(f"pg-to-latex: skipping {arg}: not a .pg file or a directory", file=sys.stderr)
             continue
+        copies = 0
         for q, explicit in candidates:
             if "_for-upload" in q.parts:
-                # A copy webwork-build made: convert the problem it was copied from.
-                try:
-                    source = upload_source(q)
-                except Skip as why:
-                    print(f"pg-to-latex: skipping {q.name}: {why}", file=sys.stderr)
-                    continue
-                print(f"pg-to-latex: {q.name} is a generated copy; using its source, "
-                      f"{source.relative_to(q.parents[4])}", file=sys.stderr)
-                q = source
+                # A copy webwork-build made, deleted by the next build. Refused,
+                # but aloud: a silent skip once left only "no .pg files found".
+                copies += 1
+                continue
             if not q.exists():
                 print(f"pg-to-latex: skipping {q}: broken link", file=sys.stderr)
                 continue
@@ -633,6 +604,11 @@ def gather(paths):
             if real not in seen:
                 seen.add(real)
                 found.append((real, explicit))
+        if copies:
+            what = (f"{p.name}: a generated upload copy" if p.suffix == ".pg" else
+                    f"{copies} .pg files under {arg}: generated upload copies")
+            print(f"pg-to-latex: skipping {what} (webwork-build's, in _for-upload/); "
+                  f"convert from the group directory or webwork/ instead", file=sys.stderr)
     return found
 
 
