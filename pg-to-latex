@@ -33,10 +33,11 @@
 # only at OTHER seeds: converted again, as an ALTERNATE named after the first
 # conversion, <its name>__alt1, __alt2, ... — with a warning if this seed gives
 # the same answer key, or the very same problem, as one already there, since an
-# alternate (a second version of a test) exists to differ. A conversion with no
-# `seed' line might be any seed: at the default seed that problem is skipped, so
-# walking a directory never mints alternates of it, but an explicit -s converts
-# one anyway, with a warning. An existing file is never overwritten.
+# alternate (a second version of a test) exists to differ. ALTERNATES ARE MADE
+# ONLY ON REQUEST: without -s, a problem converted at ANY seed is skipped, so
+# walking a directory never mints them. A conversion with no `seed' line is
+# skipped the same way, and passed with a warning under -s. An existing file is
+# never overwritten.
 #
 # A COPY IN _for-upload/ STANDS FOR ITS SOURCE. webwork-build's flat copies are
 # never converted themselves -- the next build deletes them -- so each is looked
@@ -733,15 +734,16 @@ def convert(pg, args):
     for tex, seed in existing:
         if seed == args.seed:
             raise Skip(f"already converted at seed {seed}, as {tex.name}; -s picks another seed")
-    # A conversion with no seed line -- frozen by hand before the key existed,
-    # perhaps at values no seed reproduces -- might BE this seed. A run at the
-    # default seed stops there, so walking a directory never quietly mints
-    # alternates; naming a seed with -s says an alternate is what you want.
+    # An ALTERNATE is made only on request. At the default seed, any existing
+    # conversion means "already converted" -- whatever seed it used, or none --
+    # so walking a directory never quietly mints alternates of problems first
+    # frozen at a chosen seed (piecewise-linear-from-graph at 36, say). Naming a
+    # seed with -s is the request.
+    if existing and not args.explicit_seed:
+        tex, seed = existing[0]
+        at = f"at seed {seed}" if seed is not None else "with no seed recorded"
+        raise Skip(f"already converted {at}, as {tex.name}; -s N makes an alternate at seed N")
     seedless = [tex for tex, seed in existing if seed is None]
-    if seedless and not args.explicit_seed:
-        raise Skip(f"{seedless[0].name} converts this problem but records no seed, so seed "
-                   f"{args.seed} may repeat it; add `seed = {{...}}' to it, or give -s to "
-                   f"convert an alternate anyway")
 
     if args.name:
         name = args.name
