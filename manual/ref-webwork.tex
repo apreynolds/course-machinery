@@ -195,24 +195,28 @@ It deliberately does not call \texttt{webwork-check}, which also examines every 
 webwork-build --review [-r ROUND] [-n] [-t TEMPLATE] SECTION
 \end{manexsource}
 
-A \emph{draft} group directory, \file{\ldots{}-{}-CANDIDATES-CLAUDE}, holds links to candidates wherever they live, and reviewing one means reading it on the server.
-The server already has the upstream trees, so a review set needs no problem files, only a \file{.def}.
-\texttt{-{}-review} writes one into each draft directory of the section, as \file{set<draft name>-r<ROUND>.def}, and bundles them flat into \file{\_for-upload/<SECTION>-review-r<ROUND>.tgz}.
+A \emph{draft} group directory, \file{\ldots{}-{}-CANDIDATES-CLAUDE}, holds links to candidates wherever they live --- an upstream clone, a fork already in the topic, another course's corpus --- and reviewing one means reading it on the server.
+\texttt{-{}-review} makes a review set for each draft directory of the section that still holds links, in the layout of a built set:
 
-\begin{center}
-\begin{tabularx}{\linewidth}{@{}l Y@{}}
-link reaches & reviewed as\\
-\hline
-the OPL clone's \file{OpenProblemLibrary/X} & \file{Library/X}\\
-the OPL clone's \file{Contrib/X} & \file{Contrib/X}\\
-the diffyqs clone's \file{X} & \file{diffyqs-webwork/X}\\
-a fork at \file{<topic>/webwork/opl/X}, \ldots & its upstream path, flagged in the \file{.def}: the review shows upstream, not our edit\\
-anything else & nothing: listed in the \file{.def}'s header, to be read locally\\
-\end{tabularx}
-\end{center}
+\begin{manexsource}
+_for-upload/OS1.3-review-r1/
+    setOS1.3_..._01-Radians--CANDIDATES-CLAUDE-r1.def
+    setOS1.3_..._01-Radians--CANDIDATES-CLAUDE-r1/06-DegreeAndRadian30.pg  ...
+    setOS1.3_..._01-Radians--CANDIDATES-CLAUDE-r1/MANIFEST.tsv
+    setOS1.3_..._01-Radians--CANDIDATES-CLAUDE-r1/LICENSE.md
+_for-upload/OS1.3-review-r1.tgz
+\end{manexsource}
 
-The template supplies dates and per-problem settings; its header is replaced by \texttt{defaultHeader}, since nothing is uploaded for it to point at.
+\emph{The problems are copies.}
+The first version uploaded only \file{.def} files pointing at \file{Library/} paths, on the assumption that the server's problem library matches the local clone; it does not, and the OS1.3 review found 15 of its 84 candidates missing on the server.
+A copy makes the review independent of the server's library, and shows exactly the file that was profiled, a fork as our edit rather than its upstream.
+Each copy keeps its draft link's name, so \file{07-x.pg} on the server is the link \file{07-x.pg} in the draft directory.
+A static image a problem names in quotes is copied beside it; one named but not found beside the source is a warning, to be checked on the server.
+The draft directory also keeps its \file{.def}, which records the round built last.
+
+The template supplies dates and per-problem settings; its header is replaced by \texttt{defaultHeader}, since a review set is not a practice set.
 Draft links may be absolute, but must resolve and must carry an \file{NN-} prefix, which is the review order.
+A draft directory with no links left gets no review set.
 
 \emph{The round is part of the set ID}, because an import skips a set name that already exists: after culling links, build \texttt{-r 2}, and the culled round arrives as a new set.
 Rebuilding a round replaces the draft's earlier \file{.def} files; old rounds stay on the server until deleted there, which is harmless, since review sets carry no student data.
