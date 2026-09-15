@@ -66,16 +66,39 @@
 # Nothing is written unless every link resolves, is relative, and lands inside
 # the topic's own webwork/. Exit status is 1 on any error.
 #
-# REVIEW MODE (--review), added 2026-09-13. A draft directory,
-# <SECTION>_<Title>-<nn>-<Group>--CANDIDATES-CLAUDE/, holds NN-name.pg links to
-# candidates wherever they live: an upstream clone, or a fork already in the
-# topic. Reviewing one means reading it on the server, and the server already has
-# the upstream trees, so a review set needs NO problem files -- only a .def whose
-# source_file lines point at them. This writes, for every draft directory of
-# SECTION:
+# REVIEW MODE (--review), added 2026-09-13; since 2026-09-15 it ships COPIES. A
+# draft directory, <SECTION>_<Title>-<nn>-<Group>--CANDIDATES-CLAUDE/, holds
+# NN-name.pg links to candidates wherever they live: an upstream clone, a fork
+# already in the topic, another course's corpus. Reviewing one means reading it
+# on the server. For every draft directory of SECTION that holds links, this
+# writes:
 #
-#     <draft>/set<draft name>-r<ROUND>.def        inside the draft directory
-#     _for-upload/<SECTION>-review-r<ROUND>.tgz   every one of them, flat
+#     <draft>/set<draft>-r<ROUND>.def             inside the draft directory
+#     _for-upload/<SECTION>-review-r<ROUND>/      every review set, unpacked:
+#         set<draft>-r<ROUND>.def                 the same .def
+#         set<draft>-r<ROUND>/NN-name.pg          copies, keeping the draft's names
+#         set<draft>-r<ROUND>/<image>             static images they name
+#         set<draft>-r<ROUND>/MANIFEST.tsv        where each copy came from, blob
+#         set<draft>-r<ROUND>/LICENSE.md          from <topic>/webwork/
+#     _for-upload/<SECTION>-review-r<ROUND>.tgz   that directory's contents
+#
+# WHY COPIES. The first version uploaded only .def files whose source_file lines
+# pointed at Library/, Contrib/ and diffyqs-webwork/ paths, on the assumption
+# that the server's problem library matches the local clones. It does not: the
+# clones track upstream, and the server has whatever library was installed. The
+# OS1.3 review found PCC/Trigonometry -- 15 of its 84 candidates -- missing on
+# the server. Copies make the review independent of that, and are a better
+# review besides: the server shows exactly the file that was profiled, a fork
+# as OUR edit rather than its upstream, and a candidate from a corpus the server
+# never had. It is the layout of a built set, so it unpacks the same way.
+#
+# A copy keeps its draft link's name, NN included, so a problem called 07-x.pg
+# on the server is the link 07-x.pg in the draft directory; the .def numbers the
+# problems 1, 2, ... in that order. A static image a .pg names in quotes
+# ("c6s2p5.png") is copied beside it when it sits beside the source. One named
+# but not found is only a warning, since a name can be built at render time;
+# check that problem on the server. A draft directory with no links -- every
+# candidate culled -- gets no review set.
 #
 # Upload the .tgz into templates/, unpack it, and import the .defs. After culling
 # links, build the next round with -r 2: the round is part of the set ID because
@@ -84,22 +107,10 @@
 # convenient; review sets carry no student data. A round's earlier .def files in
 # a draft directory are removed when it is rebuilt.
 #
-# Where each link's problem is on the server, from where its target resolves:
-#
-#     <OPL clone>/OpenProblemLibrary/X     Library/X
-#     <OPL clone>/Contrib/X                Contrib/X
-#     <diffyqs clone>/X                    diffyqs-webwork/X
-#     <topic>/webwork/opl|contrib|diffyqs/X   the same, from upstream -- the review
-#                                          shows the UPSTREAM problem, not our edit,
-#                                          and the .def says so
-#     anything else                        no server path: listed in the .def's
-#                                          header, to be read locally
-#
-# The clones are found as webwork-check finds them (OPL_ROOT, OPL_CLONE,
-# OPL_CONTRIB, DIFFYQS_CLONE). The template supplies dates and per-problem
-# settings; its header is replaced by defaultHeader, since nothing is uploaded
-# for it to point at. Draft links may be absolute, but must resolve and must have
-# an NN- prefix, which is the review order.
+# The template supplies dates and per-problem settings; its header is replaced
+# by defaultHeader, since a review set is not a practice set. Draft links may be
+# absolute, but must resolve and must have an NN- prefix, which is the review
+# order.
 
 set -uo pipefail
 
@@ -132,13 +143,6 @@ elif [ -d "$REPO/WEBWORK" ]; then
 else
     SETS_DIR=$REPO/_assessments/webwork-assignments
 fi
-
-# The upstream clones, for --review only. The same defaults and overrides as
-# webwork-check; if you change these, change them there too.
-DIFFYQS_CLONE=${DIFFYQS_CLONE:-$HOME/2teach/diffyqs-webwork-clone}
-OPL_ROOT=${OPL_ROOT:-$HOME/2teach/webwork-open-problem-library-clone}
-OPL_CLONE=${OPL_CLONE:-$OPL_ROOT/OpenProblemLibrary}
-OPL_CONTRIB=${OPL_CONTRIB:-$OPL_ROOT/Contrib}
 
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 die()   { echo "webwork-build: $*" >&2; exit 1; }
@@ -345,46 +349,30 @@ repo_physical=$(cd "$REPO" && pwd -P)
 # proper resumes at step 2.
 # ---------------------------------------------------------------------------
 
-# physical DIR: the directory's physical path, or nothing if it does not exist.
-physical() { (cd "$1" 2> /dev/null && pwd -P); }
+# shown_path FILE: how the manifest and the dry run name a candidate -- relative
+# to the course repo when it is inside it, ~-relative when it is under $HOME.
+shown_path() {
+    case "$1" in
+        "$repo_physical"/*) printf '%s\n' "${1#"$repo_physical"/}" ;;
+        "$HOME"/*)          printf '~/%s\n' "${1#"$HOME"/}" ;;
+        *)                  printf '%s\n' "$1" ;;
+    esac
+}
 
-# server_path FILE: where FILE's problem is on the server, from where FILE
-# physically is. Prints "PATH<TAB>KIND", KIND being `upstream' (a clone's own
-# file), `fork' (our copy, reviewed as its upstream) or `local' (no server path,
-# PATH `-'). Never an empty PATH: a tab is IFS whitespace, so `read' would
-# collapse an empty field and shift the ones after it.
-server_path() {
-    local f=$1 rel tree kind root prefix
-    for tree in "opl:$opl_p:Library" "contrib:$contrib_p:Contrib" "diffyqs:$diffyqs_p:diffyqs-webwork"; do
-        IFS=: read -r kind root prefix <<< "$tree"
-        # A clone that does not exist on this machine matches nothing.
-        if [ -n "$root" ] && [ "${f#"$root"/}" != "$f" ]; then
-            printf '%s/%s\tupstream\n' "$prefix" "${f#"$root"/}"
-            return
-        fi
-        if [ -n "$own" ] && [ "${f#"$own/$kind"/}" != "$f" ]; then
-            rel=${f#"$own/$kind"/}
-            # A fork only reviews as upstream if upstream still has the file.
-            if [ -n "$root" ] && [ -f "$root/$rel" ]; then
-                printf '%s/%s\tfork\n' "$prefix" "$rel"
-            else
-                printf -- '-\tlocal\n'
-            fi
-            return
-        fi
-    done
-    printf -- '-\tlocal\n'
+# images_named FILE: the static image files FILE names in quotes, one per line.
+# A heuristic, and deliberately a narrow one: a quoted bare filename with an
+# image extension, which is how image("x.png") and friends are written.
+images_named() {
+    grep -oE '"[A-Za-z0-9_.-]+\.(png|gif|jpe?g|svg)"' "$1" | tr -d '"' | sort -u
 }
 
 if [ "$review" -eq 1 ]; then
-    opl_p=$(physical "$OPL_CLONE")
-    contrib_p=$(physical "$OPL_CONTRIB")
-    diffyqs_p=$(physical "$DIFFYQS_CLONE")
-
-    # Per draft directory, in group order: its path, and "NN-name<TAB>server
-    # path<TAB>kind" rows in NN order.
+    # Per draft directory with links, in group order: its path, and
+    # "NN<TAB>NN-name<TAB>physical file" rows in NN order.
     review_dirs=()
     review_rows=()
+    empty_dirs=()
+    plan=()           # group order: "R<index into review_dirs>" or "E<empty dir>"
 
     while IFS=$'\t' read -r nn dir; do
         name=$(basename "$dir")
@@ -402,24 +390,30 @@ if [ "$review" -eq 1 ]; then
                 err "$shown does not resolve"
                 continue
             fi
-            # A real file in a draft is allowed; it simply has no server path.
+            # A real file in a draft is allowed; it is copied like any other.
             if [ -L "$link" ]; then
                 target=$(readlink "$link")
                 file="$(cd "$dir" && cd "$(dirname "$target")" && pwd -P)/$(basename "$target")"
             else
                 file="$(cd "$dir" && pwd -P)/$lname"
             fi
-            rows+="$lnum"$'\t'"$lname"$'\t'"$(server_path "$file")"$'\n'
+            rows+="$lnum"$'\t'"$lname"$'\t'"$file"$'\n'
         done
-        if [ -n "$rows" ]; then
-            rows=$(printf '%s' "$rows" | sort -t $'\t' -k1,1n)
-            dup=$(printf '%s\n' "$rows" | cut -f1 | uniq -d | head -1)
-            [ -z "$dup" ] || err "$topic/webwork-sets/$name has two links numbered $dup"
+        if [ -z "$rows" ]; then
+            empty_dirs+=("$dir")
+            plan+=("E$dir")
+            continue
         fi
+        rows=$(printf '%s' "$rows" | sort -t $'\t' -k1,1n)
+        dup=$(printf '%s\n' "$rows" | cut -f1 | uniq -d | head -1)
+        [ -z "$dup" ] || err "$topic/webwork-sets/$name has two links numbered $dup"
         valid_setid "$name-r$round" || err "$name: characters webwork2 will not accept in a set name"
+        plan+=("R${#review_dirs[@]}")
         review_dirs+=("$dir")
         review_rows+=("$rows")
     done <<< "$group_rows"
+
+    [ "${#review_dirs[@]}" -gt 0 ] || err "every draft directory for $section is empty, so there is nothing to review"
 
     read_template
     if [ "$errors" -gt 0 ]; then
@@ -427,80 +421,135 @@ if [ "$review" -eq 1 ]; then
         exit 1
     fi
 
-    # Nothing is uploaded for a header to point at.
+    # A review set is not a practice set, so the course's set header stays out.
     header_ref=defaultHeader
-    tgz="$out/$section-review-r$round.tgz"
+    stage="$out/$section-review-r$round"
+    tgz="$stage.tgz"
 
     echo "webwork-build --review: $section from $topic, round $round"
-    tar_args=()
-    for i in "${!review_dirs[@]}"; do
+
+    if [ "$dryrun" -eq 0 ]; then
+        mkdir -p "$out" || die "cannot create $out"
+        rm -rf "${stage:?}" "$tgz"
+        mkdir "$stage" || die "cannot create $stage"
+        # An emptied draft has no set this round; its old .def would say it had.
+        for dir in "${empty_dirs[@]+"${empty_dirs[@]}"}"; do
+            rm -f "$dir/set$(basename "$dir")".def "$dir/set$(basename "$dir")"-r*.def
+        done
+    fi
+
+    for step in "${plan[@]}"; do
+        if [ "${step:0:1}" = E ]; then
+            printf '  %-60s no links, so no review set\n' "$(basename "${step:1}")"
+            continue
+        fi
+        i=${step:1}
         dir=${review_dirs[$i]}
         name=$(basename "$dir")
         setid="$name-r$round"
+        setdir="set$setid"
         rows=${review_rows[$i]}
-        n_up=$(printf '%s\n' "$rows" | awk -F'\t' '$4=="upstream"' | grep -c . || true)
-        n_fork=$(printf '%s\n' "$rows" | awk -F'\t' '$4=="fork"' | grep -c . || true)
-        n_local=$(printf '%s\n' "$rows" | awk -F'\t' '$4=="local"' | grep -c . || true)
-        printf '  %-60s %3d on the server, %d of them forks; %d local only\n' \
-            "$name" $((n_up + n_fork)) "$n_fork" "$n_local"
+        n=$(printf '%s\n' "$rows" | grep -c .)
 
         if [ "$dryrun" -eq 1 ]; then
-            [ -n "$rows" ] && printf '%s\n' "$rows" | while IFS=$'\t' read -r _ lname path kind; do
-                [ "$kind" = local ] && path="(read locally)"
-                printf '      %-50s %-8s %s\n' "$lname" "$kind" "$path"
+            printf '  %-60s %3d problem(s)\n' "$name" "$n"
+            printf '%s\n' "$rows" | while IFS=$'\t' read -r _ lname file; do
+                printf '      %-40s <-  %s\n' "$lname" "$(shown_path "$file")"
             done
             continue
         fi
 
-        def="$dir/set$setid.def"
-        # A rebuilt round replaces the draft's earlier .def files.
-        rm -f "$dir/set$name".def "$dir/set$name"-r*.def
+        # Written with `cat', not `cp', so no extended attributes come along to
+        # become AppleDouble members, exactly as the build proper does.
+        mkdir "$stage/$setdir" || die "cannot create $stage/$setdir"
+        manifest="$stage/$setdir/MANIFEST.tsv"
+        printf 'file\tblob\tsource\n' > "$manifest"
+        n_img=0
+        while IFS=$'\t' read -r _ lname file; do
+            cat "$file" > "$stage/$setdir/$lname" || die "could not copy $file"
+            printf '%s\t%s\t%s\n' "$lname" "$(git hash-object "$file")" "$(shown_path "$file")" >> "$manifest"
+            while IFS= read -r img; do
+                [ -n "$img" ] || continue
+                src="$(dirname "$file")/$img"
+                dst="$stage/$setdir/$img"
+                if [ ! -f "$src" ]; then
+                    echo "webwork-build: warning: $name/$lname names $img, which is not beside its source; check it on the server" >&2
+                elif [ -f "$dst" ]; then
+                    # Two problems in one set naming the same image file.
+                    cmp -s "$src" "$dst" || err "$name: two problems need different files both named $img"
+                else
+                    cat "$src" > "$dst" || die "could not copy $src"
+                    printf '%s\t%s\t%s\n' "$img" "$(git hash-object "$src")" "$(shown_path "$src")" >> "$manifest"
+                    n_img=$((n_img + 1))
+                fi
+            done < <(images_named "$file")
+        done <<< "$rows"
+
+        # The copies are a redistribution, and OPL material is CC BY-NC-SA.
+        if [ -f "$REPO/$topic/webwork/LICENSE.md" ]; then
+            cat "$REPO/$topic/webwork/LICENSE.md" > "$stage/$setdir/LICENSE.md"
+        fi
+
+        def="$stage/$setdir.def"
         {
-            echo "# set$setid.def -- REVIEW set, round $round, GENERATED by webwork-build --review"
+            echo "# $setdir.def -- REVIEW set, round $round, GENERATED by webwork-build --review"
             echo "# on $(date +%Y-%m-%d) from $topic/webwork-sets/$name. Do not edit: cull"
             echo "# links in that directory and build the next round."
             echo "#"
+            echo "# The problems are COPIES in $setdir/, each named as its draft link;"
+            echo "# $setdir/MANIFEST.tsv says where each came from."
             echo "# Template: ${template#"$REPO/"}, with its header replaced by defaultHeader."
-            if [ "$n_fork" -gt 0 ]; then
-                echo "#"
-                echo "# Already forked, so reviewed here AS UPSTREAM -- our edits are not shown:"
-                printf '%s\n' "$rows" | awk -F'\t' '$4=="fork" {print "#   " $2}'
-            fi
-            if [ "$n_local" -gt 0 ]; then
-                echo "#"
-                echo "# No server path, so NOT in this set -- read these locally:"
-                printf '%s\n' "$rows" | awk -F'\t' '$4=="local" {print "#   " $2}'
-            fi
             echo
             for line in "${pre[@]+"${pre[@]}"}"; do fill "$line" "" ""; done
             k=0
-            [ -n "$rows" ] && while IFS=$'\t' read -r _ lname path kind; do
-                [ "$kind" = local ] && continue
+            while IFS=$'\t' read -r _ lname _; do
                 k=$((k + 1))
-                echo "# [$k] $lname$([ "$kind" = fork ] && echo "  (upstream of our fork)")"
-                for line in "${block[@]}"; do fill "$line" "$k" "$path"; done
+                echo "# [$k] $lname"
+                for line in "${block[@]}"; do fill "$line" "$k" "$setdir/$lname"; done
             done <<< "$rows"
             for line in "${post[@]+"${post[@]}"}"; do fill "$line" "" ""; done
         } > "$def"
-        tar_args+=(-C "$dir" "set$setid.def")
+
+        # Every file the .def names must be in the set. True by construction,
+        # which is why it is worth checking: a template typo would break it.
+        while IFS= read -r ref; do
+            [ -n "$ref" ] && [ "$ref" != defaultHeader ] || continue
+            [ -f "$stage/$ref" ] || err "$setdir.def names $ref, which is not in the set"
+        done < <(sed -E -n 's/#.*//; s/^[[:space:]]*(source_file|screenHeaderFile|paperHeaderFile)[[:space:]]*=[[:space:]]*([^[:space:]]*).*/\2/p' "$def")
+
+        # The draft directory keeps a copy of its .def: it records which round
+        # was built last, which is what pr-webwork's `review' reads.
+        rm -f "$dir/set$name".def "$dir/set$name"-r*.def
+        cat "$def" > "$dir/$setdir.def"
+
+        printf '  %-60s %3d problem(s)%s\n' "$name" "$n" \
+            "$([ "$n_img" -gt 0 ] && echo ", $n_img image(s)")"
     done
 
     if [ "$dryrun" -eq 1 ]; then
         echo
-        echo "Dry run: would write set<draft>-r$round.def in each draft directory, and ${tgz#"$REPO/"}"
+        echo "Dry run: would write set<draft>-r$round.def in each draft directory with links,"
+        echo "and ${stage#"$REPO/"}{/,.tgz} holding the copies"
         exit 0
     fi
 
-    mkdir -p "$out" || die "cannot create $out"
-    rm -f "$tgz"
-    if ! COPYFILE_DISABLE=1 tar -czf "$tgz" --exclude '.*' "${tar_args[@]}"; then
+    [ "$errors" -eq 0 ] || die "$errors error(s) above; ${stage#"$REPO/"} is incomplete and no tarball was written"
+
+    # Every set directory and .def in the stage, by name, so nothing stray and no
+    # ./ prefix reaches the tarball.
+    members=()
+    for i in "${!review_dirs[@]}"; do
+        setdir="set$(basename "${review_dirs[$i]}")-r$round"
+        members+=("$setdir" "$setdir.def")
+    done
+    if ! COPYFILE_DISABLE=1 tar -czf "$tgz" --exclude '.*' -C "$stage" "${members[@]}"; then
         die "tar failed; $tgz was not written"
     fi
-    verify_tarball "$tgz" "${#review_dirs[@]}"
+    verify_tarball "$tgz" "$(find "$stage" -type f | wc -l | tr -d ' ')"
     warn_if_tracked "$tgz"
 
     echo
-    echo "Wrote ${tgz#"$REPO/"}: ${#review_dirs[@]} review .def file(s), one per draft directory."
+    echo "Wrote ${tgz#"$REPO/"} ($(du -h "$tgz" | cut -f1 | tr -d ' ')): ${#review_dirs[@]} review set(s), with their problems copied in."
     echo "Upload it into templates/ in the File Manager, unpack it there, and import the .def files."
     [ "$round" -gt 1 ] && echo "Earlier rounds' sets stay on the server until you delete them."
     exit 0
