@@ -7,7 +7,9 @@
 #                   the symlinks in a set's group directories
 #   -s, --seed N    freeze this problem seed (default 1234)
 #   -o, --out DIR   write <name>.tex into DIR (default: <topic>/problems/, worked
-#                   out from where the .pg lives); `-o -' prints to stdout
+#                   out from where the .pg lives, or for an alternate the
+#                   directory the first conversion sits in); `-o -' prints to
+#                   stdout
 #   -n, --name STR  basename for the .tex file (one .pg only; default: the .pg's
 #                   own name with _ turned into -, or <name>__alt<n> for a
 #                   problem already converted at another seed)
@@ -27,11 +29,14 @@
 # you named its file; one found by walking a directory is just reported.
 #
 # NEVER TWICE AT ONE SEED. A problem is identified by its \ProblemMeta `number'
-# (its path in the source library) and `seed', both read off the .tex files in
-# the output directory — the converted files get descriptive names, so the
-# filename alone cannot tell. Already converted at this seed: skipped. Converted
-# only at OTHER seeds: converted again, as an ALTERNATE named after the first
-# conversion, <its name>__alt1, __alt2, ... — with a warning if this seed gives
+# (its path in the source library) and `seed', both read off the .tex files
+# under <topic>/problems/ and under the output directory, SUBDIRECTORIES
+# INCLUDED — the converted files get descriptive names and may be filed away
+# into subfolders, so neither the filename nor its folder can tell. Already
+# converted at this seed: skipped. Converted only at OTHER seeds: converted
+# again, as an ALTERNATE beside the first conversion and named after it,
+# <its name>__alt1, __alt2, ... (the first number no .tex there uses, in any
+# subfolder) — with a warning if this seed gives
 # the same answer key, or the very same problem, as one already there, since an
 # alternate (a second version of a test) exists to differ. ALTERNATES ARE MADE
 # ONLY ON REQUEST: without -s, a problem converted at ANY seed is skipped, so
@@ -612,42 +617,82 @@ def gather(paths):
     return found
 
 
-def out_dir(pg, out):
-    """Where this problem's .tex goes: -o, else <topic>/problems/."""
-    if out:
-        return pathlib.Path(out).expanduser()
+def topic_problems(pg):
+    """<topic>/problems/ for a .pg under <topic>/webwork/, else None."""
     parts = pg.parts
     if "webwork" not in parts:
-        raise Skip("not under a <topic>/webwork/ tree, so there is no <topic>/problems/ "
-                   "to write to; give -o DIR")
+        return None
     at = len(parts) - 1 - parts[::-1].index("webwork")
     return pathlib.Path(*parts[:at]) / "problems"
 
 
-def conversions(directory, number):
-    """[(tex, seed or None), ...]: every .tex in `directory` converted from `number`.
+def out_dir(pg, out):
+    """Where this problem's .tex goes: -o, else <topic>/problems/."""
+    if out:
+        return pathlib.Path(out).expanduser()
+    bank = topic_problems(pg)
+    if bank is None:
+        raise Skip("not under a <topic>/webwork/ tree, so there is no <topic>/problems/ "
+                   "to write to; give -o DIR")
+    return bank
+
+
+def bank_files(roots):
+    """[(tex, root it was found under), ...]: every .tex under the roots, recursively.
+
+    The roots are <topic>/problems/ and the output directory, which are usually
+    the same place, or one inside the other: a file reached from both is listed
+    once, under the first root given.
+    """
+    found, seen = [], set()
+    for root in roots:
+        if root is None or not root.is_dir():
+            continue
+        for tex in sorted(root.rglob("*.tex")):
+            real = tex.resolve()
+            if real not in seen:
+                seen.add(real)
+                found.append((tex, root))
+    return found
+
+
+def shown(tex, root):
+    """A conversion's path as a message names it: relative to the root it was found under.
+
+    Just the file name for one at the top of problems/; `graphs/foo.tex' for one
+    filed away into a subfolder, which the name alone would hide.
+    """
+    return str(tex.relative_to(root))
+
+
+def conversions(files, number):
+    """[(tex, seed or None, root), ...]: every file of bank_files converted from `number`.
 
     Both read from the \\ProblemMeta block, one key per line as ProblemMeta.sty
     requires. The seed is None for a file converted before the `seed' key
     existed and not backfilled since.
     """
-    if not directory.is_dir():
-        return []
     want = re.compile(r"^\s*number\s*=\s*\{" + re.escape(number) + r"\}", re.M)
     found = []
-    for tex in sorted(directory.glob("*.tex")):
+    for tex, root in files:
         text = tex.read_text(encoding="utf-8", errors="replace")
         if want.search(text):
             m = re.search(r"^\s*seed\s*=\s*\{\s*(\d+)\s*\}", text, re.M)
-            found.append((tex, int(m.group(1)) if m else None))
+            found.append((tex, int(m.group(1)) if m else None, root))
     return found
 
 
-def alternate_name(directory, existing):
-    """<name>__alt<n> after the first conversion's own name, n the first free."""
+def alternate_name(files, existing):
+    """<name>__alt<n> after the first conversion's own name, n the first free.
+
+    Free across the whole bank, not just the directory it will be written to: two
+    files called foo__alt1.tex in different subfolders would be two different
+    problems that read as one.
+    """
     base = re.sub(r"__alt\d*$", "", existing[0][0].stem)
+    taken = {tex.stem for tex, _ in files}
     n = 1
-    while (directory / f"{base}__alt{n}.tex").exists():
+    while f"{base}__alt{n}" in taken:
         n += 1
     return f"{base}__alt{n}"
 
@@ -679,7 +724,7 @@ def warn_if_repeats(pg, seed, existing):
     can be exactly what was wanted.
     """
     new_key, new_statement = answer_key(pg, seed), None
-    for tex, other in existing:
+    for tex, other, root in existing:
         if answer_key(pg, other) != new_key:
             continue
         if new_statement is None:
@@ -687,7 +732,7 @@ def warn_if_repeats(pg, seed, existing):
         same = new_statement is not None and new_statement == comparable_statement(pg, other)
         what = "the SAME PROBLEM" if same else "the same answer key"
         print(f"pg-to-latex: warning: seed {seed} gives {what} as seed {other} "
-              f"({tex.name}){'' if same else '; check the two differ where it matters'}",
+              f"({shown(tex, root)}){'' if same else '; check the two differ where it matters'}",
               file=sys.stderr)
 
 
@@ -706,35 +751,46 @@ def convert(pg, args):
 
     directory = out_dir(pg, args.out)
     _, number, _ = provenance(pg)
-    existing = conversions(directory, number)
-    for tex, seed in existing:
+    # The whole bank, subfolders included: a conversion filed away into
+    # problems/graphs/ is still a conversion. The output directory is searched
+    # too, for an -o that points outside problems/.
+    files = bank_files([topic_problems(pg), directory])
+    existing = conversions(files, number)
+    for tex, seed, root in existing:
         if seed == args.seed:
-            raise Skip(f"already converted at seed {seed}, as {tex.name}; -s picks another seed")
+            raise Skip(f"already converted at seed {seed}, as {shown(tex, root)}; "
+                       "-s picks another seed")
     # An ALTERNATE is made only on request. At the default seed, any existing
     # conversion means "already converted" -- whatever seed it used, or none --
     # so walking a directory never quietly mints alternates of problems first
     # frozen at a chosen seed (piecewise-linear-from-graph at 36, say). Naming a
     # seed with -s is the request.
     if existing and not args.explicit_seed:
-        tex, seed = existing[0]
+        tex, seed, root = existing[0]
         at = f"at seed {seed}" if seed is not None else "with no seed recorded"
-        raise Skip(f"already converted {at}, as {tex.name}; -s N makes an alternate at seed N")
-    seedless = [tex for tex, seed in existing if seed is None]
+        raise Skip(f"already converted {at}, as {shown(tex, root)}; "
+                   "-s N makes an alternate at seed N")
+    seedless = [(tex, root) for tex, seed, root in existing if seed is None]
+
+    # An alternate goes beside the conversion it is an alternate OF, so a problem
+    # filed into a subfolder keeps its versions together; -o still overrides.
+    if existing and not args.out:
+        directory = existing[0][0].parent
 
     if args.name:
         name = args.name
     elif existing:
-        name = alternate_name(directory, existing)
+        name = alternate_name(files, existing)
     else:
         name = pg.stem.replace("_", "-")
     dest = directory / f"{name}.tex"
     if dest.exists():
         raise Skip(f"refusing to overwrite {dest}")
 
-    for tex in seedless:
-        print(f"pg-to-latex: warning: {tex.name} records no seed, so whether seed "
+    for tex, root in seedless:
+        print(f"pg-to-latex: warning: {shown(tex, root)} records no seed, so whether seed "
               f"{args.seed} repeats it was not checked", file=sys.stderr)
-    seeded = [(tex, seed) for tex, seed in existing if seed is not None]
+    seeded = [(tex, seed, root) for tex, seed, root in existing if seed is not None]
     if seeded:
         warn_if_repeats(pg, args.seed, seeded)
     text = scaffold(pg, args.seed)
