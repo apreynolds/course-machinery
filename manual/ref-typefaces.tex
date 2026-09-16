@@ -54,7 +54,9 @@ Two caveats on that fourth row. The hook is on \env{tabular} itself, so a
 table built by another package -- \env{longtblr} and the rest of
 \file{tabularray}, which is not built on \env{tabular} -- does \emph{not}
 inherit it, and a schedule table full of dates will stay osf under
-\texttt{[osf]}. And when a whole document reads better in lining figures,
+\texttt{[osf]}. No lecture or assessment uses \texttt{[osf]}, so the gap is
+only live in CourseDocument; the fix, when it is needed, is a \file{tabularray}
+counterpart of the hook in \file{Typefaces.sty}, noted there. And when a whole document reads better in lining figures,
 the first row is a per-document choice, not a fixed property of the class:
 CourseDocument's \texttt{[lining]} option
 (section~\ref{sec:ref-coursedocument}) is the switch, because there is no
