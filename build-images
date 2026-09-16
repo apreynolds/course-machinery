@@ -8,7 +8,7 @@
 #       --width LEN     typeset measure, any TeX length       (default: 2.6\alphabet)
 #       --margins N     white border in TeX pt                (default: 10)
 #       --no-question   skip the question-only variant
-#       --no-solutions  skip the -SOLUTIONS variant
+#       --no-solutions  skip the _SOLUTIONS variant
 #       --no-pdf        keep only the PNG, not the cropped PDF
 #       --no-png        keep only the cropped PDF, not the PNG
 #       --keep          keep the generated wrapper and log, and say where
@@ -17,7 +17,7 @@
 # Two independent choices, each defaulting to BOTH. WHICH VARIANTS to render:
 #
 #     <name>.pdf            <name>.png              the question alone
-#     <name>-SOLUTIONS.pdf  <name>-SOLUTIONS.png    question + worked solution
+#     <name>_SOLUTIONS.pdf  <name>_SOLUTIONS.png    question + worked solution
 #
 # where --no-question drops the top row and --no-solutions the bottom one. And
 # WHICH FORMATS to keep of whatever is rendered: --no-png stops at the cropped
@@ -26,7 +26,7 @@
 # simply never reaches --out. Asking for no variant, or for neither format, is
 # an error rather than a silent no-op.
 #
-# The -SOLUTIONS suffix is build-pdfs' own view naming, deliberately.
+# The _SOLUTIONS suffix deliberately differs from build-pdfs' -SOLUTIONS view naming.
 #
 # WHAT IT IS FOR. A D2L (or Moodle, or Canvas) question pool wants one IMAGE per
 # question. This turns one problem file from the bank into that image, without
@@ -162,7 +162,7 @@ status=0
 render() {
     local pdir=$1 pfile=$2 stem=$3 solutions=$4
     local job="$stem"
-    [ "$solutions" -eq 1 ] && job="$stem-SOLUTIONS"
+    [ "$solutions" -eq 1 ] && job="${stem}_SOLUTIONS"
 
     local wrapper="$work/$job.tex"
 

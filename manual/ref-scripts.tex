@@ -57,8 +57,8 @@ build-images [OPTIONS] FILE.tex ...
 One problem file in, one picture out --- for a learning-management system whose
 question pools take an image rather than text. Each input yields
 \file{NAME.pdf} and \file{NAME.png} (the question alone), plus
-\file{NAME-SOLUTIONS.pdf} and \file{NAME-SOLUTIONS.png} (the question with its
-worked solution), reusing build-pdfs' view suffix.
+\file{NAME\_SOLUTIONS.pdf} and \file{NAME\_SOLUTIONS.png} (the question with its
+worked solution), not build-pdfs' \file{-SOLUTIONS}.
 
 Those four are two independent choices, each defaulting to both, so any single
 output can be asked for on its own: \texttt{-{}-no-question} and
