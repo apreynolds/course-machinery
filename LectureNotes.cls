@@ -45,6 +45,14 @@
 % lists that are not question parts.
 \RequirePackage{enumitem}
 
+% Tables: tabularray (tblr/longtblr) is the house table package, in all three
+% classes. Same parity argument as enumitem above -- a problems/ file with a
+% tblr in it must compile as a lecture Example and as a test Question alike --
+% and lectures carry tables of their own (a table of values, a log table).
+% The load cost is small beside tcolorbox, which CourseBoxes already brings;
+% tabularray's real cost is per table, and a lecture without one pays none.
+\RequirePackage{tabularray}
+
 % The exercise system. Two independent packages, essential first:
 %   Exercises  -- \begin{problem}/\begin{solution} + the solutions toggle. A
 %                 lecture imports problem files too, and they may carry solutions.

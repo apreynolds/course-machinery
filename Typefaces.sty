@@ -111,6 +111,17 @@
 % Tables want tabular lining figures even when body prose is osf. Harmless when
 % it isn't. Only needs the opening hook -- the switch is local to the group, so
 % no matching \AtEndEnvironment is required.
+%
+% KNOWN GAP: tabularray's tblr/longtblr are NOT built on tabular, so this hook
+% never reaches them -- under [osf] a tblr gets old-style figures. It bites
+% nowhere yet: LectureNotes and Assessment load [lining], and a CourseDocument
+% full of data passes [lining] too. If osf figures ever appear in a tblr, the
+% fix belongs here, beside this hook, not in the document: tabularray's own
+% equivalent is \SetTblrInner{cells={font=\LibertinusSerifTLF}}. Tested
+% 2026-09-16: that gives lining figures and keeps \textbf working, but a table
+% that sets its own font= on a cell replaces it, and that cell goes back to osf
+% (so such a table must add \LibertinusSerifTLF to its own key). Manual: the
+% caveat under ref-typefaces.tex's figure table.
 \AtBeginEnvironment{tabular}{\LibertinusSerifTLF}
 
 \renewcommand*{\oldstylenums}[1]{{\LibertinusSerifOsF #1}}

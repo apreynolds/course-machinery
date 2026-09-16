@@ -53,6 +53,13 @@
 % common needs; both are enumitem options, not stock list features.
 \RequirePackage{enumitem}
 
+% Tables: tabularray (tblr/longtblr) is the house table package, in all three
+% classes. A problems/ file with a tblr in it must compile unchanged here and in
+% a lecture -- the parity LectureNotes.cls argues for enumitem. The load cost is
+% small beside tcolorbox, which InstructorNotes already brings; tabularray's
+% real cost is per table, and a test without one pays none.
+\RequirePackage{tabularray}
+
 % Used DIRECTLY by this class: \ifdefempty guards the optional cover fields,
 % \marginnote drops the marks in the right-margin rail (PROBLEM LABELS below).
 % Both would arrive indirectly anyway (Exercises loads etoolbox, InstructorNotes

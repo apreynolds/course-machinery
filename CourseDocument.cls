@@ -82,8 +82,8 @@
 % Tables, on the same reasoning: a syllabus is more list AND TABLE than prose --
 % a grade scale, an instructor/section roster, a TA/room roster, a term schedule
 % -- so the class carries the table package rather than each document loading it.
-% Not in LectureNotes or Assessment: neither is table-shaped, and tabularray is a
-% heavy load (expl3) to hand a class that would not use it.
+% LectureNotes and Assessment load it too: it is the house table package, and a
+% problem file with a tblr in it has to compile wherever it is imported.
 %
 % The tabular-vs-tblr figure gap is real but does not bite here: Typefaces pins
 % lining figures with \AtBeginEnvironment{tabular}, and tblr is not built on
