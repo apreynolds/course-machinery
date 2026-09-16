@@ -71,7 +71,8 @@ error rather than a silent no-op.
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 wrapper & a throwaway \texttt{article} document in \env{\$TMPDIR}, never
-  written into your tree. It loads \file{Exercises.sty} directly, because none
+  written into your tree. It loads \file{Exercises.sty} (and \file{tabularray},
+  which every class carries, so a problem with a \env{tblr} builds) directly, because none
   of the three classes wants to be a single problem on a page: \file{Assessment}
   hangs numbers and marks in margin rails that fall outside a crop box, and
   \file{CourseDocument} brings a title block and headers a question has no use

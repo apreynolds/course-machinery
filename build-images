@@ -39,7 +39,8 @@
 # problem on a page: Assessment.cls hangs question numbers and marks in margin
 # rails (Assessment.cls:324-330) that fall outside a naive crop box, and
 # CourseDocument brings a title block, headers and a table of contents that a
-# question image has no use for.
+# question image has no use for. What the classes all carry and a problem may
+# use -- tabularray, for a tblr -- the wrapper loads itself.
 #
 # Nothing in the machinery is modified or special-cased to support this. Every
 # hook used is one Exercises already documents:
@@ -184,6 +185,7 @@ render() {
           '          top=\imgmargin, bottom=\imgmargin,' \
           '          marginparwidth=0pt, marginparsep=0pt}' \
           '\usepackage{parskip}' \
+          '\usepackage{tabularray}' \
           '\usepackage{ProblemMeta}' \
           '\usepackage{Exercises}' \
           '\pagestyle{empty}' \
