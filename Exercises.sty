@@ -1109,14 +1109,33 @@
 %     member's margin mark, so members carry no points= of their own. "Choose N of M"
 %     is only used when the alternatives are equal value, so one declaration fits.
 %   * THE INSTRUCTION ("Answer any two of Questions 7-9.") is generated and printed
-%     ABOVE EACH member, so the "choose 2 of these" context travels with every
-%     question across page breaks (same robustness argument as a repeated
+%     ABOVE EACH member by default, so the "choose 2 of these" context travels with
+%     every question across page breaks (same robustness argument as a repeated
 %     problemgroup instruction). The NUMBERS are cross-references -- \ref to the
 %     first and last member -- so they are never typed and AUTO-UPDATE when a
 %     question is inserted before the block. Cost: the usual second compile to
 %     settle them (they show "??" once, exactly like \printtotalpoints; latexmk
 %     reruns on the changed .aux). The wording is a class-overridable hook
 %     (\ProblemChoiceInstruction), so it is one consistent phrasing per course.
+%
+%     WHERE it appears is per-group: instruction=each (default), first or none.
+%     Repeating it is right when the choice is one block among required questions
+%     -- "answer any 2 of Questions 7-9" at the foot of an exam, where a student
+%     meets Q8 without having read Q7's heading. It is noise when the WHOLE paper
+%     is one choice (every MATH 1003 test is 5 of 6): the sentence is then a fact
+%     about the paper, belongs with the cover instructions, and repeating it above
+%     every question says six times what the cover said once -- and costs a line
+%     that shows badly when two questions share a page.
+%
+%       each    above every member. The default: no existing paper changes.
+%       first   above the first member only, so the block still announces itself
+%               where it starts and the rest of the run stays clean.
+%       none    never printed. The paper must say it somewhere else -- there is
+%               NO check for that, because this package cannot read the cover.
+%
+%     The two \labels are dropped in every mode, so the numbers stay available to
+%     a \ref the author writes by hand (a cover instruction naming the range) even
+%     when nothing generated prints.
 %
 % Members must be single-value problems: a qparts/problemgroup member adds to the
 % total by a different path and would double-count. (Not guarded -- the normal use
@@ -1127,8 +1146,25 @@
 \newcommand{\pchoice@select}{}
 \newcommand{\pchoice@val}{}
 \newcommand{\pchoice@id}{0}
+\newcommand{\pchoice@instr}{each}
 \define@key{pchoice}{select}{\def\pchoice@select{#1}}
 \define@key{pchoice}{points}{\def\pchoice@val{#1}}
+
+% instruction=each|first|none -- see WHERE above. The three modes are declared as
+% control sequences rather than tested with a string chain, so the key validates
+% itself: an unknown value is a typo and errors HERE, naming the group, rather
+% than silently printing nothing (the failure a plain \ifdefstring chain gives,
+% and the one hardest to notice -- a missing instruction looks like a choice).
+\@namedef{pchoice@mode@each}{}
+\@namedef{pchoice@mode@first}{}
+\@namedef{pchoice@mode@none}{}
+\define@key{pchoice}{instruction}{%
+  \@ifundefined{pchoice@mode@#1}%
+    {\PackageError{Exercises}%
+       {problemchoice: unknown instruction `#1'}%
+       {Use instruction=each (the default), first, or none.}}%
+    {\def\pchoice@instr{#1}}%
+}
 
 % Spell out a small count (the "two" in "any two of ..."); digits are the fallback
 % for anything past nine. \ifcase needs an integer -- select is guarded to be one.
@@ -1143,19 +1179,32 @@
 \newcommand{\ProblemChoiceInstruction}[3]{%
   \noindent\textbf{Answer any \pchoice@numword{#1} of Questions~#2--#3.}}
 
-% Printed above each member by the problem env. On the FIRST member it also drops
-% the \label the range's LEFT end reads; the RIGHT end is labelled at
-% \end{problemchoice}. The \ref to that (forward) last label is "??" until the
-% rerun -- the accepted two-pass cost, the same one \printtotalpoints pays.
-\newcommand{\pchoice@emit}{%
+% The sentence itself, with its surrounding space. Factored out of \pchoice@emit
+% so the mode decides WHETHER it is called and nothing else has to know how it is
+% set: the vertical space belongs to the sentence, so a suppressed instruction
+% leaves no gap where it would have been.
+\newcommand{\pchoice@say}{%
   \par\addvspace{\medskipamount}%
-  \ifpchoicefirst
-    \global\pchoicefirstfalse
-    \label{pc@\pchoice@id @first}%
-  \fi
   \ProblemChoiceInstruction{\pchoice@select}%
     {\ref{pc@\pchoice@id @first}}{\ref{pc@\pchoice@id @last}}%
     \vspace{-1em}\par\nobreak
+}
+
+% Called by the problem env for every member. On the FIRST member it drops the
+% \label the range's LEFT end reads; the RIGHT end is labelled at
+% \end{problemchoice}. The \ref to that (forward) last label is "??" until the
+% rerun -- the accepted two-pass cost, the same one \printtotalpoints pays.
+%
+% The label is dropped BEFORE the mode is consulted, and in every mode: it is the
+% range's left end, which \ref needs whether or not this package prints anything.
+\newcommand{\pchoice@emit}{%
+  \ifpchoicefirst
+    \global\pchoicefirstfalse
+    \label{pc@\pchoice@id @first}%
+    \ifdefstring{\pchoice@instr}{none}{}{\pchoice@say}%
+  \else
+    \ifdefstring{\pchoice@instr}{each}{\pchoice@say}{}%
+  \fi
 }
 
 \newcounter{pchoicetmp}  % scratch for select*value
@@ -1164,7 +1213,7 @@
   \stepcounter{pchoicegroup}%
   \edef\pchoice@id{\arabic{pchoicegroup}}%
   \setcounter{pchoicemembers}{0}%
-  \def\pchoice@select{}\def\pchoice@val{}%
+  \def\pchoice@select{}\def\pchoice@val{}\def\pchoice@instr{each}%
   \setkeys{pchoice}{#1}%
   \inproblemchoicetrue    % LOCAL: nested member groups see it; \end auto-clears it
   \pchoicefirsttrue
