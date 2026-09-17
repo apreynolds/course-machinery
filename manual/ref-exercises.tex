@@ -43,8 +43,11 @@ section~\ref{sec:assessments}.
   \cs{leftgraph}\texttt{[X]\{FILE\}}, then \cs{rightcolumn}, then
   \cs{rightitem}\texttt{\{...\}} / \cs{rightgraph}\texttt{\{FILE\}}. The
   \texttt{[X]} names the match, shown only in solutions.\\
-\env{problemchoice}\texttt{[select=, points=]} & choose-$N$-of-$M$: emits
-  the instruction on every member, counts select$\times$points once.\\
+\env{problemchoice}\texttt{[select=, points=, instruction=]} &
+  choose-$N$-of-$M$: counts select$\times$points once.
+  \texttt{instruction=each} (default) repeats the generated sentence above
+  every member, \texttt{first} prints it once, \texttt{none} never prints it
+  (the paper must say it elsewhere).\\
 \end{tabularx}
 \end{center}
 

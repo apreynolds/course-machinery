@@ -169,6 +169,25 @@ per-question value, and the total counts it $\text{select} \times
 \texttt{points=} of their own (one that does triggers a warning, since it
 would silently diverge from the shared value).
 
+\texttt{instruction=} says \emph{where} that sentence appears, and the
+default is the block above: \texttt{each}. Repeating it earns its keep when
+the choice is one block among required questions -- a student meeting Q8
+alone still learns that it is one of a choice. It is noise when the
+\emph{whole paper} is one choice, where the sentence is really a fact about
+the paper: then set \texttt{instruction=first} to announce the run once, or
+\texttt{instruction=none} and say it in the cover instructions.
+
+\begin{manexsource}
+\begin{problemchoice}[select=5, points=6, instruction=none]
+\end{manexsource}
+
+\noindent
+Nothing checks that the paper says it somewhere -- this package cannot read
+your cover. Both \cs{label}s are still dropped in every mode, so a cover line
+can name the range itself with \cs{ref}\texttt{\{pc@1@first\}} and
+\cs{ref}\texttt{\{pc@1@last\}} (the digit is the group's number, counting
+from one).
+
 \subsection{Answer space and page furniture}
 
 \cs{workspace}\texttt{[N]} reserves $N$ lines of handwriting after a question
