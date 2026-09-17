@@ -86,6 +86,40 @@ follow, both intentional:
     layout, unlike the answer key painted over blank space.
 \end{itemize}
 
+\subsection{Space the key reclaims: \env{studentonly}}
+
+Some of the room an answer needs is already on the page, spent on something
+only the student uses -- most often an empty grid to sketch on, which the key
+reprints blank and then draws the real graph underneath. \env{studentonly}
+hands that room back:
+
+\begin{manexsource}
+\begin{problem}
+  Sketch the graph of $f$.
+  \begin{solution}          % FIRST: it paints downward
+    ...prose, and the graph drawn on a grid...
+  \end{solution}
+  \begin{studentonly}       % its space is kept, its ink dropped
+    \PWgrid{}
+  \end{studentonly}
+\end{problem}
+\workspace[10]
+\end{manexsource}
+
+The student copy prints the body; the key prints an empty box of exactly the
+same height, so the contract above is untouched -- same page breaks, same page
+count -- and the solution now has that height \emph{plus} the workspace to
+paint into. Adopting it therefore never makes a previously adequate
+\cs{workspace} too small. Under \cs{collapseworkspace} the block vanishes
+entirely, like every other reservation.
+
+\textbf{The solution must come first.} A solution written \emph{after} the
+block starts below the reclaimed space and paints into the workspace instead,
+leaving a blank gap where the grid was. Nothing can detect which you meant, so
+nothing warns: the key just looks wrong. Note also that the body is measured
+by typesetting it, and in the key that box is then discarded -- so keep
+\cs{label}s out of a \env{studentonly} body.
+
 \subsection{Solid mode: the compact answer key}
 
 Sometimes the spaced layout is wrong: an answer-key handout to post online,

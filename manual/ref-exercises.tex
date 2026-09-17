@@ -35,6 +35,10 @@ section~\ref{sec:assessments}.
   overlay by default (section~\ref{sec:overlay}).\\
 \env{hint} & printed only when this problem's hints are on; plain italic
   run-in under a \cs{HintLabel}. Never an overlay.\\
+\env{studentonly} & printed in the student copy; in the key its \emph{space}
+  is kept and its ink dropped, so a solution above it paints into the room
+  (an empty grid to sketch on). Put the \env{solution} \emph{before} it.
+  Nothing under \cs{collapseworkspace} (section~\ref{sec:overlay}).\\
 \env{choices}\texttt{[stacked$\vert$onepar$\vert$grid]} & lettered MC
   options; \cs{choice}\texttt{[correct]\{...\}} marks the key (boxed only
   in solutions), \cs{graphchoice}\texttt{[correct]\{FILE\}} is a graph

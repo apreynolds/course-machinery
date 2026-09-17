@@ -1350,6 +1350,72 @@
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% STUDENT-ONLY CONTENT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \begin{studentonly} ... \end{studentonly} -- content the STUDENT COPY prints and
+% the answer key does not, leaving its space free for the solution to paint into.
+%
+% The case it was built for: a question supplies an empty grid to sketch on. The
+% key then shows that same blank grid with the real graph drawn BELOW it, which is
+% the one thing a key never wants -- the empty version is useless there, and it
+% costs the height the drawn version needs.
+%
+% NOT A PLAIN "DROP IT WHEN SOLUTIONS ARE ON". That would shorten the key by the
+% grid's height and break the overlay contract (Workspace.sty, OVERLAY mode): the
+% key is meant to be a pixel-perfect overlay of the student copy, so every page
+% break falls in the same place and a marker can read both against each other.
+% What is dropped here is the INK, not the SPACE:
+%
+%   student copy          the body, as written
+%   key (overlay)         a box of exactly the body's height, empty
+%   key (\collapseworkspace)  nothing at all -- the compact key reserves no room
+%                             for anything, which is the whole point of that mode
+%
+% THE BODY IS TYPESET EITHER WAY, once, and the student branch prints that very
+% box rather than re-reading the body: measuring and printing cannot then disagree,
+% which is what makes the two copies line up exactly rather than approximately.
+% Consequence worth knowing: in the key the box is measured and discarded, so a
+% \label or a \ref inside the body is lost there. Keep cross-references out of a
+% studentonly body; a grid, a figure or a table to fill in has none.
+%
+% ORDERING RULE, and it is the one thing to get right: put \begin{solution} BEFORE
+% the studentonly block, not after. A solution box is emitted at zero height and
+% paints DOWNWARD (\WSZeroHeight), so a solution written above this block covers
+% the space this block reserves; one written below starts past it and paints into
+% the \workspace instead, leaving the reclaimed space blank. Nothing can detect
+% the intent, so nothing warns -- the key just quietly looks wrong.
+%
+% The room the solution has to work in is therefore this block's height PLUS any
+% \workspace that follows, which is strictly more than the \workspace alone it
+% would have had without this block. A previously-adequate \workspace[N] never
+% becomes too small by adopting studentonly.
+%
+% \ifWorkspaceOverlay is reached through \csname because a bare \if... inside a
+% skipped conditional branch is still counted by TeX's conditional scanner and
+% would unbalance the \fi's. Absent Workspace (CourseDocument, or build-images'
+% bare wrapper) there is no overlay to preserve and no reserved room to protect,
+% so the key prints nothing -- the same answer as \collapseworkspace.
+\newsavebox{\ex@so@box}
+
+\newcommand{\ex@so@blank}{%
+  \ifcsname ifWorkspaceOverlay\endcsname
+    \csname ifWorkspaceOverlay\endcsname
+      \@tempdima=\ht\ex@so@box
+      \@tempdimb=\dp\ex@so@box
+      \setbox\ex@so@box\vbox to \@tempdima{}%
+      \dp\ex@so@box=\@tempdimb
+      \box\ex@so@box
+    \fi
+  \fi
+}
+
+\NewEnviron{studentonly}{%
+  \par
+  \setbox\ex@so@box\vbox{\BODY}%
+  \ifsolutions\ex@so@blank\else\box\ex@so@box\fi
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HINT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % A hint is a LIGHT run-in aside, NOT a box: a new line, a "HINT:" label, then the
