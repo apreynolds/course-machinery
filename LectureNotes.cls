@@ -312,13 +312,15 @@
 % (CourseBoxes' hook, rendered just below); \section/\subsection appear too, when
 % a lecture happens to use them.
 %
-% HENCE FLAT, AND HENCE TYPEFACE RATHER THAN INDENT. Indentation implies hierarchy;
-% in the common no-section lecture there is none to imply, and indenting every
-% result would push the whole list right for nothing. So every level sits at one
-% margin and the DISTINCTION IS THE FACE -- sans for headings (echoing
-% \titleformat's \sffamily\bfseries on the page), serif roman for results. A
-% sectionless lecture then reads as a plain flat list, and a sectioned one still
-% separates at a glance. No conditional layout, nothing measured across runs.
+% INDENTED UNDER THE HEADINGS (2026-09-24; this reverses an earlier "flat list,
+% typeface rather than indent" design). In practice every lecture with a contents
+% list uses subsections, and the flat list read as one undifferentiated column:
+% headings were \small, so they were SMALLER than the results beneath them, with
+% their leaders and page numbers out of line. Now headings are full-size sans with
+% space above, sub-subsections and results sit one indent in, and the face still
+% separates heading (sans) from result (serif). A sectionless list simply sits
+% 1.5em in -- the cost of keeping the layout unconditional, with nothing measured
+% across runs.
 \setcounter{tocdepth}{3}
 
 % The pseudo-level the box hook writes. \titlecontents defines \l@cbresult, but a
@@ -343,38 +345,50 @@
 % see. Its entries are still hyperlinks -- and with \LinkColor black they look like
 % plain text and behave as taps, which is the whole navigation story on the room
 % copy now that the back-to-top arrow is gone.
+%
+% The handout's page number goes in a right-hand COLUMN (\contentspage sets it
+% flush right in the \contentsmargin), not straight after the leaders, so the
+% numbers line up and a full-width entry cannot run into its own.
 \ifProjector
   \newcommand{\CourseTocFill}{}
 \else
-  \newcommand{\CourseTocFill}{\titlerule*[0.8pc]{.}\normalfont\thecontentspage}
+  \newcommand{\CourseTocFill}{\titlerule*[0.8pc]{.}\normalfont\contentspage}
 \fi
 
 \titlecontents{section}[0em]
-  {\sffamily\bfseries}
+  {\addvspace{0.8em}\sffamily\bfseries}
   {\thecontentslabel.\enspace}
   {}
   {\CourseTocFill}[]
 
+% The level lectures actually use as a heading. Full size, with its own space
+% above so each group reads as a block.
 \titlecontents{subsection}[0em]
-  {\sffamily\bfseries\small}
+  {\addvspace{0.8em}\sffamily\bfseries}
   {\thecontentslabel.\enspace}
   {}
   {\CourseTocFill}[]
 
-\titlecontents{subsubsection}[0em]
-  {\sffamily\small}
+% A heading inside a group: at the results' indent, sans but not bold.
+\titlecontents{subsubsection}[1.5em]
+  {\addvspace{0.3em}\sffamily}
   {\thecontentslabel.\enspace}
   {}
   {\CourseTocFill}[]
 
-\titlecontents{cbresult}[0em]
+% Results, one indent in. The [3em] and the -1.5em kern together make a HANGING
+% indent: the first line starts at 1.5em and a wrapped line at 3em. The line is
+% ragged rather than justified (stretch on \rightskip) and never hyphenated, so a
+% long "Example 1.20 (Parking Fees ... Function)" breaks between words and keeps
+% its page number on the last line.
+\titlecontents{cbresult}[3em]
+  {\hyphenpenalty=10000 \advance\rightskip 0pt plus 6em\relax}
   {}
-  {}
-  {}
+  {\hspace*{-1.5em}}
   {\CourseTocFill}[]
 
-% The projector list needs no reserved right margin, having nothing to put there.
-\ifProjector\contentsmargin{0pt}\else\contentsmargin{1em}\fi
+% The page column's width. The projector has nothing to put there.
+\ifProjector\contentsmargin{0pt}\else\contentsmargin{2em}\fi
 
 % CourseBoxes' hook, rendered. Composes "Definition 2.1.1 (Derivative)", dropping
 % whichever pieces are absent -- an unnumbered result (\begin{example*}) gives
@@ -400,16 +414,32 @@
   \addcontentsline{toc}{cbresult}{\CB@tocline}%
 }
 
-% \lecturetoc -- what a lecture actually writes. The class owns the presentation
-% (page break, and whatever heading \tableofcontents' \section* renders as) so a
-% lecture spends one token and the look stays tunable in one place. DOCUMENT-called
+% \lecturetoc -- what a lecture actually writes: the lecture's TITLE, then its
+% contents list, then a page break. The class owns the presentation so a lecture
+% spends one token and the look stays tunable in one place. DOCUMENT-called
 % rather than class-emitted, deliberately: a one-topic lecture wants no list at all,
-% and only the author knows which those are.
+% and only the author knows which those are. (Such a lecture therefore has no
+% title either -- only the running head.)
+%
+% The title is read from \booksection ("1.2  Basic Classes of Functions") or
+% \lecturetitle (the title alone), so no lecture source needs editing; a lecture
+% declaring neither gets no title and no rule. There is no "Contents" heading:
+% under a title it said nothing, and it cost enough height to push a full list
+% onto a second page.
+%
+% \@starttoc{toc} is the list without \tableofcontents' \section* heading.
 %
 % The trailing \clearpage does not risk a blank page when the first \subsection
 % also breaks: \clearpage on a page with no contributed material does nothing.
+\newcommand{\LectureTitleFont}{\sffamily\bfseries\LARGE}
 \newcommand{\lecturetoc}{%
-  \tableofcontents
+  \ifdefempty{\BookSectionTitle}{}{%
+    {\noindent\LectureTitleFont
+     \ifdefempty{\BookSectionNumber}{}{\BookSectionNumber\quad}%
+     \BookSectionTitle\par}%
+    \vspace{0.4em}\hrule\vspace{0.8em}%
+  }%
+  \@starttoc{toc}%
   \clearpage
 }
 
