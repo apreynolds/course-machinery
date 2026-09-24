@@ -33,8 +33,9 @@ that file; section~\ref{sec:ref-textref} covers naming a second book with
 Then the first line of the document proper: \cs{booksection} says which
 section of the book this lecture \emph{is}. It supplies the title and sets the
 running head on every page --- so the lecture is tied to its text structurally,
-rather than by remembering to cite. Note there is no \cs{section*}: the head is
-the title, written once.
+rather than by remembering to cite. Note there is no \cs{section*}: the
+coordinate is written once, and \cs{lecturetoc} on the next line prints it as the
+title above the contents list.
 
 The \texttt{link=} option is what makes that head clickable, and it is
 \emph{optional}. A course taught from a printed text, or from none, writes
