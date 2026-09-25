@@ -20,6 +20,7 @@
 #
 #     set<SETID>/00-setHeader.pg   the template's `#! header:' file, if it names one
 #     set<SETID>/01-<name>.pg ...  flat COPIES of the linked problems
+#     set<SETID>/<image>           static images those problems name
 #     set<SETID>/LICENSE.md        from <topic>/webwork/
 #     set<SETID>/MANIFEST.tsv      where each copy came from, with its blob hash
 #     set<SETID>.def
@@ -41,6 +42,17 @@
 # twice in 0-functions/webwork, as different files) -- and it keeps the reviewed
 # order visible in the File Manager. Numbering runs continuously across groups:
 # if group 01 has four links, the first problem of group 02 becomes 05-.
+#
+# STATIC IMAGES travel with the problems (added 2026-09-25; review mode has done
+# this since 2026-09-15 and settled mode did not, which shipped three of Module
+# 3's MATH3503 problems to the server with "Unable to find file" on the page).
+# A .pg names one in quotes -- image("2masses-3springs-new.png") -- and PG
+# resolves that against the problem's OWN directory, which on the server is
+# set<SETID>/. So the file is copied in flat beside the problem, from the
+# directory of the file the link reaches. One named but not found is only a
+# warning, since a name can be built at render time; check that problem on the
+# server. Two problems needing DIFFERENT files of the same name is fatal, since
+# a flat set cannot hold both.
 #
 # Provenance leaves the PATH but not the FILE: `## Author', `## Institution' and
 # `UPSTREAM-BLOB' travel inside every copy, and MANIFEST.tsv records the source
@@ -695,6 +707,10 @@ if [ "$dryrun" -eq 1 ]; then
     echo
     for i in "${!sources[@]}"; do
         printf '  %s  <-  %s\n' "${flat[$i]}" "${targets[$i]}"
+        while IFS= read -r img; do
+            [ -n "$img" ] || continue
+            printf '    %s  <-  %s\n' "$img" "$(dirname "${targets[$i]}")/$img"
+        done < <(images_named "${sources[$i]}")
     done
     echo
     echo "Dry run: would write $out/$setdir{/,.def,.tgz}"
@@ -720,10 +736,35 @@ if [ -n "$header_src" ]; then
     printf '%s\t%s\t%s\n' "$header_name" "$(git hash-object "$header_src")" "${header_src#"$REPO/"}" >> "$manifest"
 fi
 
+n_img=0
 for i in "${!sources[@]}"; do
     cat "${sources[$i]}" > "$out/$setdir/${flat[$i]}" || die "could not copy ${sources[$i]}"
     printf '%s\t%s\t%s\n' "${flat[$i]}" "$(git hash-object "$out/$setdir/${flat[$i]}")" \
         "${targets[$i]}" >> "$manifest"
+
+    # A static image the problem names travels with it, flat, beside the copy:
+    # image("x.png") resolves against the problem's own directory, and on the
+    # server that directory is set<SETID>/. The source is the directory of the
+    # file the LINK reaches, not of the link, which sits in the group directory.
+    while IFS= read -r img; do
+        [ -n "$img" ] || continue
+        src="$REPO/$(dirname "${targets[$i]}")/$img"
+        dst="$out/$setdir/$img"
+        if [ ! -f "$src" ]; then
+            echo "webwork-build: warning: ${flat[$i]} names $img, which is not beside its source; check it on the server" >&2
+        elif [ -f "$dst" ]; then
+            # Two problems in one set naming the same image file. Identical is
+            # the usual case and fine; different is unfixable while the set is
+            # flat, so say so rather than shipping one of them twice.
+            cmp -s "$src" "$dst" \
+                || die "$setid: two problems need different files both named $img"
+        else
+            cat "$src" > "$dst" || die "could not copy $src"
+            printf '%s\t%s\t%s\n' "$img" "$(git hash-object "$src")" \
+                "$(dirname "${targets[$i]}")/$img" >> "$manifest"
+            n_img=$((n_img + 1))
+        fi
+    done < <(images_named "${sources[$i]}")
 done
 
 # The copies are a redistribution, and OPL material is CC BY-NC-SA, so the
@@ -773,5 +814,5 @@ warn_if_tracked "$tgz"
 
 echo
 echo "Wrote ${tgz#"$REPO/"} ($(du -h "$tgz" | cut -f1 | tr -d ' '))"
-echo "  $total problems$([ -n "$header_src" ] && echo ", set header")$([ -f "$out/$setdir/LICENSE.md" ] && echo ", LICENSE.md"), MANIFEST.tsv, $setdir.def"
+echo "  $total problems$([ "$n_img" -gt 0 ] && echo ", $n_img image(s)")$([ -n "$header_src" ] && echo ", set header")$([ -f "$out/$setdir/LICENSE.md" ] && echo ", LICENSE.md"), MANIFEST.tsv, $setdir.def"
 echo "Upload it into templates/ in the File Manager, unpack it there, then import $setdir.def."
