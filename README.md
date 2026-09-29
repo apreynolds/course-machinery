@@ -191,7 +191,7 @@ cd _assessment
 
 A source declaring `%! views: solutions, hints` yields the student PDF plus a
 `-SOLUTIONS` and a `-HINTS` copy. One declaring `%! coverpage: yes` also yields
-`test_COVERPAGE.pdf`, page 1 of the finished test on its own. One declaring
+`test-COVERPAGE.pdf`, page 1 of the finished test on its own. One declaring
 `%! copies: solutions-->TA-dir(from 2026-10-01)` sends the solutions to a folder
 named in `.MIRRORDIR`, but not before that date. The manual's build chapter
 covers the view system, the mirror file and dated copies in full.

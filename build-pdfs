@@ -99,7 +99,7 @@
 # moved here.
 #
 # Cover page via a magic comment: a `%! coverpage: yes' line in the same leading
-# block additionally writes FILE_COVERPAGE.pdf, page 1 of the finished PDF on its
+# block additionally writes FILE-COVERPAGE.pdf, page 1 of the finished PDF on its
 # own, for printing an assessment's cover separately. `no' or no line at all is
 # off; any other value warns. It is taken from the base (student) PDF only, not
 # from any view, and follows the same mirror / BOTH handling as that PDF.
@@ -623,7 +623,7 @@ wants_coverpage() {
   esac
 }
 
-# Extract page 1 of a built PDF to FILE_COVERPAGE.pdf, so a test's cover can be
+# Extract page 1 of a built PDF to FILE-COVERPAGE.pdf, so a test's cover can be
 # printed on its own (a different paper, a different count) without printing the
 # paper behind it.
 #
@@ -651,7 +651,7 @@ wants_coverpage() {
 # reads as breakage.
 #   $1 directory the built PDF lives in   $2 jobname
 extract_coverpage() {
-  local pdfdir=$1 job=$2 out="$2_COVERPAGE.pdf" log
+  local pdfdir=$1 job=$2 out="$2-COVERPAGE.pdf" log
   if ! command -v gs >/dev/null 2>&1; then
     echo "build-pdfs: ghostscript (gs) not found, skipping $out" >&2
     return 0
@@ -733,8 +733,8 @@ build_file() {
       # line makes this block the subshell's last statement, where a trailing
       # false would have build_file report the whole file FAILED. The -f test
       # keeps a skipped extraction (no gs) from failing the copy.
-      if [[ $mode == BOTH && -f "${jobname}_COVERPAGE.pdf" ]]; then
-        cp -- "${jobname}_COVERPAGE.pdf" "$outdir/" || exit
+      if [[ $mode == BOTH && -f "${jobname}-COVERPAGE.pdf" ]]; then
+        cp -- "${jobname}-COVERPAGE.pdf" "$outdir/" || exit
       fi
     fi
 
