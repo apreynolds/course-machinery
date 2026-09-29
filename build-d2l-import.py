@@ -7,8 +7,8 @@
 # say which problems are in which pool, and their points= says what each is
 # worth — and emits:
 #
-#   <quiz>_questions.csv     bulk import for D2L's question library
-#   <quiz>_paste-sheet.md    the same questions as LaTeX, for typing them into
+#   <quiz>-questions.csv     bulk import for D2L's question library
+#   <quiz>-paste-sheet.md    the same questions as LaTeX, for typing them into
 #                            D2L's editor by hand instead
 #
 # The pool .tex is the single source of truth. Nothing about a quiz is repeated
@@ -208,8 +208,8 @@ def build(pools, outdir, note):
                  "and `%! d2l-quiz:' magic comments")
 
     outdir.mkdir(parents=True, exist_ok=True)
-    return (write_csv(outdir / f"{quiz}_questions.csv", questions, note),
-            write_paste_sheet(outdir / f"{quiz}_paste-sheet.md", questions, note))
+    return (write_csv(outdir / f"{quiz}-questions.csv", questions, note),
+            write_paste_sheet(outdir / f"{quiz}-paste-sheet.md", questions, note))
 
 
 CSV_HEADER = [
