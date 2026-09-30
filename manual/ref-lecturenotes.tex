@@ -69,7 +69,9 @@ Other deliberate class behaviour:
   \item The running head is the lecture's \cs{booksection} coordinate
     (linked if the book is online), on every page \emph{including} the
     projector copy -- a scrolled
-    document is where persistent orientation is worth most. It carries a
+    document is where persistent orientation is worth most.
+    The one exception is a first page titled by \cs{lecturetoc}, which drops
+    the head (page style \texttt{lecturefirst}): the title repeats it, larger. It carries a
     rule, which disappears along with the head if the lecture declares no
     coordinate. Page \emph{numbers} are the opposite case: the handout has a
     centred one, the projector copy none (it is never collated, so a number
