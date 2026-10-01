@@ -75,7 +75,8 @@ The generated \file{webwork-sets/\_for-upload/} is skipped entirely.
 
 \paragraph{Known gaps.}
 A server-flat \file{local/\ldots} path with no topic in front of it, as in MATH1003's diagnostic test, reports as \texttt{UNKNOWN SOURCE}.
-A gateway's \texttt{group:<name>} pool references are not modelled, so such a \file{.def} cannot pass.
+A gateway's \texttt{group:<set ID>} pool is checked only against the repo: the set needs a group directory in some topic, or a \file{.def} beside the gateway's, and otherwise reports as \texttt{NO SUCH SET}.
+Whether the set is on the \emph{server} under that ID, which is what a student starting a version needs, cannot be seen from here.
 
 \paragraph{The OPL has two problem trees.}
 This is the trap worth knowing. The Open Problem Library clone holds
