@@ -140,6 +140,19 @@ name, its right a label, so nothing has to be guessed. (An older source may
 still carry the destination as a \texttt{:LABEL} suffix on the views line. It
 builds the view and warns you where the copy moved to.)
 
+The cover page is the one PDF that is neither \env{default} nor a view, so it
+has a name of its own on the copies line:
+
+\begin{manexsource}
+%! coverpage: yes
+%! copies: coverpage-->Print-shop
+\end{manexsource}
+
+\noindent That sends \file{FILE-COVERPAGE.pdf} to the labelled directory as
+well as the mirror. The same rule holds as for a view: the copies line never
+\emph{makes} a PDF, so without \texttt{\%! coverpage: yes} the entry warns and
+sends nothing. It can carry a date like any other entry.
+
 \paragraph{Holding a copy until a date.}
 Where a PDF goes and \emph{when} it may go are also different questions, and the
 second one has teeth: solutions that reach TAs before the assessment cannot be

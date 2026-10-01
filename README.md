@@ -70,7 +70,8 @@ which one:
   destinations named there, optionally holding one until a date it names; every
   run ends by sending whatever has come due, and `--release` does that on its
   own. A `%! coverpage: yes` comment additionally saves the first page on its
-  own, for printing an assessment's cover separately.
+  own, for printing an assessment's cover separately; `coverpage-->LABEL` on
+  the copies line sends that page to a named destination too.
 - `build-images` — render single problem files to cropped PDFs and PNGs, one
   picture per problem, for a learning-management system whose question pools
   take an image rather than text. Question-only and question-with-solution

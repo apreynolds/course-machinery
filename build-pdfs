@@ -67,6 +67,10 @@
 # declaring a copy never adds a build. The label must resolve to an existing
 # directory through a `LABEL: path' line in the governing .MIRRORDIR.
 #
+# `coverpage' is the one further name: `coverpage-->LABEL' ships
+# FILE-COVERPAGE.pdf, and by the same rule needs `%! coverpage: yes' (below) to
+# have made it. It takes a date like any other entry.
+#
 # `(from YYYY-MM-DD)' embargoes a copy: the destination is inert before that
 # date and an ordinary destination on and after it. Dates are compared as text,
 # which is why they must be ISO; it needs no date(1) arithmetic and so behaves
@@ -540,7 +544,8 @@ copy_is_due() {
 
 # Resolve a source's `%! copies:' entries against its own `%! views:' line and
 # echo one VALIDATED entry per line, three `|'-separated fields: the jobname
-# suffix (empty for the base PDF), the label, and the date (empty when the entry
+# suffix (empty for the base PDF, -COVERPAGE for the cover page, else the
+# view's), the label, and the date (empty when the entry
 # carries none). Anything invalid warns and is dropped here, so a caller can act
 # on every line it receives without re-checking.
 #
@@ -568,7 +573,19 @@ copies_for_file() {
     { read -r view; read -r label; read -r date; } <<<"$parsed"
 
     suffix=""
-    if [[ $view != default ]]; then
+    if [[ $view == coverpage ]]; then
+      # Not a view: the cover is page 1 lifted out of the base PDF, and what
+      # asks for it is `%! coverpage: yes', not `%! views:'. Same rule as for a
+      # view, though -- declaring a copy must never ADD a build -- so without
+      # that line there is no FILE-COVERPAGE.pdf to ship. wants_coverpage's own
+      # warning about a bad value is silenced: the build has already said it,
+      # and the sweep would otherwise repeat it on every run.
+      if ! wants_coverpage "$file" 2>/dev/null; then
+        echo "build-pdfs: $file: copies names 'coverpage', which '%! coverpage: yes' does not request, skipping" >&2
+        continue
+      fi
+      suffix="-COVERPAGE"
+    elif [[ $view != default ]]; then
       if ! spec=$(view_spec "$view"); then
         echo "build-pdfs: $file: copies names '$view', which is not a view, skipping" >&2
         continue
