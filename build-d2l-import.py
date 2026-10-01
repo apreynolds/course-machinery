@@ -46,10 +46,12 @@ import re
 import sys
 
 # The note shown under every question image. Not an instruction to answer in
-# D2L: the handwritten work is submitted separately and the D2L text box is
+# D2L: the handwritten work is submitted to Crowdmark and the D2L text box is
 # left empty, so there is no answer key here for anyone to read either.
-DEFAULT_NOTE = ("(NOTE: you do not need to enter your answer here; "
-                "submit your handwritten work separately.)")
+# A course that collects the work some other way passes its own with --note.
+DEFAULT_NOTE = ("(NOTE: submit a photo or scan of your handwritten work to "
+                "Crowdmark; check your email for instructions. You do not "
+                "need to enter your answer here.)")
 
 # `%! key: value' magic comments, the same idiom build-pdfs uses for `%! views:'.
 MAGIC = re.compile(r"^%!\s*([a-z0-9-]+)\s*:\s*(.*?)\s*$", re.M)
