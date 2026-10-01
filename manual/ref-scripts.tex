@@ -22,7 +22,8 @@ views & \texttt{\%!\ views: solutions, hints, projector, instructor} in
 copies & \texttt{\%!\ copies: default-->TAs, instructor-->TA-dir(from
   2026-10-01)} in the same block drops those PDFs, flat, into the named
   \file{.MIRRORDIR} destinations, on top of the mirror. \env{default} is
-  the base PDF; any other name must also be on the views line.
+  the base PDF; \env{coverpage} is \file{FILE-COVERPAGE.pdf} and needs
+  the coverpage line below; any other name must also be on the views line.
   \texttt{(from \emph{date})} holds a copy until that day (inclusive):
   the build will not send it early, and the end-of-run sweep sends it
   once the date arrives. Anything malformed warns and sends nothing. A
