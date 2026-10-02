@@ -24,7 +24,7 @@
 #   TIER 1 -- BUGGY. The problem does not work. This is the only blocking class,
 #            and it sets the exit status. Breakage on some seeds, a checker that
 #            rejects its own stated answer, a missing macro, an answer that never
-#            changes.
+#            changes, a graded answer with no box on the page.
 #
 #   TIER 2 -- EDITABLE. Context that belongs to someone else's course: a video
 #            embed, instructions about attempts that contradict the set, a
@@ -66,6 +66,10 @@ SERVER_ONLY_WARNINGS = [
 # as a constant PopUp. Found 2026-09-11 on Determine_EOO_Abs_Even.pg, which is
 # "even" on every seed and was missed while PopUp-only.
 CHOICE_TYPES = re.compile(r"\((popup|radio|checkbox|select|multiple|string)", re.I)
+
+# Problems that reveal their parts one at a time. A later part's answer is
+# registered before its box is shown, which is the design and not a defect.
+SCAFFOLD = re.compile(r"scaffold\.pl|compoundProblem\d*\.pl", re.I)
 
 # Tier 2 patterns, applied to the WHOLE file body, not just the statement: a
 # YouTube embed is usually assembled in the Perl above the statement and reaches
@@ -138,6 +142,45 @@ def parse_answers(render):
         if m:
             out.append((m.group(1), m.group(2), m.group(3).strip()))
     return out
+
+
+def graded_labels(render):
+    """The label of every answer PG registered, and so will grade.
+
+    Wider than parse_answers(), which reads only the `Value (...)' rows: a
+    MultiAnswer blank is listed as `AnSwEr0003   MultiAnswer(2) ...' and is
+    graded like any other.
+    """
+    return re.findall(r"^\s*(AnSwEr\d+)\s", render, re.M)
+
+
+def shown_labels(render):
+    """The answer labels that have a box on the page, or None if unknown.
+
+    Read from the preview that `pr-pg-render --html' writes, with the solution
+    and hints hidden, as a student first sees the problem. The preview has no
+    MathQuill, so each blank is a plain <input>, <select> or <textarea> named
+    for its answer. Only the bare AnSwErNNNN names count: the further cells of
+    an answer array (MaTrIx_AnSwEr0001_0_1) and the parts of a single-result
+    MultiAnswer (MuLtIaNsWeR_...) belong to an answer that is already counted,
+    and a hidden input (previous_AnSwEr0001) is not a box.
+    """
+    m = re.search(r"^\s*preview\s+(\S.*)$", render, re.M)
+    if not m:
+        return None
+    try:
+        # Bytes, not text: the preview is not valid UTF-8.
+        html = pathlib.Path(m.group(1).strip()).read_bytes()
+    except OSError:
+        return None
+    shown = set()
+    for tag_ in re.findall(rb"<(?:input|select|textarea)\b[^>]*>", html):
+        if re.search(rb"type=[\"']?hidden", tag_):
+            continue
+        name = re.search(rb"name=[\"']?(AnSwEr\d+)[\"'\s>]", tag_)
+        if name:
+            shown.add(name.group(1).decode())
+    return shown
 
 
 def real_problems(render):
@@ -218,11 +261,40 @@ def profile(path, seeds, show_statement, pg_root):
             macro_parts.append(m)
 
     # --- render at the default seed -------------------------------------
-    render, _ = run(["pr-pg-render", str(path)])
+    # --html writes the preview as well as the listing, for the hidden-blank
+    # check below. It is one fixed file in pr-pg-render's cache, so it is read
+    # straight away, and two profiles running at once would race for it.
+    render, _ = run(["pr-pg-render", "--html", str(path)])
     answers = parse_answers(render)
     errors, warnings = real_problems(render)
     if errors:
         findings1.extend(errors[:4])
+
+    # --- is every graded answer a box the student can see? --------------
+    # PG formats a solution or hint block whether or not it is shown, so an
+    # answer blank written in one is registered and graded while invisible. The
+    # student sees one box, fills it in correctly, and is told a question is
+    # unanswered. Nothing else here notices: the hidden blank renders on every
+    # seed and accepts its own stated answer.
+    #
+    # Found 2026-10-01 by a MATH1003 student, on three problems converted from
+    # APEX's PreTeXt source, where one element is a blank in a statement and
+    # the printed value in a solution.
+    graded, shown = graded_labels(render), shown_labels(render)
+    boxes = "-"
+    if graded and shown is not None and not errors:
+        hidden = [g for g in graded if g not in shown]
+        boxes = f"{len(graded)} graded, {len(graded) - len(hidden)} on the page"
+        if hidden and SCAFFOLD.search(text):
+            findings2.append(
+                f"{len(hidden)} graded answer(s) have no box on the page, but "
+                "this is a scaffold, which hides its later parts by design -- "
+                "open every part on the server and count")
+        elif hidden:
+            findings1.append(
+                f"{len(hidden)} graded answer(s) have NO BOX on the page "
+                f"({', '.join(h[-2:] for h in hidden)}) -- look for an answer "
+                "blank inside the solution or a hint; full marks are impossible")
     if warnings:
         findings2.append(
             f"renders but emits {len(warnings)} warning(s) — cosmetic, still worth "
@@ -343,6 +415,7 @@ def profile(path, seeds, show_statement, pg_root):
     print(f"  answers    {len(answers)} blank(s)")
     for label, typ, val in answers:
         print(f"               [{label[-2:]}] ({typ}) {val}")
+    print(f"  boxes      {boxes}")
     print(f"  self-check {self_check}")
     print(f"  seeds      {sweep_line}")
     print(f"  variation  {variation}")
