@@ -59,6 +59,7 @@ which one:
 | `Workspace.sty` | Reserved answer space, and the zero-height overlay contract |
 | `TextRef.sty` | Ties a document to *its* textbook — section links, named results |
 | `MathStuff.sty` | Shared mathematical notation |
+| `Figures.sty` | TikZ and pgfplots, with one shared vocabulary of plot styles — opt-in, no class loads it |
 | `Typefaces.sty`, `TitleBlock.sty`, `Hyperlinks.sty` | Fonts, titles and headings, links |
 
 **Scripts:**

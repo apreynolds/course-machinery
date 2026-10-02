@@ -1,0 +1,140 @@
+\section{Figures.sty}\label{sec:ref-figures}
+
+TikZ, pgfplots, and one shared vocabulary of plot styles, so that every
+drawn graph in every course looks like its neighbours. \textbf{No class
+loads it.} pgfplots is the slowest thing in the toolkit, so a document
+that draws says so, and one that does not pays nothing:
+
+\begin{verbatim}
+\usepackage{Figures}
+\end{verbatim}
+
+\subsection*{A figure is a file}
+
+One \texttt{tikzpicture} per file, in the topic's \texttt{figures/}
+directory -- a sibling of \texttt{problems/} and \texttt{images/} -- pulled
+in with a plain \cs{import}:
+
+\begin{verbatim}
+\begin{center}
+  \import{../figures/}{apex-figure-1-4-3.tex}
+\end{center}
+\end{verbatim}
+
+\texttt{figures/} is for \LaTeX{} that draws something; \texttt{images/}
+is raster. \cs{import} resolves relative to the consuming file, so the same
+figure works from a lecture and from a problem file. As with
+\cs{importproblem}, write the path literally, never through a macro.
+
+A figure takes pgfplots' default size. To set several side by side, narrow
+them for that one group:
+
+\begin{verbatim}
+\begin{center}
+  % local to this group: center is one
+  \pgfplotsset{width=0.36\linewidth}
+  \import{../figures/}{a.tex}\hfill
+  \import{../figures/}{b.tex}\hfill
+  \import{../figures/}{c.tex}
+\end{center}
+\end{verbatim}
+
+\subsection*{Where the vocabulary came from}
+
+The style names are APEX Calculus's, from the figure preamble in that
+book's source. Every figure in APEX is pgfplots code written against these
+names, so with the package loaded \emph{an APEX figure compiles verbatim}:
+copy the code out of the book's \texttt{<latex-image>} element, undo the
+XML escaping (\texttt{\&lt;} and \texttt{\&gt;}), and it builds. Figures
+drawn from scratch use the same names. APEX is CC~BY-NC~4.0; the package
+carries the attribution, and a figure file whose code is the book's carries
+a source line.
+
+Tested against the 175 body figures of APEX chapters 1--4 and
+sections~5.1 and~6.7. The handful that fail want something the package
+deliberately does not load -- see \emph{Not loaded} below.
+
+\subsection*{Curves, lines and dots}
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{firstcurvestyle}, \texttt{second\ldots}, \texttt{third\ldots} &
+  the first, second and third curve on an axis: solid, dash-dotted,
+  dash-dot-dotted, in the three role colours. A bare \cs{addplot} or
+  \cs{addplot+} takes them in order from the cycle list, so most figures
+  never name one.\\
+\texttt{areastyle} & a half-transparent filled region.\\
+\texttt{tangentline}, \texttt{normalline}, \texttt{secantline} &
+  a line about a curve, with arrow tips; add \texttt{seg} to the name for
+  the same line as a plain segment.\\
+\texttt{asymptote} & a thick dashed line with arrow tips.\\
+\texttt{guideline}, \texttt{symmetryline}, \texttt{lineseg} &
+  thin black construction lines.\\
+\texttt{soliddot}, \texttt{hollowdot} & marks only, not joined up: the
+  function is defined here, or the curve heads here but is not here.\\
+\end{tabularx}
+\end{center}
+
+\subsection*{Ends of a curve}
+
+Added to an \cs{addplot} beside its curve style, to say what happens at
+each end. A kite is ``it carries on''; a circle is an endpoint, filled if
+it is included.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{leftarrow}, \texttt{rightarrow}, \texttt{infinite} &
+  a kite at the left end, the right end, or both.\\
+\texttt{open}, \texttt{closed}, \texttt{openclosed}, \texttt{closedopen} &
+  circles at both ends, named left end first.\\
+\texttt{openleft}, \texttt{closedright}, \ldots & a circle at one end
+  only.\\
+\texttt{infiniteopen}, \texttt{closedinfinite}, \ldots & a kite at one end
+  and a circle at the other.\\
+\texttt{openinterval}, \texttt{closedinterval} & a heavy segment ending in
+  parentheses or brackets, for a number line.\\
+\end{tabularx}
+\end{center}
+
+\subsection*{Axes}
+
+The one part of the package that changes pgfplots' behaviour unasked:
+\emph{every} axis in a document that loads Figures gets the house default
+-- axis lines through the origin rather than a box, labels $x$ and $y$,
+one minor tick between labelled ones, and the curve cycle list. That is
+what makes a figure file short: it states its window and its plots.
+Override any of it per axis (\texttt{xlabel=\{\$t\$\}}).
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{numberline} & an axis with no $y$: a number line.\\
+\texttt{xdiscontinuity}, \texttt{ydiscontinuity} & a break mark in an
+  axis whose window does not start at~0.\\
+\end{tabularx}
+\end{center}
+
+\subsection*{Knobs}
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{firstcolor}, \texttt{secondcolor}, \texttt{thirdcolor} & the three
+  role colours (blue, red, a dark magenta). Every style is written in
+  terms of them, so \cs{colorlet}\texttt{\{firstcolor\}\{black\}} after
+  loading recolours every figure. APEX's greyscale print palette is in the
+  package as three commented lines.\\
+\texttt{compat=1.18} & pinned, not \texttt{newest}, so a \TeX{} Live
+  upgrade cannot move every label; and set at all, because pgfplots warns
+  on every build without it.\\
+\end{tabularx}
+\end{center}
+
+\subsection*{Not loaded}
+
+Only \texttt{arrows.meta} and \texttt{fillbetween} are loaded. APEX's own
+preamble also loads \texttt{tikz-cd}, \texttt{tkz-euclide} and several
+more TikZ libraries; each costs load time and a function graph needs none
+of them. A figure that wants a \emph{library} loads it at the top of its
+own file -- \cs{usetikzlibrary} works in the document body -- as the
+handful of APEX figures that use \texttt{positioning} must. One that wants
+a \emph{package} (\texttt{tkz-euclide}) needs it in the preamble of the
+document that imports it.
