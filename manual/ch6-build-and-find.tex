@@ -33,6 +33,12 @@ the repo nor the output directory -- keyed by the directory's repo-relative
 path, so two topics' same-named \file{problems/} folders never share
 latexmk state.
 
+That folder is shared with anything else that compiles the same document -- an editor's own compile, a bare latexmk wrapper -- and latexmk keeps one record in it.
+The record is shared but the PDF's destination is not: those tools leave the PDF beside the source, while \file{build-pdfs} may send it to a mirror (below).
+latexmk calls a document up to date when no input has changed since the recorded run and the PDF it is asked for exists, so after a local build of an edited source it would leave the \emph{previous} PDF in the mirror and still report success.
+\file{build-pdfs} therefore reads where the recorded run wrote its PDF, and when that is not where this run will write it, forces the build and says so (\texttt{rebuilding: \dots}).
+The one visible effect is that a save which changes nothing can still compile, once.
+
 \subsubsection{Views: one source, several PDFs}
 
 A magic comment in a source's \emph{leading} comment block (it must precede

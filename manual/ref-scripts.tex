@@ -41,7 +41,8 @@ output & nearest ancestor \file{.MIRRORDIR} (bare base path $+$ optional
   \texttt{LABEL: path} lines are the address book the \texttt{copies} row
   draws on (each must exist). \file{SAMPLE-MIRRORDIR} is the template.\\
 aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
-  key}$\rangle$-$\langle$\emph{job}$\rangle$.\\
+  key}$\rangle$-$\langle$\emph{job}$\rangle$.
+  Shared with other tools that compile the document; the base build is forced when the last build recorded there wrote its PDF somewhere else.\\
 \file{.latexmkrc} & installed in each source's directory from
   \file{latexmkrc-shared} before compiling, when missing or out of date.
   A copy without the \texttt{managed by build-pdfs} marker line counts as
