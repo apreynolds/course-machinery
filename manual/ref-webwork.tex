@@ -283,20 +283,26 @@ Both take any mix of \file{.pg} files and directories, searched recursively.
 pg-profile [-n SEEDS] [--no-statement] [--tier1-only] FILE.pg|DIR ...
 \end{manexsource}
 
-Everything needed to judge one problem, on one screen: its OPL tags, the macros it loads, every answer blank, whether its checker accepts its own stated answers, a seed sweep, whether the answers vary, the state of its solution, and the full statement.
+Everything needed to judge one problem, on one screen: its OPL tags, the macros it loads, every answer blank, whether each graded answer has a box on the page, whether its checker accepts its own stated answers, a seed sweep, whether the answers vary, the state of its solution, and the full statement.
 Findings come in two tiers, and only the first is a veto.
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 Tier 1 & \emph{buggy}: errors on some seeds, a checker that rejects its own
-  answer, a macro the pinned pg clone lacks, or a problem whose every blank ---
-  a multiple-choice one included --- is the same on every seed. Sets the exit
-  status.\\
+  answer, a macro the pinned pg clone lacks, a problem whose every blank ---
+  a multiple-choice one included --- is the same on every seed, or a graded
+  answer with no box on the page. Sets the exit status.\\
 Tier 2 & \emph{editable}: a video embed, named software, a claimed attempt
   limit, a cosmetic warning, a commented-out solution stub. A reason to fork and
   edit the problem, not to reject it.\\
 \end{tabularx}
 \end{center}
+
+The \texttt{boxes} row is the hidden-blank check, added 2026-10-02.
+PG formats a solution or hint block whether or not it is shown, so an answer blank written inside one is registered and graded while invisible: the student sees one box, answers it correctly, and is told a question is unanswered.
+Every other row passes such a problem, because the hidden blank renders on every seed and accepts its own stated answer.
+The check compares the answers PG lists against the inputs in the preview \texttt{pr-pg-render -{}-html} writes with the solution hidden.
+A scaffold, which hides its later parts by design, is reported in tier 2 instead.
 
 Macros are checked against the pg clone at \env{PG\_ROOT}, the same variable \texttt{pr-pg-render} reads.
 A clean profile means the problem \emph{works}, never that it is good: correctness of the answer, clarity, and fit to the course stay human work.
