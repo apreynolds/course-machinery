@@ -201,3 +201,34 @@ key schema; the reading, matching and emitting are written once. A blockless
 kind takes its own exit straight after the directory walk, so it never reaches
 either of the two block parsers. Run any shim with \texttt{-{}-help} for its concrete
 flags.
+
+\subsection*{admin/test-admin and attendance.sty}
+
+Everything a test needs on paper, in one sitting: the per-section attendance sheets, the print order, and which booklets go in which TA's envelope.
+Run it once per test, from the course's own checkout:
+
+\begin{manexsource}
+.course-machinery/admin/test-admin N [--yes] [--dry-run] [--force]
+\end{manexsource}
+
+\texttt{-{}-dry-run} goes through every step and writes nothing; \texttt{-{}-yes} answers every question with its default.
+The script is Python and declares its one dependency inline, so \texttt{uv} builds its environment on first run.
+
+It holds no fact about any one course.
+It finds the course by walking up from its own location to the first directory that holds a \file{course-info/} --- not the first that holds \file{.git}, which inside a submodule would be the machinery itself --- and reads everything from there:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\file{admin-settings.csv} & columns \texttt{setting}, \texttt{value}: \texttt{course\_number}, and \texttt{team\_dir}, the team's shared folder relative to the home directory.\\
+\file{course-sections.csv} & one row per section: its enrolment, day, room, instructor and TA.\\
+\file{print-job.csv} & the print order's fixed answers and policy numbers.\\
+\file{calendar-dates.csv} & optional; supplies the test dates.\\
+\end{tabularx}
+\end{center}
+
+Three things are still assumed in the script and are stated in its header: the subject \texttt{MATH}, Tuesday and Thursday sittings, and \file{TESTS/ADMIN/} as the directory the sheet is built in.
+
+\file{admin/attendance.sty} is the sheet's layout: one page per section, a ruled list of names with a column to tick.
+It reads no data file.
+\texttt{test-admin} writes a document that is a run of \env{attendancesheet} environments with one \cs{Student} line per name, and that generated file holds student names, so a course should git-ignore it.
+The package takes the course's name from the course's own \file{courseinfo.sty}.

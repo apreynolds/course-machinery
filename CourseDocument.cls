@@ -113,7 +113,7 @@
 
 % \textbookref -- links into the course text (a syllabus cites the book as much
 % as a lecture does). Mechanism only; the manifest is course data, in the
-% course's own text layer (.course-machinery-local/textbook.tex).
+% course's own text layer (texts/ here, or a course's own file in its course-info/).
 \RequirePackage{TextRef}
 
 % Instructor-only notes layer, shared with LectureNotes. AFTER Typefaces: this is

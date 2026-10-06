@@ -291,6 +291,11 @@ this directory and the text layer — was the obvious next question.
 > page or a test header wants course identity. It is a `.sty` rather than data
 > only because `\DTMsavedate` needs `\usepackage` timing.
 >
+> **Superseded, 2026-10-05.** The tiers are gone. The question is now "is this
+> a fact about one offering?": yes goes in the course's visible `course-info/`
+> (where `courseinfo.sty` now lives, with the data files), no goes in this
+> machinery. See the architecture chapter, *Where course-specific things live*.
+>
 > The cadence objection that sequenced this item also resolved, and not as
 > expected: per-term facts and per-text facts were never the axis that
 > mattered. The axis is *how many directories read the file*.
