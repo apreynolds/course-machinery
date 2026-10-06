@@ -35,8 +35,7 @@
 
 \RequirePackage[most]{tcolorbox}   % the note boxes
 \RequirePackage{environ}           % \NewEnviron: drop a block's body when off
-\RequirePackage{keyval}            % \define@key / \setkeys: textprose's print key
-\RequirePackage{etoolbox}          % \ifstrequal, for print=false
+\RequirePackage{PrintKey}          % print=false, shared with CourseBoxes and Exercises
 \RequirePackage{marginnote}        % \marginnote: margin placement without floating
 
 %%% --- The layer flag (same idiom as Exercises.sty / ProblemMeta.sty) ---------
@@ -100,7 +99,16 @@
     \sffamily\BODY
   \end{tcolorbox}}%
 }
-\NewEnviron{InstructorBox}[1][note]{\ifinstructornotes\instr@sidebar{#1}\fi}
+% PRINT KEY: the bar word and the key share the one bracket, in either order --
+% \begin{InstructorBox}[marking, print=false]. \PrintKeyParse takes the print
+% word out and leaves the bar word in \PrintKeyRest (empty means "note").
+\NewEnviron{InstructorBox}[1][]{%
+  \PrintKeyParse{#1}%
+  \ifx\PrintKeyRest\@empty \def\PrintKeyRest{note}\fi
+  \ifinstructornotes
+    \PrintKeyIfPrint{\expandafter\instr@sidebar\expandafter{\PrintKeyRest}}{}%
+  \fi
+}
 
 %%% --- textprose: the textbook's own running prose, kept in a lecture ----------
 %%% A lecture built text-first boxes the book's definitions, theorems and
@@ -119,27 +127,23 @@
 %%%     mistaken for an InstructorBox.
 %%%
 %%% ONE KEY, print: \begin{textprose}[print=false] (or the flag form, [noprint])
-%%% keeps a passage in the source and off every copy -- the same two spellings,
-%%% with the same meaning, as on \importproblem and notesproblem. It is the
-%%% editing verdict "read, not wanted on the page": the passage stays foldable
-%%% in the source without being deleted. Anything but "false" reads as true.
-\newif\iftextprose@print
-\define@key{textprose}{noprint}[true]{\textprose@printfalse}
-\define@key{textprose}{print}[true]{%
-  \ifstrequal{#1}{false}{\textprose@printfalse}{\textprose@printtrue}}
+%%% keeps a passage in the source and off every copy -- the key every box takes
+%%% (PrintKey.sty). It is the editing verdict "read, not wanted on the page":
+%%% the passage stays foldable in the source without being deleted.
 \NewEnviron{textprose}[1][]{%
-  \textprose@printtrue  % the default, reset per passage (local: the environment is a group)
-  \setkeys{textprose}{#1}%
-  \ifinstructornotes\iftextprose@print
-    \begin{tcolorbox}[enhanced, breakable, parbox=false,
-      frame hidden, boxrule=0pt, sharp corners,
-      colback=white,
-      borderline west={1.5pt}{0pt}{InstructorInk},  % the thin slate rule
-      left=8pt, right=0pt, top=2pt, bottom=2pt,
-      before upper={\color{InstructorInk}}]
-      \BODY
-    \end{tcolorbox}%
-  \fi\fi
+  \PrintKeyParse{#1}%
+  \ifinstructornotes
+    \PrintKeyIfPrint{%
+      \begin{tcolorbox}[enhanced, breakable, parbox=false,
+        frame hidden, boxrule=0pt, sharp corners,
+        colback=white,
+        borderline west={1.5pt}{0pt}{InstructorInk},  % the thin slate rule
+        left=8pt, right=0pt, top=2pt, bottom=2pt,
+        before upper={\color{InstructorInk}}]
+        \BODY
+      \end{tcolorbox}%
+    }{}%
+  \fi
 }
 
 %%% --- margin note: slate bold sans in the margin (unified with the layer) -----

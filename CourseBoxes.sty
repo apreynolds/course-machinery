@@ -49,6 +49,7 @@
      before CourseBoxes, as the course classes do.}}
 
 \RequirePackage{etoolbox}            % \ifblank (the "no box" test in \NewTextResult).
+\RequirePackage{PrintKey}            % print=false, shared with Exercises and InstructorNotes
                                      % tcolorbox pulls it in anyway; named here so the
                                      % dependency is stated rather than inherited.
 \RequirePackage[most]{tcolorbox}     % \tcolorboxenvironment, enhanced, breakable
@@ -255,32 +256,77 @@
 %%% the intent, while \leavevmode is only how it is achieved here.
 \newcommand{\cb@flushhead}{\leavevmode}
 
+% \cb@starhead{TITLE}{BASE-ENV}: open the base environment of a starred box
+% with its title in parentheses. A macro so the title, held in \cb@title, can be
+% expanded into place before \begin reads its bracket.
+\newcommand{\cb@starhead}[2]{\begin{#2}[(#1)]}
+% \cb@startoc{TITLE}{Display Name}: the contents entry of a titled starred box,
+% for the same reason -- the title arrives already expanded out of \cb@title.
+\newcommand{\cb@startoc}[2]{\CourseBoxTocEntry{#2}{}{#1}}
 \NewDocumentCommand{\NewTextResult}{O{cbdefn} m m m}{%
   \cb@checkname{#2}%
   \ifcb@namefree
   \theoremstyle{#1}%
   \newtheorem*{cb@#2}{#3}%                 % base: starred = no counter
   \ifblank{#4}{}{\tcolorboxenvironment{cb@#2}{#4}}%   % box the base, unless no style
-  \NewDocumentEnvironment{#2}{m o}{%
-    \phantomsection
-    \protected@edef\@currentlabel{##1}%    % \label will record the typed number
-    % After \phantomsection, so the contents entry links to THIS result.
-    \IfValueTF{##2}{\CourseBoxTocEntry{#3}{##1}{##2}}{\CourseBoxTocEntry{#3}{##1}{}}%
-    \IfValueTF{##2}{\begin{cb@#2}[##1 (##2)]}{\begin{cb@#2}[##1]}%
-    \cb@flushhead
+  % PRINT KEY. A leading bracket, tight against the name, switches the box off:
+  %   \begin{definition}[print=false]{1.5.1}[Continuous Function]
+  % First rather than last because the trailing bracket is already the title.
+  % Switched off, the box leaves nothing: no box, no contents entry, no label.
+  % See PrintKey.sty for why the body is gobbled rather than captured.
+  \NewDocumentEnvironment{#2}{O{} m o}{%
+    \PrintKeyParse{##1}%
+    \PrintKeyIfPrint{%
+      \phantomsection
+      \protected@edef\@currentlabel{##2}%    % \label will record the typed number
+      % After \phantomsection, so the contents entry links to THIS result.
+      \IfValueTF{##3}{\CourseBoxTocEntry{#3}{##2}{##3}}{\CourseBoxTocEntry{#3}{##2}{}}%
+      \IfValueTF{##3}{\begin{cb@#2}[##2 (##3)]}{\begin{cb@#2}[##2]}%
+      \cb@flushhead
+    }{%
+      \PrintKeyGobbleBody
+    }%
   }{%
-    \end{cb@#2}%
+    \PrintKeyIfPrint{\end{cb@#2}}{}%
   }%
   % Unnumbered twin. Same cb@ base (same head style, same box or lack of one), so
   % the two forms cannot drift apart; only the number and the label differ.
-  \NewDocumentEnvironment{#2*}{o}{%
-    \phantomsection
-    \protected@edef\@currentlabel{[unnumbered #3]}%   % loud, never empty
-    \IfValueTF{##1}{\CourseBoxTocEntry{#3}{}{##1}}{\CourseBoxTocEntry{#3}{}{}}%
-    \IfValueTF{##1}{\begin{cb@#2}[(##1)]}{\begin{cb@#2}}%
-    \cb@flushhead
+  %
+  % PRINT KEY on the starred form. Its one bracket has always been the TITLE,
+  % so the key takes a bracket of its own in front, as on the numbered form:
+  %   \begin{remark*}[print=false][Intuitive idea]
+  %   \begin{example*}[print=false]
+  % With two brackets the first is the key and the second the title. With one,
+  % it is the key only if it is exactly a print word (print=false, noprint,
+  % print=true, print) and the title otherwise -- so every existing
+  % \begin{remark*}[Some title] still means what it did.
+  \NewDocumentEnvironment{#2*}{o o}{%
+    \def\cb@opts{}\let\cb@title\relax
+    \IfValueTF{##2}{%
+      \def\cb@opts{##1}\def\cb@title{##2}%
+    }{%
+      \IfValueT{##1}{%
+        \PrintKeyIfKey{##1}{\def\cb@opts{##1}}{\def\cb@title{##1}}%
+      }%
+    }%
+    \expandafter\PrintKeyParse\expandafter{\cb@opts}%
+    \PrintKeyIfPrint{%
+      \phantomsection
+      \protected@edef\@currentlabel{[unnumbered #3]}%   % loud, never empty
+      \ifx\cb@title\relax
+        \CourseBoxTocEntry{#3}{}{}%
+        \def\cb@next{\begin{cb@#2}}%
+      \else
+        \expandafter\cb@startoc\expandafter{\cb@title}{#3}%
+        \def\cb@next{\expandafter\cb@starhead\expandafter{\cb@title}{cb@#2}}%
+      \fi
+      \cb@next
+      \cb@flushhead
+    }{%
+      \PrintKeyGobbleBody
+    }%
   }{%
-    \end{cb@#2}%
+    \PrintKeyIfPrint{\end{cb@#2}}{}%
   }%
   \fi
 }
@@ -295,12 +341,20 @@
   \theoremstyle{#1}%
   \newtheorem*{cb@#2}{#3}%
   \tcolorboxenvironment{cb@#2}{#4}%
-  \NewDocumentEnvironment{#2}{}{%
-    \protected@edef\@currentlabel{[unlabelled aside]}%
-    \begin{cb@#2}%
-    \cb@flushhead
+  % PRINT KEY: \begin{takeaway}[print=false]. `!O{}' allows no space before the
+  % bracket, so only one written ON the \begin is read as options -- an aside
+  % whose body happens to open with a bracket on the next line is left alone.
+  \NewDocumentEnvironment{#2}{!O{}}{%
+    \PrintKeyParse{##1}%
+    \PrintKeyIfPrint{%
+      \protected@edef\@currentlabel{[unlabelled aside]}%
+      \begin{cb@#2}%
+      \cb@flushhead
+    }{%
+      \PrintKeyGobbleBody
+    }%
   }{%
-    \end{cb@#2}%
+    \PrintKeyIfPrint{\end{cb@#2}}{}%
   }%
   \fi
 }
@@ -414,15 +468,23 @@
 \theoremstyle{cbtip}
 \newtheorem*{cb@tip}{\cb@tiphead}
 \tcolorboxenvironment{cb@tip}{cb/tip}
+% PRINT KEY: the audience and the key share the one bracket, in either order --
+% \begin{tip}[surviving, print=false]. \PrintKeyParse takes the print word out
+% and leaves the audience in \PrintKeyRest.
 \NewDocumentEnvironment{tip}{O{}}{%
-  \protected@edef\@currentlabel{[unlabelled aside]}%
-  \def\cb@tiphead{Tip}%
-  \def\cb@aud{#1}%
-  \ifx\cb@aud\cb@survkey  \def\cb@tiphead{Tip for the \textit{surviving}}\fi
-  \ifx\cb@aud\cb@thrivkey \def\cb@tiphead{Tip for the \textit{thriving}}\fi
-  \begin{cb@tip}%
+  \PrintKeyParse{#1}%
+  \PrintKeyIfPrint{%
+    \protected@edef\@currentlabel{[unlabelled aside]}%
+    \def\cb@tiphead{Tip}%
+    \let\cb@aud\PrintKeyRest
+    \ifx\cb@aud\cb@survkey  \def\cb@tiphead{Tip for the \textit{surviving}}\fi
+    \ifx\cb@aud\cb@thrivkey \def\cb@tiphead{Tip for the \textit{thriving}}\fi
+    \begin{cb@tip}%
+  }{%
+    \PrintKeyGobbleBody
+  }%
 }{%
-  \end{cb@tip}%
+  \PrintKeyIfPrint{\end{cb@tip}}{}%
 }
 
 \endinput
