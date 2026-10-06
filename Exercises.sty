@@ -50,6 +50,7 @@
 \RequirePackage{import}        % \import, wrapped by \importproblem
 \RequirePackage{totcount}      % \newtotcounter/\total: two-pass sum for \printtotalpoints
 \RequirePackage{keyval}        % \importproblem's [key=value] options
+\RequirePackage{PrintKey}      % print=false on solution and hint, shared with the other boxes
 \RequirePackage{xstring}       % \IfInteger: lone-number back-compat for \importproblem
 \RequirePackage{graphicx}      % \includegraphics, wrapped by \graphchoice (MC graphs)
 
@@ -1336,16 +1337,27 @@
 % fragile (the body is still scanned, and the \fi lands in the wrong group); this
 % is not. When solutions are ON, the body is set inside the ex/solution box --
 % or ex/solutionplain (no tab) for \begin{solution}[notitle].
+%
+% PRINT KEY: \begin{solution}[notitle, print=false] keeps a solution in the source
+% and off every copy, the key every box takes (PrintKey.sty). \PrintKeyParse takes
+% the print word out of the bracket and leaves the rest for `exbox'. The keys
+% are now read whether or not solutions show, so a typo in the bracket is
+% reported on every build, not only on the ones that print the box.
+% \ex@boxkeys exists so \PrintKeyRest can be expanded into \setkeys' argument.
+\newcommand{\ex@boxkeys}[1]{\setkeys{exbox}{#1}}
 \NewEnviron{solution}[1][]{%
+  \PrintKeyParse{#1}%
+  \ex@notitlefalse
+  \expandafter\ex@boxkeys\expandafter{\PrintKeyRest}%
   \ifsolutions
-    \ex@notitlefalse
-    \setkeys{exbox}{#1}%
-    \par
-    \ifex@notitle
-      \WSZeroHeight{\begin{tcolorbox}[ex/solutionplain]\BODY\end{tcolorbox}}%
-    \else
-      \WSZeroHeight{\begin{tcolorbox}[ex/solution]\BODY\end{tcolorbox}}%
-    \fi
+    \PrintKeyIfPrint{%
+      \par
+      \ifex@notitle
+        \WSZeroHeight{\begin{tcolorbox}[ex/solutionplain]\BODY\end{tcolorbox}}%
+      \else
+        \WSZeroHeight{\begin{tcolorbox}[ex/solution]\BODY\end{tcolorbox}}%
+      \fi
+    }{}%
   \fi
 }
 
@@ -1438,7 +1450,11 @@
 % context) follows the document \ifhints toggle. \showhint collapses the three
 % states to one boolean the emit-or-drop below reads.
 \newif\ifshowhint
-\NewEnviron{hint}{%
+%
+% PRINT KEY: \begin{hint}[print=false] overrides all three states -- the hint is
+% in the source and on no copy, the key every box takes (PrintKey.sty). It still
+% counts as "this file has a hint" for the warning below.
+\NewEnviron{hint}[1][]{%
   % Record that the imported file HAS a hint, shown or not -- \importproblem
   % reads this to warn when [hint] is forced on a hint-less file.
   \global\Ex@hintseentrue
@@ -1446,6 +1462,8 @@
   \ifdefstring{\CurrentProblemHint}{on}{\showhinttrue}{%
     \ifdefstring{\CurrentProblemHint}{off}{}{\ifhints\showhinttrue\fi}%
   }%
+  \PrintKeyParse{#1}%
+  \PrintKeyIfPrint{}{\showhintfalse}%
   \ifshowhint
     \par\smallskip
     \noindent\HintLabel\ {\itshape\ignorespaces\BODY}\par

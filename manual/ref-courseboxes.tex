@@ -67,6 +67,53 @@ not ship here -- it is declared in the course's text layer,
 \file{textbook.tex}, with the factories below
 (section~\ref{sec:extending}).
 
+\subsection*{Switching a box off: \texttt{print=false}}\label{sec:print-key}
+
+Every box takes one key that keeps it in the source and off every copy --
+no box, no contents-line entry, no \cs{label}. It is the editing verdict
+``not on the page, but not deleted'', and it means what it already meant on
+\cs{importproblem} and \env{notesproblem}. \texttt{noprint} is the flag form;
+\texttt{print=true} states the default.
+
+\begin{manexsource}
+\begin{definition}[print=false]{1.5.1}[Continuous Function]
+\begin{remark*}[print=false][Intuitive idea]
+\begin{example*}[print=false]
+\begin{takeaway}[print=false]
+\begin{tip}[surviving, print=false]
+\begin{InstructorBox}[marking, print=false]
+\begin{solution}[notitle, print=false]
+\begin{hint}[print=false]
+\begin{textprose}[print=false]
+\end{manexsource}
+
+The rule for where it goes: \textbf{in a bracket straight after the name}.
+Where a box already has a bracket of words there (\env{tip},
+\env{InstructorBox}, \env{solution}), the key joins them, in any order.
+Three things worth knowing:
+
+\begin{itemize}
+  \item \textbf{Fact boxes: the key comes first, the title last.} The trailing
+    bracket of \verb|\begin{theorem}{2.1}[Title]| is the title and stays so.
+  \item \textbf{Starred fact boxes had one bracket, and it was the title.} It
+    still is. Two brackets are key then title. A single bracket is read as the
+    key only when it is exactly a print word, so a title can be anything
+    except the literal text \texttt{print=false} or \texttt{noprint}.
+  \item \textbf{A switched-off box takes its \cs{label} with it}, so a
+    \cs{ref} to it warns as undefined -- loudly, which is the point.
+\end{itemize}
+
+A box that prints is typeset exactly as before: the body is swallowed only
+when the box is off, so nothing about verbatim material or page layout
+changes for a box left alone. The shared code is \file{PrintKey.sty}; a new
+box gets the key by calling \cs{PrintKeyParse} on its bracket and wrapping
+its output in \cs{PrintKeyIfPrint}.
+
+Not covered, on purpose: the structure \emph{inside} a problem
+(\env{qparts}, \env{choices}, \env{matching}) -- switch off the
+\env{notesproblem} around it -- and \env{studentonly}, which reserves space
+rather than drawing a box.
+
 \subsection*{The factories}
 
 \begin{center}

@@ -1,0 +1,101 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{PrintKey}[2026/10/06 the print=false key shared by every box]
+%%% ===========================================================================
+%%% PrintKey -- ONE implementation of `print=false' for every box environment.
+%%%
+%%% THE INTERFACE, as an author sees it. Any box takes the key in a bracket:
+%%%
+%%%   \begin{definition}[print=false]{1.5.1}[Continuous Function]
+%%%   \begin{remark*}[print=false][Intuitive idea]
+%%%   \begin{takeaway}[print=false]
+%%%   \begin{InstructorBox}[marking, print=false]
+%%%   \begin{solution}[notitle, print=false]
+%%%
+%%% and the box then prints on no copy: no box, no contents-line entry, no
+%%% \label. It is the editing verdict "keep this in the source, off the page" --
+%%% the same meaning the key already had on \importproblem and notesproblem.
+%%% `noprint' is the flag form of the same thing; `print=true' (or bare `print')
+%%% says the default out loud.
+%%%
+%%% WHY A PACKAGE OF ITS OWN. The boxes live in three packages (CourseBoxes,
+%%% Exercises, InstructorNotes) that do not all load one another, and each
+%%% already has a bracket of its own with its own words in it (`notitle',
+%%% `marking', `surviving'). So the shared part is small and specific: pick the
+%%% print words out of a bracket, hand the rest back, and -- for a box that is
+%%% not printing -- swallow its body.
+%%%
+%%% WHAT IT PROVIDES (the internals are expl3 and can stay a black box):
+%%%
+%%%   \PrintKeyParse{LIST}      Read a comma list. Sets the answer that
+%%%                             \PrintKeyIfPrint reads (print unless told not to)
+%%%                             and leaves every OTHER item, in order, in
+%%%                             \PrintKeyRest for the caller's own option code.
+%%%                             Both are local, so the answer belongs to the
+%%%                             environment that asked and ends with its group.
+%%%   \PrintKeyIfPrint{T}{F}    Branch on that answer.
+%%%   \PrintKeyIfKey{X}{T}{F}   Is X exactly one of the print words? For the one
+%%%                             place a bracket could be either this key or a
+%%%                             title (the starred fact boxes; see CourseBoxes).
+%%%   \PrintKeyGobbleBody       Swallow the rest of the current environment's
+%%%                             body. Must be the LAST thing in the begin-code of
+%%%                             a non-printing box, whose end-code must then do
+%%%                             nothing.
+%%%
+%%% Why gobble rather than capture-and-drop (\NewEnviron, as notesproblem does):
+%%% capturing would be needed on EVERY use, printing or not, and a captured body
+%%% cannot hold verbatim material. Gobbling happens only when the box is switched
+%%% off, so a box that prints is typeset exactly as it was before this key
+%%% existed.
+%%% ===========================================================================
+\RequirePackage{environ}   % \Collect@Body: read an environment's body up to its \end
+
+\ExplSyntaxOn
+\bool_new:N  \l__printkey_print_bool
+\clist_new:N \l__printkey_rest_clist
+\tl_new:N    \l__printkey_item_tl
+\tl_new:N    \PrintKeyRest
+
+% Classify one item, spaces ignored (so `print = false' reads as `print=false'):
+% run the first branch for "do not print", the second for "print", the third if
+% the item is not a print word at all.
+\cs_new_protected:Npn \__printkey_classify:nnnn #1#2#3#4
+  {
+    \tl_set:Nn \l__printkey_item_tl {#1}
+    \tl_remove_all:Nn \l__printkey_item_tl { ~ }
+    \str_case:VnF \l__printkey_item_tl
+      {
+        { noprint }     {#2}
+        { noprint=true } {#2}
+        { print=false } {#2}
+        { print }       {#3}
+        { print=true }  {#3}
+      }
+      {#4}
+  }
+
+\NewDocumentCommand \PrintKeyParse { m }
+  {
+    \bool_set_true:N \l__printkey_print_bool
+    \clist_clear:N \l__printkey_rest_clist
+    \clist_map_inline:nn {#1}
+      {
+        \__printkey_classify:nnnn {##1}
+          { \bool_set_false:N \l__printkey_print_bool }
+          { \bool_set_true:N  \l__printkey_print_bool }
+          { \clist_put_right:Nn \l__printkey_rest_clist {##1} }
+      }
+    \tl_set:NV \PrintKeyRest \l__printkey_rest_clist
+  }
+
+\NewDocumentCommand \PrintKeyIfPrint { +m +m }
+  { \bool_if:NTF \l__printkey_print_bool {#1} {#2} }
+
+\NewDocumentCommand \PrintKeyIfKey { m +m +m }
+  { \__printkey_classify:nnnn {#1} {#2} {#2} {#3} }
+\ExplSyntaxOff
+
+% \Collect@Body reads up to the \end of the environment we are in, hands the
+% body to its argument, and then runs that \end. \@gobble throws the body away.
+\newcommand{\PrintKeyGobbleBody}{\Collect@Body\@gobble}
+
+\endinput
