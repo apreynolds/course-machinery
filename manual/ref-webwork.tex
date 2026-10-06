@@ -330,3 +330,23 @@ The verdicts are graded exactly as \texttt{pg-profile} grades them, so the two t
 
 Until 2026-09-13 typed words did not count as choices, and any fixed choice failed; the first let a problem answering ``even'' on every seed through, and the second was stricter than \texttt{pg-profile}.
 \texttt{-n} defaults to 8 seeds, and \texttt{-q} prints only the problems that fail.
+
+\subsection*{book-exercises and apex-webwork-to-pg}
+
+Two readers of a textbook's own source, for the start of a practice set.
+Both work from a local clone of the book and take every path as an argument, so neither knows which course is running it.
+They came from MATH1003 on 2026-10-05, with the text layer, on the same reasoning: a textbook is a fact about the outside world.
+
+\begin{manexsource}
+book-exercises [--no-answers] [--groups-only] MODULE
+apex-webwork-to-pg [--list] [--out DIR] [--only PREFIX] --number N.M SECTION
+\end{manexsource}
+
+\texttt{book-exercises} prints the end-of-section exercises of an OpenStax CNXML module as readable text, with the MathML flattened.
+It is for judging the form and difficulty of each exercise group so that problems can be matched to it; the rendering is deliberately crude and is not for typesetting.
+\texttt{-{}-groups-only} prints just the direction lines and the exercise range each governs.
+
+\texttt{apex-webwork-to-pg} converts the WeBWorK exercises embedded in an APEX Calculus section's PreTeXt source into PGML \file{.pg} files, one per exercise.
+\texttt{-{}-list} prints the book number, label and group of every exercise and writes nothing.
+The clone defaults to \file{\textasciitilde/2teach/APEXCalculusPTX-clone}; the environment variable \env{APEX\_CLONE} overrides it.
+The output is a faithful conversion, not a finished problem: the book's problems still need the usual edits, recorded in each file's header.

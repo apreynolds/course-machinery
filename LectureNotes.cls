@@ -83,7 +83,7 @@
 
 % \textbookref -- links into the course text. Mechanism only: the base URL and the
 % section manifest are course data, declared in the course's own text layer
-% (.course-machinery-local/textbook.tex).
+% (texts/ here, or a course's own file in its course-info/).
 % Inert until that file is \input; unresolved references print as plain text.
 \RequirePackage{TextRef}
 
@@ -113,7 +113,7 @@
 % The noun is a per-TEXT choice -- texts variously say Example / Exercise /
 % Problem, and the notes should echo whichever the students are reading. A course
 % overrides it by redefining \NotesProblemLabelWord (its home is the text layer,
-% .course-machinery-local/textbook.tex). We route \ProblemLabelWord through that
+% texts/ here, or a course's own file in its course-info/). We route \ProblemLabelWord through that
 % macro rather than setting the word directly, so a text layer shared with an
 % ASSESSMENT document can retune the notes noun without disturbing
 % Assessment.cls's fixed "Q"

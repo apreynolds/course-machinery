@@ -33,7 +33,7 @@ whole --- see \emph{The book registry} below.
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{usetext}\texttt{\{apex\}} & in a master's preamble: this document is
-  an \emph{apex} document. Loads \file{.course-machinery-local/apex.tex}.\\
+  an \emph{apex} document. Loads \file{apex.tex}, found in \file{texts/}.\\
 \cs{DeclareBook}\texttt{\{name\}\{\dots\}} & a registry entry: what a book
   is called, who publishes it, where it lives. Keyval; see below.\\
 \cs{booktitle}\texttt{\{apex\}} & the book's title, set in italic and
@@ -120,16 +120,29 @@ independent; the filename carries one, this line the other.
 
 \subsection*{Loading the text layer}
 
-A course's text data lives in \file{.course-machinery-local/}, the course's
-tier-two machinery folder (section~\ref{sec:extending}), and \textbf{no
-master \cs{input}s it by path.} \file{.latexmkrc} puts that one folder on
+Text data lives in \file{texts/} in this machinery: one text layer per book, named for the book (\file{apex.tex}, \file{openstax-calculus1.tex}), and the registry, \file{books.tex}.
+It is shared because a book's title, URL and vocabulary are the same in every course that uses it (section~\ref{sec:extending}).
+A course may keep a text layer of its own in its \file{course-info/}, which is searched first; the demo's \file{textbook.tex} and \file{openstax.tex} are there.
+\textbf{No master \cs{input}s any of it by path.} \file{.latexmkrc} puts both folders on
 \env{TEXINPUTS}, so the file is found \emph{by name} from any depth. That
 is what lets a lecture sit anywhere in the tree: there is no \texttt{../..}
 in a master to keep true to the folder layout, and moving a file deeper or
-shallower breaks nothing. Only what is deposited in that folder is exposed
+shallower breaks nothing. Only what is deposited in those folders is exposed
 this way, not the rest of the course.
 
-Two things load from there, and they load differently.
+\textbf{What \cs{usetext} takes is a file name, not a book key.}
+Its argument names a file in \file{texts/}, without the extension.
+The layer for OpenStax's \emph{Calculus, Volume 1} is loaded with
+
+\begin{manexsource}
+\usetext{openstax-calculus1}
+\end{manexsource}
+
+\noindent and that file then sets the book itself, with \cs{SetDefaultText}\texttt{\{openstax\}}.
+The key \texttt{openstax} is what \cs{booktitle} and \cs{DeclareBook} use, and it does not have to match the file name.
+The file is named for the book because a name in \file{texts/} must be unique across every course, and one publisher has many books.
+
+Two things load, and they load differently.
 \file{books.tex}, the registry, is loaded \textbf{always and whole}, into
 every document. The \emph{text layer} is the one a master picks:
 
@@ -141,7 +154,7 @@ every document. The \emph{text layer} is the one a master picks:
     For a course drawing chapters from more than one book.
   \item Neither, and no \file{textbook.tex} --- nothing loads, and nothing
     breaks. A course with no online text needs no text layer at all, and
-    may have no \file{.course-machinery-local/} folder either if nothing
+    may have no \file{course-info/} folder either if nothing
     else of its own is shared across files; \cs{booksection} still sets
     the head.
 \end{itemize}
@@ -160,6 +173,7 @@ then carries its book with it, and ``which lectures use the other book?''
 is a positive grep rather than a search for absence. If you would rather
 have a default anyway, \file{textbook.tex} containing nothing but
 \cs{usetext}\texttt{\{apex\}} gives one that a lecture can still override.
+Keep that file in the course's \file{course-info/}, never in \file{texts/}: the machinery's path entry ends in \texttt{//}, so a \file{textbook.tex} there would be the default of every course at once.
 
 \textbf{Why a document names its book, rather than each reference.} Two
 kinds of fact attach to a textbook, and only one of them is exclusive.
@@ -189,7 +203,7 @@ instead.
 }
 \end{manexsource}
 
-\file{.course-machinery-local/books.tex} holds one such block per book,
+\file{texts/books.tex} holds one such block per book,
 and every document gets all of them. Only \texttt{base} is
 machinery-facing --- it is what \cs{booksection} and \cs{textbookref}
 append pages to, and it simply calls \cs{DeclareTextBase}. The other four

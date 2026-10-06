@@ -191,12 +191,18 @@ copy again, which is how a directory keeps a hand-tuned rc.
 so `build-pdfs` treats them as hand-tuned and leaves them alone. Delete them once
 and the next build installs the current file.
 
-The same file puts `.course-machinery-local/` on the path beside it. That is
-where a course keeps machinery of its *own* that more than one directory has to
-find — the text layer above all. Anything only one directory's documents load
-goes beside those documents instead and needs no path entry at all. The manual's
-architecture chapter states the rule; it is the one question that decides where
-a new file goes.
+The same file puts the course's `course-info/` on the path beside it, and
+searches it first. That is where a course keeps what is *its own*: the facts
+about one offering (sections, rooms, dates, instructors) and the packages that
+read them. It is a visible folder on purpose, because colleagues edit it. Code,
+and facts about the outside world such as a textbook's title and URL, live here
+in the machinery instead (`texts/` holds the text layer). Anything only one
+directory's documents load goes beside those documents and needs no path entry
+at all. The manual's architecture chapter states the rule; it is the one
+question that decides where a new file goes.
+
+A course that still has a hidden `.course-machinery-local/` from before this
+split gets nothing from it any more: move what it holds into `course-info/`.
 
 To build, run `build-pdfs` inside the directory you want to compile:
 
