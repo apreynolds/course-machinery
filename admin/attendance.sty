@@ -1,0 +1,302 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% attendance.sty -- per-section test attendance sheets
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% One page per tutorial section: a heading naming the test, the section, its TA
+%% and its enrolment, then a ruled list of that section's students with a column
+%% to tick. One sheet per section makes the document, in the order
+%% course-sections.csv lists them.
+%%
+%% NOTHING HERE IS COURSE-SPECIFIC. The course's name reaches the heading through
+%% courseinfo's \coursenum and \coursetitle, so porting this file to another
+%% course is a copy and no edit. Everything that varies -- the sections, their
+%% order, the TAs, the counts -- arrives as arguments from the generator.
+%%
+%% THIS PACKAGE OWNS THE LAYOUT AND NOTHING ELSE. The names come from
+%% test-admin, which reads the registrar's class-list exports and
+%% writes test-N-attendance-sheet.tex as a run of the environment below. That generated
+%% file is disposable and git-ignored (it holds student names); this file is the
+%% part worth keeping and reviewing, which is the whole reason the two are
+%% separate. Nothing here reads a data file.
+%%
+%% WHY NOT AN OPTION IN coursetables.sty. That package's job is turning the
+%% CSV/TSV files beside it, in the course's course-info/, into tables with
+%% datatool -- \DTLread, \DTLdisplaydb, \DTLmapdata. This table's rows arrive as \Student calls from a generator, so
+%% there is no database, no read, and nothing for it to share. Two small
+%% packages, two jobs -- the same split courseinfo.sty:9-12 argues for itself.
+%% Not loading it also keeps its document-wide table style out of here, which
+%% matters: the sheet wants a full grid and coursetables deliberately does not.
+%%
+%% WHERE THIS LIVES: admin/ in the shared machinery, on TEXINPUTS (the machinery's
+%% entry ends in //, so a subdirectory is searched too), found by name. It is
+%% shared because it is pure layout: any course that sits tests section by
+%% section can use it as it stands. It came from MATH 1003, which is the course
+%% the measurements below were tuned on.
+%%
+%% It used to sit in the directory the generator wrote its document into, on the
+%% tier-three rule that machinery used by the documents in one directory lives
+%% beside them -- found in the cwd, because build-pdfs cd's into the source's
+%% directory. That rule is gone along with tier three; the generated sheet now
+%% builds in TESTS/ADMIN/ and finds this package on the search path like any other.
+%%
+%% NO LEADING DOT. A tier-three .sty was hidden so that machinery beside
+%% documents did not read as another document. Nothing sits beside the documents
+%% any more, so the name is plain: \usepackage{attendance} at the call site,
+%% which the generator emits, and \ProvidesPackage{attendance} below, which must
+%% match it or LaTeX warns on every build.
+%%
+%% THE MOVE TOOK NO EDIT AT ALL, which says something about this file rather than
+%% about the directory. This package READS NO DATA FILE (see above), so it has no
+%% bare filenames quietly depending on the cwd and was free to sit at either
+%% tier. coursetables.sty was not free that way: its \DTLread calls broke the one
+%% time it was made reachable from directories its CSVs were not in, and it could
+%% only move once the data moved with it. A package that only takes arguments can
+%% go anywhere; a package that opens files travels with what it opens.
+%%
+%% DEPENDS ON courseinfo for \coursenum and \coursetitle in the heading, and is
+%% \RequirePackage'd below rather than left to the document: a package that
+%% prints the course's name should carry that dependency itself, so the generated
+%% file stays a list of sheets and nothing else. courseinfo's \DTMsavedate needs
+%% datetime2, which the class has already pulled in via Titling.sty by the time a
+%% \usepackage in the document's preamble reaches us.
+%%
+%% DEPENDS ON CourseDocument only for the body font and \textwidth. It would
+%% degrade under article, but it is not meant to travel.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{attendance}[2026/08/24 per-section test attendance sheets]
+
+\RequirePackage{courseinfo}
+% array for \extrarowheight, which adds space ABOVE a row -- the right knob for
+% text sitting under a rule. See coursetables.sty:88-91 for the same reasoning.
+\RequirePackage{array}
+% xcolor for \StudentElsewhere's grey. CourseDocument.cls loads it already, and
+% loads it FIRST with its dvipsnames option (CourseDocument.cls:26-27,142), so
+% this is the harmless idempotent case rather than an option clash -- and it is
+% what keeps the rule stated at the top of this block true: a package used here
+% is required here, not assumed of whatever class happens to be in force.
+\RequirePackage{xcolor}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% THE PAGE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% THE VERTICAL MARGINS ARE THE POINT HERE. They are
+%% ta-roster-math1003-26f.tex:6's, and the row budget in TUNING below is measured
+%% against them -- change these and re-check that a 35-student section still
+%% clears the page.
+%%
+%% The horizontal keys now do very little. The table is sized by its own two
+%% columns and centred inside whatever the measure happens to be, so the width
+%% set here only governs how wide the centred heading lines may run before they
+%% wrap. It is kept because CourseDocument's measure (textwidth=2.6\alphabet plus
+%% a marginpar gutter, CourseDocument.cls:103,110) is chosen so PROSE is
+%% comfortable to read, and nothing on this page is prose -- but the sheet no
+%% longer fills it, and dropping these three keys would change little beyond the
+%% heading's wrap point.
+\geometry{top=2cm, bottom=2cm, textwidth=16cm, hmarginratio=1:1,
+          marginparwidth=0pt}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% TUNING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The binding constraint is that ONE SECTION MUST FIT ONE PAGE, and the largest
+%% section is 35 students, so 36 rows (with the header) have to clear the text
+%% block. At 11pt a natural row is about 4.8mm and the text block under the
+%% document's top=2cm,bottom=2cm is about 22.5cm, of which the heading takes
+%% roughly 2.9cm -- so the budget is near 5.3mm a row and there is not much slack.
+%% \attrowheight is that budget, and it is a length precisely so this can be
+%% retuned in one place when a section grows or the heading changes.
+%%
+%% IT WAS 5.5mm AND THE HEADING GREW. Adding the booklet-count line cost about
+%% 4mm, which was more than the slack: a 35-row sheet went to two pages with NO
+%% warning from LaTeX, in exactly the silent way described below, and did so even
+%% with no name wrapping at all. Measured, not estimated -- 5.5mm failed a 35-row
+%% sheet outright, 5.4mm carried one with five wrapping names, and 5.3mm was
+%% taken for margin. The tick box loses 0.2mm, which no one writing in it will
+%% find. If the heading ever gains another line, expect to spend about the same
+%% again and RE-MEASURE: build a 35-row sheet and count its pages, because the
+%% arithmetic in this paragraph is a sanity check and not the test.
+%%
+%% HOW OVERFLOW ACTUALLY SHOWS UP, which is not what you would expect. A tabular
+%% is one unbreakable box, so a sheet too tall for its page does NOT produce an
+%% Overfull \vbox and does NOT run past the bottom rule. TeX simply cannot place
+%% the box on the current page and moves the whole table to the next one, leaving
+%% the heading stranded on a page by itself. The document quietly becomes 25
+%% pages and every warning stays silent -- exactly the failure that matters,
+%% since a TA would carry one sheet to the test not knowing the list continued.
+%%
+%% Nothing in LaTeX will tell you. test-admin therefore counts the
+%% pages of the finished PDF and warns when they do not equal the number of
+%% sheets; that check is the real guard, not anything in this file.
+%%
+%% The trigger in practice is a long name WRAPPING in the narrowed name column,
+%% since a wrapped row is taller. It takes a nearly full section plus a long name
+%% to do it. If it happens, widen \attnamewidth below or shave \attrowheight.
+\newlength{\attrowheight}
+\setlength{\attrowheight}{5.3mm}
+
+%% Width of the NAME column. Set outright rather than "whatever is left over",
+%% which is what it used to be -- the table is sized by its columns now, and the
+%% \centering in the environment puts the result in the middle of the page.
+%%
+%% A name that does not fit WRAPS, because the column is a p-column, and a
+%% wrapped row is taller. Thirty-five of those plus a wrap or two is the
+%% combination that would push a section onto a second page, so if this is
+%% narrowed further, re-check the fit against a long name -- see TUNING above.
+\newlength{\attnamewidth}
+\setlength{\attnamewidth}{8cm}
+
+%% Space added to the tick column BEYOND its heading. The column is measured from
+%% the words "Test N" each sheet (see the environment), so it is exactly as wide
+%% as its heading plus this and the usual \tabcolsep either side -- enough for a
+%% checkmark, which is all it has to hold.
+\newlength{\atttickpad}
+\setlength{\atttickpad}{0.8em}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% INTERNALS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The tick column's width, measured from its own heading once per sheet. Not a
+%% bare `c' column, which would measure the same thing automatically: a p-column
+%% is what lets \centering\arraybackslash hold a checkmark in the middle of a
+%% cell that is otherwise empty on every row.
+\newlength{\att@tickwidth}
+
+%% Struts the row to \attrowheight. The depth keeps the descenders of the name
+%% off the rule below it; the height is what actually sets the row's pitch.
+\newcommand{\att@strut}{%
+  \rule[-0.25\attrowheight]{0pt}{\attrowheight}%
+}
+
+%% The heading block. NOT \maketitle: that is a document's title, and this
+%% document has twenty-four sheets and no title of its own. Repeating a title
+%% block would also carry the "Updated" line and the vertical space that goes
+%% with it, which is exactly the 2.5cm the table needs.
+%% \sffamily is Merriweather at scaled=0.85 (Typefaces.sty:44-56) against the
+%% Libertinus serif body -- the same sans the class's own \maketitle uses for its
+%% title and subtitle, so the sheet reads as a sibling of the other course
+%% documents without borrowing their sizes or their "Updated" line.
+%% THE SECOND LINE IS THE ENVELOPE'S STORY. A section's envelope no longer holds
+%% one booklet per name on this sheet: students writing at the Student
+%% Accessibility Centre have theirs waiting there instead, so the count is short
+%% by however many of them there are. Saying so here is what stops a TA counting
+%% the envelope, making it a few light, and going looking for the missing paper.
+%%
+%% "WRITING ELSEWHERE", never "SAC". This sheet is carried into a room and left
+%% on a desk, and where a student writes is their accommodation, not the room's
+%% business. The TA needs to know not to expect them and not to mark them absent;
+%% neither of those needs the reason printed. The generated .tex uses the same
+%% wording, so nothing in the source says it either.
+%%
+%% The count is only printed when there IS one -- \ifnum guards it -- so the
+%% ordinary sheet reads "26 booklets" and stops.
+\newcommand{\att@heading}[6]{%
+  \begingroup
+  \centering
+  \sffamily
+  {\large\bfseries\coursenum---\coursetitle\par}
+  \vspace{0.35em}
+  {\Large\bfseries Test #1 Attendance\par}
+  \vspace{0.35em}
+  {Section #2\quad\textbullet\quad TA: #3\quad\textbullet\quad #4 students\par}
+  \vspace{0.15em}
+  {\small #5 booklets
+    \ifnum#6>0 \quad\textbullet\quad #6 writing elsewhere\fi\par}
+  \endgroup
+  \vspace{1.0em}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% THE SHEET
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% \begin{attendancesheet}{<test>}{<section>}{<TA>}{<count>}{<booklets>}{<elsewhere>}
+%%   \Student{Last, First}
+%%   ...
+%% \end{attendancesheet}
+%%
+%% A full grid, vertical rules included -- a departure from the house style in
+%% coursetables.sty, and a deliberate one. Those tables are read; this one is
+%% written on in a room, against the clock, and the ruled box is what keeps a
+%% tick beside the right name.
+%%
+%% THE TICK COLUMN IS ON THE LEFT because that is the order the hand works in:
+%% the TA reads down the names, finds the student, and marks to the left of the
+%% name they have just landed on.
+%%
+%% THE TABLE IS NARROWER THAN THE TEXT BLOCK and is centred in it by the
+%% \centering below. That \centering is the whole reason narrowing the columns is
+%% safe: a tabular narrower than the measure sits FLUSH LEFT by default, which is
+%% precisely the bug that once made every sheet look shifted off-centre, back
+%% when the tick column was a natural-width `c'. Sizing the columns and centring
+%% the result is the same fix stated positively -- but remove the \centering and
+%% the old symptom returns immediately.
+%%
+%% tabular, not longtable: see TUNING. A longtable would break across pages
+%% quietly, which is the failure this sheet must not have.
+%%
+%% \extrarowheight is set INSIDE the environment, so it is local to the group and
+%% never reaches another table -- unlike coursetables.sty, which sets it
+%% document-wide on purpose.
+%% The page break is at the END of a sheet, not the start. Ending the page is
+%% what makes one section one page, and it puts no blank page at the front the
+%% way an opening break would. The final sheet's break is a no-op, since
+%% \end{document} clears the page regardless.
+%%
+%% It must NOT be a flag saying "break unless this is the first sheet": \begin
+%% opens a group before running an environment's begin code, so a \newif set
+%% there is restored at \end and every sheet would believe it was the first.
+%% Breaking on the way out sidesteps the question -- \clearpage is an action,
+%% and actions do not care what group they are in.
+\newenvironment{attendancesheet}[6]{%
+  \att@heading{#1}{#2}{#3}{#4}{#5}{#6}%
+  % The tick column is measured from the heading it will carry, so "Test 2" and
+  % "Test 10" each get a column that fits and no more.
+  \settowidth{\att@tickwidth}{\textbf{Test #1}}%
+  \addtolength{\att@tickwidth}{\atttickpad}%
+  \setlength{\extrarowheight}{0pt}%
+  \renewcommand{\arraystretch}{1}%
+  \begingroup
+  \centering
+  \begin{tabular}{|>{\centering\arraybackslash}p{\att@tickwidth}|p{\attnamewidth}|}
+  \hline
+  \textbf{Test #1} & \att@strut\textbf{Student Name}\tabularnewline
+  \hline
+}{%
+  \end{tabular}%
+  \par
+  \endgroup
+  \clearpage
+}
+
+%% One row. The strut is in the name cell because that is the cell that always
+%% has content; an empty tick cell would collapse without it.
+\newcommand{\Student}[1]{%
+  & \att@strut #1\tabularnewline\hline
+}
+
+%% A student who is writing elsewhere. Still listed, and listed in place, because
+%% a name missing from the sheet is indistinguishable from a name that was never
+%% enrolled -- and because a TA who cannot find a student on the list has no way
+%% to tell "not my problem" from "something has gone wrong with the class list".
+%%
+%% AN EM DASH, NOT AN EMPTY CELL, in the tick column: an empty box invites a tick,
+%% and a ticked box for someone who was never in the room is a mark that has to be
+%% chased down later. The dash says the question does not apply.
+%%
+%% Greyed with lowercase black -- xcolor's grey, which the class explains at
+%% CourseDocument.cls:137: it mixes in RGB and holds the hue, where capital Black
+%% is dvipsnames cmyk and greys differently. 55%% is light enough to read as
+%% set-aside and dark enough to stay legible in a photocopy.
+\newcommand{\StudentElsewhere}[1]{%
+  \textcolor{black!55}{\textemdash}
+  & \att@strut\textcolor{black!55}{#1}\tabularnewline\hline
+}
+
+%% Used in place of the rows when no class list covered this section -- a missing
+%% download, most likely. The page is still emitted so the document always has one
+%% page per section and the gap is visible rather than inferred from a page count
+%% nobody checks.
+\newcommand{\NoRosterData}{%
+  \multicolumn{2}{|c|}{\att@strut\itshape No class-list data for this section.%
+    }\tabularnewline\hline
+}
+
+\endinput

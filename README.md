@@ -89,6 +89,15 @@ which one:
   recorded by the `seed` key of `\ProblemMeta`. A scaffold, not a converter:
   it strips WeBWorK's furniture, builds `qparts` from the answer blanks, and
   marks the judgement it leaves behind `% TODO`.
+- `book-exercises` — print the end-of-section exercises of an OpenStax CNXML
+  module as readable text, MathML flattened, so a practice set can be matched
+  to the book's exercise groups. Reads a local clone of the book.
+- `apex-webwork-to-pg` — convert the WeBWorK exercises embedded in an APEX
+  Calculus section's PreTeXt source into PGML `.pg` files. Reads a local clone
+  of the book (`APEX_CLONE` overrides where).
+- `admin/attendance.sty` — the layout of per-section test attendance sheets:
+  one page per section, a ruled list of names with a column to tick. Reads no
+  data; a generator supplies the names as `\Student{…}` calls.
 - `webwork-check` / `webwork-deploy` — verify a course's WeBWorK set
   definitions and problem trees, and build one uploadable tarball per topic.
   Only useful to a course that assigns WeBWorK, but many do.
