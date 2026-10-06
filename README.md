@@ -59,6 +59,7 @@ which one:
 | `Workspace.sty` | Reserved answer space, and the zero-height overlay contract |
 | `TextRef.sty` | Ties a document to *its* textbook — section links, named results |
 | `MathStuff.sty` | Shared mathematical notation |
+| `Figures.sty` | TikZ and pgfplots, with one shared vocabulary of plot styles — opt-in, no class loads it |
 | `Typefaces.sty`, `TitleBlock.sty`, `Hyperlinks.sty` | Fonts, titles and headings, links |
 
 **Scripts:**
@@ -70,7 +71,8 @@ which one:
   destinations named there, optionally holding one until a date it names; every
   run ends by sending whatever has come due, and `--release` does that on its
   own. A `%! coverpage: yes` comment additionally saves the first page on its
-  own, for printing an assessment's cover separately.
+  own, for printing an assessment's cover separately; `coverpage-->LABEL` on
+  the copies line sends that page to a named destination too.
 - `build-images` — render single problem files to cropped PDFs and PNGs, one
   picture per problem, for a learning-management system whose question pools
   take an image rather than text. Question-only and question-with-solution
@@ -87,6 +89,21 @@ which one:
   recorded by the `seed` key of `\ProblemMeta`. A scaffold, not a converter:
   it strips WeBWorK's furniture, builds `qparts` from the answer blanks, and
   marks the judgement it leaves behind `% TODO`.
+- `book-exercises` — print the end-of-section exercises of an OpenStax CNXML
+  module as readable text, MathML flattened, so a practice set can be matched
+  to the book's exercise groups. Reads a local clone of the book.
+- `apex-webwork-to-pg` — convert the WeBWorK exercises embedded in an APEX
+  Calculus section's PreTeXt source into PGML `.pg` files. Reads a local clone
+  of the book (`APEX_CLONE` overrides where).
+- `admin/test-admin` — everything a test needs on paper, in one sitting: the
+  per-section attendance sheets, the Print Services order and the envelope
+  split, from the registrar's class-list exports. Run once per test from a
+  course's own checkout; it finds the course by its `course-info/` folder and
+  reads the course number and Team folder from `admin-settings.csv` there.
+  `courseadmin.py` and `checkbox_xlsx.py` are its two modules.
+- `admin/attendance.sty` — the layout of per-section test attendance sheets:
+  one page per section, a ruled list of names with a column to tick. Reads no
+  data; `test-admin` supplies the names as `\Student{…}` calls.
 - `webwork-check` / `webwork-deploy` — verify a course's WeBWorK set
   definitions and problem trees, and build one uploadable tarball per topic.
   Only useful to a course that assigns WeBWorK, but many do.
@@ -174,12 +191,18 @@ copy again, which is how a directory keeps a hand-tuned rc.
 so `build-pdfs` treats them as hand-tuned and leaves them alone. Delete them once
 and the next build installs the current file.
 
-The same file puts `.course-machinery-local/` on the path beside it. That is
-where a course keeps machinery of its *own* that more than one directory has to
-find — the text layer above all. Anything only one directory's documents load
-goes beside those documents instead and needs no path entry at all. The manual's
-architecture chapter states the rule; it is the one question that decides where
-a new file goes.
+The same file puts the course's `course-info/` on the path beside it, and
+searches it first. That is where a course keeps what is *its own*: the facts
+about one offering (sections, rooms, dates, instructors) and the packages that
+read them. It is a visible folder on purpose, because colleagues edit it. Code,
+and facts about the outside world such as a textbook's title and URL, live here
+in the machinery instead (`texts/` holds the text layer). Anything only one
+directory's documents load goes beside those documents and needs no path entry
+at all. The manual's architecture chapter states the rule; it is the one
+question that decides where a new file goes.
+
+A course that still has a hidden `.course-machinery-local/` from before this
+split gets nothing from it any more: move what it holds into `course-info/`.
 
 To build, run `build-pdfs` inside the directory you want to compile:
 
@@ -191,7 +214,7 @@ cd _assessment
 
 A source declaring `%! views: solutions, hints` yields the student PDF plus a
 `-SOLUTIONS` and a `-HINTS` copy. One declaring `%! coverpage: yes` also yields
-`test_COVERPAGE.pdf`, page 1 of the finished test on its own. One declaring
+`test-COVERPAGE.pdf`, page 1 of the finished test on its own. One declaring
 `%! copies: solutions-->TA-dir(from 2026-10-01)` sends the solutions to a folder
 named in `.MIRRORDIR`, but not before that date. The manual's build chapter
 covers the view system, the mirror file and dated copies in full.

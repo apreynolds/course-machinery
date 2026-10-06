@@ -27,7 +27,7 @@ assessment. Workflow: section~\ref{sec:lectures}.
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \cs{NotesProblemLabelWord} & the noun imported problems render as
   (default \emph{Example}); redefine per \emph{text}, in
-  \file{.course-machinery-local/textbook.tex}. Routed into \cs{ProblemLabelWord} so a
+  \file{textbook.tex}. Routed into \cs{ProblemLabelWord} so a
   shared text layer cannot disturb Assessment's fixed ``Q''.\\
 \cs{lecturetoc} & the lecture's title and table of contents, then a page
   break. The title (``1.2\quad Basic Classes of Functions'', with a rule
@@ -69,7 +69,9 @@ Other deliberate class behaviour:
   \item The running head is the lecture's \cs{booksection} coordinate
     (linked if the book is online), on every page \emph{including} the
     projector copy -- a scrolled
-    document is where persistent orientation is worth most. It carries a
+    document is where persistent orientation is worth most.
+    The one exception is a first page titled by \cs{lecturetoc}, which drops
+    the head (page style \texttt{lecturefirst}): the title repeats it, larger. It carries a
     rule, which disappears along with the head if the lecture declares no
     coordinate. Page \emph{numbers} are the opposite case: the handout has a
     centred one, the projector copy none (it is never collated, so a number

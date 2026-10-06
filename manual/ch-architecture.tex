@@ -165,44 +165,61 @@ trick, sentinel-valued, is why a stray \cs{label} on an aside prints
 \texttt{[unlabelled aside]} instead of silently grabbing the section
 number.)
 
-\subsubsection*{Where course-specific things live: three tiers}
+\subsubsection*{Where course-specific things live}
 
-Everything a document loads sits in one of three places, and one question
-decides which: \emph{is this shared across files?}
+Everything a document loads sits in one of three places, and two questions
+decide which.
 
 \begin{manexsource}
-.course-machinery/        machinery shared across COURSES (this submodule)
-.course-machinery-local/  machinery specific to ONE course but still shared
-                          across files, so it must be findable from any depth
-beside the document       used only by the documents in one directory --
-                          found in the cwd, never on a search path
+.course-machinery/   code, and facts about the outside world -- a book's
+                     title, URL and vocabulary. Shared across COURSES
+                     (this submodule), so nothing tied to one term
+course-info/         facts about ONE OFFERING -- sections, rooms, dates,
+                     instructors -- and the packages that read them.
+                     Visible, because colleagues edit it
+beside the document  used only by the documents in one directory --
+                     found in the cwd, never on a search path
 \end{manexsource}
 
 Only the first two are search paths, and putting them there is the entire
 content of \file{.latexmkrc}. The third needs no help: TeX looks in the
 current directory first and \file{build-pdfs} has already put the build
-there. A package that draws a course's tables, together with the CSV files
-it reads, is tier three whenever the only documents that load it sit in the
-same folder.
+there.
 
-This is not a filing preference; it is the answer to a mechanical question.
-A file belongs on \env{TEXINPUTS} exactly when its readers sit at depths it
-cannot predict --- and it should stay off otherwise, because every entry
-widens what a bare name can resolve to. When a file's readership changes,
-it changes tier: that is a move, not a rewrite, since nothing anywhere
-names it by path.
+\textbf{The first question is mechanical: do this file's readers sit at
+depths it cannot predict?}
+If not, it stays beside them and off \env{TEXINPUTS}, because every entry widens what a bare name can resolve to.
+A package that draws one folder's tables, together with the CSV files it reads, belongs in that folder for as long as the only documents that load it sit there too.
+When a file's readership widens, it moves onto the path: that is a move, not a rewrite, since nothing anywhere names it by path.
 
-\paragraph{Tier two is searched before tier one.} \file{latexmkrc-shared}
-adds \file{.course-machinery/} first and \file{.course-machinery-local/}
-second, but \texttt{latexmk}'s \texttt{ensure\_path} \emph{prepends}, so the
-second one ends up in front. A course can therefore shadow a vendored
-machinery file with a same-named copy of its own, which is how a course
-overrides one package without forking this submodule. The cost is that a
-basename colliding by accident resolves to the local copy silently, for that
-course only --- so treat the names in \file{.course-machinery-local/} as
-sharing a namespace with everything vendored here.
+\textbf{The second question decides which path: is this a fact about one
+offering of the course?}
+Who teaches which section, in which room, on which dates, and what the term is called: yes, and those go in the course's own \file{course-info/}.
+So do the packages that read them, for a practical reason.
+\cs{openin} searches \env{TEXINPUTS} just as \cs{input} does, so a bare \cs{DTLread}\texttt{\{sections.csv\}} resolves wherever the package itself resolves --- but only if the data is on the path too.
+A package that travels without its data loads everywhere and works in one place, which is worse than not travelling.
 
-\subsubsection*{A passage bank is content, not a tier}
+Everything else is code or a fact about the world outside the course, and belongs here in the machinery, where every course gets it and nobody has to copy it.
+A textbook's title and URL do not change with the term, which is why the text layer is in \file{texts/} here (below).
+A script that needs an offering fact reads it from \file{course-info/} rather than holding it: \file{admin/test-admin} takes the course number and the team's shared folder from \file{course-info/admin-settings.csv}.
+
+\file{course-info/} is \emph{visible}, and that is deliberate.
+A colleague correcting their office hours is an audience, and a hidden directory named for machinery is the wrong place to send them.
+The two folders are also what a new term costs: copy \file{course-info/}, edit it, and touch nothing here.
+
+\paragraph{The course's folder is searched first.}
+The rc file adds \file{.course-machinery/} first and \file{course-info/} second, but \texttt{latexmk}'s \texttt{ensure\_path} \emph{prepends}, so the second one ends up in front.
+A course can therefore shadow a vendored machinery file with a same-named copy of its own, which is how a course overrides one package without forking this submodule.
+The cost is that a basename colliding by accident resolves to the course's copy silently, for that course only --- so treat the names in \file{course-info/} as sharing a namespace with everything vendored here.
+\file{build-images} builds the same path in the same order.
+
+\paragraph{What this replaced.}
+Until 2026-10 there was a third search path, a hidden \file{.course-machinery-local/} beside this submodule, for ``machinery specific to one course''.
+It held data that colleagues needed to edit, where they would not look, mixed with code that every course turned out to want.
+Its contents were divided by the second question above, and the path entry is gone.
+A course that still has such a directory gets nothing from it: move what it holds to \file{course-info/}.
+
+\subsubsection*{A passage bank is content, not a search path}
 
 The rule above answers a question that otherwise recurs every time something
 new turns out to be shared. The case that prompted writing it down: prose
@@ -213,8 +230,8 @@ shared across courses, so the reflex is to reach for a fourth search path.
 Don't. Ask the mechanical question instead, and notice that \emph{the banks
 are already the precedent}. A problem is shared across courses too, and
 \cs{importproblem} does not put \file{problems/} on \env{TEXINPUTS} --- it
-hands \cs{import} a literal relative directory. Content has never been a
-tier here. The tiers are for machinery, which is loaded by bare name; content
+hands \cs{import} a literal relative directory. Content has never been on
+the search path here. The path is for what is loaded by bare name; content
 is named by the document that wants it, and a passage's readers are one
 course's prose documents, sitting in one directory.
 
@@ -235,17 +252,23 @@ There is a cautionary precedent for the reflex. The per-offering setup file
 was designed on the assumption that every master would want it and it would
 therefore need \env{TEXINPUTS}. When it was finally built as
 \file{courseinfo.sty}, its readers turned out to be the prose documents of
-one directory --- the guess was wrong, and it landed a tier lower than
-predicted. Predicting a readership is the step to distrust.
+one directory --- the guess was wrong, and it began life beside them.
+It moved onto the path only later, when a generated attendance sheet in another directory needed the course's name, and the move took no edit.
+Predicting a readership is the step to distrust; moving when it changes is cheap.
 
-\subsubsection*{The text layer, tier two's first tenant}
+\subsubsection*{The text layer}
 
 The shared machinery draws a deliberate line: vocabulary every text has
 (theorem, definition, \dots) and the author's own asides ship in
-CourseBoxes; anything \emph{specific to one text} lives in the course's
-own \textbf{text layer}, \file{.course-machinery-local/textbook.tex}. It
-is tier two because every lecture in every topic folder needs it, at
-whatever depth those sit.
+CourseBoxes; anything \emph{specific to one text} lives in a
+\textbf{text layer}, one file per book.
+It has to be on the path because every lecture in every topic folder needs it, at whatever depth those sit.
+
+\textbf{Where the files are.}
+A book's vocabulary and its web address are facts about the book, the same in every course that teaches from it, so text layers live in \file{texts/} in this submodule: \file{texts/apex.tex}, \file{texts/openstax-calculus1.tex}, and the registry \file{texts/books.tex}.
+Each is named for its \emph{book}, not its publisher, because a name here has to be unique across every course (OpenStax alone publishes several of the books in play).
+A course may still keep a text layer of its own in its \file{course-info/}, which is searched first.
+The demo course does exactly that, with \file{textbook.tex} and \file{openstax.tex}, so that it shows the whole mechanism in one place; a course teaching from a book already in \file{texts/} needs no file of its own.
 
 \textbf{The membership test} is one question: \emph{would you look at the
 textbook to set this value?} ``Key Idea'' is what APEX calls its flagged
@@ -263,7 +286,7 @@ only have one of it?} A vocabulary is: you cannot call worked items
 twice. A book's title and URL are not, and a syllabus proves it by naming
 three books while being built on none. So the exclusive half stays in the
 text layer, which \cs{usetext} picks one of, and the rest moves to the
-\textbf{book registry}, \file{.course-machinery-local/books.tex}, which is
+\textbf{book registry}, \file{texts/books.tex}, which is
 loaded into every document whole (section~\ref{sec:ref-textref}). The
 registry is also the only place a book the course \emph{never teaches
 from} can live --- no document is an ``algtrig document'', so no
@@ -289,14 +312,14 @@ What is left in a text layer is therefore this:
                    base=https://opentext.uleth.ca/apex-calculus/}
 \end{manexsource}
 
-No master \cs{input}s it. \file{.latexmkrc} puts
-\file{.course-machinery-local/} on
+No master \cs{input}s it. \file{.latexmkrc} puts the machinery and
+\file{course-info/} on
 \env{TEXINPUTS}, so the file is found by \emph{name} and loaded at the end
 of the preamble, which is early enough for \cs{newtheorem}. That is what
 frees a lecture to sit at any depth: no master carries a \texttt{../..}
 that has to stay true to the folder layout. A course with two books names
 the one it means (\cs{usetext}, section~\ref{sec:ref-textref}); a course
-with no online text has no such folder and nothing loads.
+with no online text names none and nothing loads.
 
 The \cs{ifdefined} guard is what lets \emph{one} file serve every master:
 an Assessment document loads no CourseBoxes, skips the factory calls, and
@@ -333,14 +356,16 @@ registry, because the documents that cite it are built on some other book
 entirely (section~\ref{sec:ref-textref}).
 
 \textbf{Why a folder.} It is the boundary of what the build can see. The
-whole mechanism rests on \file{.course-machinery-local/} being on
+whole mechanism rests on \file{course-info/} being on
 \env{TEXINPUTS}, and naming the folder rather than the course root is what
 keeps that exposure narrow: only what is deposited there becomes findable
 by bare name, so nothing else in the course can be picked up by accident.
-That narrowness is why the tier is a folder at all rather than a habit ---
-and it is why the folder is named for its \emph{role} rather than for the
-text layer that was once its only occupant. The registry moving in beside
-it, and \file{courseinfo.sty} beside that, is the name being earned.
+That narrowness is why it is a folder at all rather than a habit.
+
+\textbf{One name never to use in \file{texts/}: \file{textbook.tex}.}
+TextRef loads a file of that name as the default for any master that names no book.
+The machinery's path entry ends in \texttt{//}, so one placed in \file{texts/} would become the default text of every course at once.
+A course that wants a default keeps its own \file{textbook.tex} in its \file{course-info/}.
 
 To restyle course-wide, prefer the named extension points -- the
 \env{cb/*} tcolorbox styles and \env{cb*} head styles

@@ -47,13 +47,15 @@
 #
 # Exit status is 1 if any check failed, so this is usable in a pre-push hook.
 #
-# KNOWN GAPS in --paths, both found on math1003's older sets:
+# KNOWN GAPS in --paths, both found on math1003's sets:
 #
 #   - A server-flat `local/...' path, with no topic in front of it -- the form
 #     the diagnostic test's .def uses -- matches none of the source forms below
 #     and reports as UNKNOWN SOURCE, although it may be fine on the server.
-#   - A gateway quiz's `group:<name>' pool references are not modelled at all,
-#     so a gateway .def written that way can never pass.
+#   - A gateway quiz's `group:<set ID>' pool is checked only against this repo:
+#     the set must have a group directory in some topic, or a .def beside the
+#     gateway's. Whether the set is on the SERVER under that ID -- which is what
+#     a student starting a version needs -- cannot be seen from here.
 
 set -uo pipefail
 
@@ -182,6 +184,7 @@ failed=0
 #   <topic>/opl/Rochester/.../x.pg      → this repo           (post-flip)
 #   <topic>/contrib/CCCS/.../x.pg       → this repo           (post-flip)
 #   <topic>/local/whatever.pg           → this repo           (post-flip)
+#   group:OS1.5_Exponential_...         → a whole set, by ID  (gateway pools)
 #
 # The four post-flip forms all resolve the same way, by stripping the topic
 # name. What the second level says is WHERE THE PROBLEM CAME FROM, and the
@@ -197,7 +200,7 @@ bad=0
 
 # One .def file, reported under LABEL.
 check_def() {
-    local def=$1 label=$2 rel src dn=0 dbad=0
+    local def=$1 label=$2 rel src pool dn=0 dbad=0
 
     while IFS= read -r rel; do
         dn=$((dn + 1))
@@ -209,6 +212,18 @@ check_def() {
                 # Topic-rooted: strip the leading topic name, which is the
                 # server-side directory, and look inside this repo.
                 src="$REPO/${rel%%/*}/webwork/${rel#*/}" ;;
+            group:*)
+                # A gateway's pool: the name is a SET ID, not a file, and the
+                # server draws from whatever that set holds. It resolves if this
+                # repo can build the set -- some topic has a settled group
+                # directory for it -- or keeps a hand-written .def for it.
+                pool=${rel#group:}
+                if ! compgen -G "$REPO/*/webwork-sets/$pool-[0-9][0-9]-*/" >/dev/null \
+                    && [ ! -f "$SETS_DIR/set$pool.def" ]; then
+                    echo "  ✗ NO SUCH SET  $label: $rel"
+                    dbad=$((dbad + 1))
+                fi
+                continue ;;
             *)
                 echo "  ? UNKNOWN SOURCE  $label: $rel"
                 dbad=$((dbad + 1)); continue ;;

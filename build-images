@@ -8,7 +8,7 @@
 #       --width LEN     typeset measure, any TeX length       (default: 2.6\alphabet)
 #       --margins N     white border in TeX pt                (default: 10)
 #       --no-question   skip the question-only variant
-#       --no-solutions  skip the _SOLUTIONS variant
+#       --no-solutions  skip the -SOLUTIONS variant
 #       --no-pdf        keep only the PNG, not the cropped PDF
 #       --no-png        keep only the cropped PDF, not the PNG
 #       --keep          keep the generated wrapper and log, and say where
@@ -17,7 +17,7 @@
 # Two independent choices, each defaulting to BOTH. WHICH VARIANTS to render:
 #
 #     <name>.pdf            <name>.png              the question alone
-#     <name>_SOLUTIONS.pdf  <name>_SOLUTIONS.png    question + worked solution
+#     <name>-SOLUTIONS.pdf  <name>-SOLUTIONS.png    question + worked solution
 #
 # where --no-question drops the top row and --no-solutions the bottom one. And
 # WHICH FORMATS to keep of whatever is rendered: --no-png stops at the cropped
@@ -26,7 +26,7 @@
 # simply never reaches --out. Asking for no variant, or for neither format, is
 # an error rather than a silent no-op.
 #
-# The _SOLUTIONS suffix deliberately differs from build-pdfs' -SOLUTIONS view naming.
+# The -SOLUTIONS suffix is build-pdfs' own view naming, deliberately.
 #
 # WHAT IT IS FOR. A D2L (or Moodle, or Canvas) question pool wants one IMAGE per
 # question. This turns one problem file from the bank into that image, without
@@ -142,14 +142,18 @@ out_dir=$(cd "$out_dir" && pwd)
 # Where the machinery is
 # ---------------------------------------------------------------------------
 # This script LIVES in the machinery, so there is no need to repeat the walk-up
-# search in latexmkrc-shared:33-44 -- the answer is its own directory. The
-# course's own shared layer, if it has one, sits beside that and is added flat,
-# matching latexmkrc-shared:46.
+# search in latexmkrc-shared -- the answer is its own directory. The course's
+# own course-info/, if it has one, sits beside that and is added flat.
+#
+# SAME ORDER AS latexmkrc-shared: course-info/, then the machinery, so a
+# course's own file wins over a same-named vendored one here exactly as it does
+# in a document build. It is PREPENDED for that reason. (The trailing colon
+# keeps TeX's own default path at the end.)
 
 machinery=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+course_root=$(dirname "$machinery")
 texinputs="$machinery//:"
-course_local="$(dirname "$machinery")/.course-machinery-local"
-[ -d "$course_local" ] && texinputs="$texinputs$course_local:"
+[ -d "$course_root/course-info" ] && texinputs="$course_root/course-info:$texinputs"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/build-images.XXXXXX") || exit 1
 [ "$keep" -eq 0 ] && trap 'rm -rf "$work"' EXIT
@@ -162,7 +166,7 @@ status=0
 render() {
     local pdir=$1 pfile=$2 stem=$3 solutions=$4
     local job="$stem"
-    [ "$solutions" -eq 1 ] && job="${stem}_SOLUTIONS"
+    [ "$solutions" -eq 1 ] && job="$stem-SOLUTIONS"
 
     local wrapper="$work/$job.tex"
 

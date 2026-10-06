@@ -75,7 +75,8 @@ The generated \file{webwork-sets/\_for-upload/} is skipped entirely.
 
 \paragraph{Known gaps.}
 A server-flat \file{local/\ldots} path with no topic in front of it, as in MATH1003's diagnostic test, reports as \texttt{UNKNOWN SOURCE}.
-A gateway's \texttt{group:<name>} pool references are not modelled, so such a \file{.def} cannot pass.
+A gateway's \texttt{group:<set ID>} pool is checked only against the repo: the set needs a group directory in some topic, or a \file{.def} beside the gateway's, and otherwise reports as \texttt{NO SUCH SET}.
+Whether the set is on the \emph{server} under that ID, which is what a student starting a version needs, cannot be seen from here.
 
 \paragraph{The OPL has two problem trees.}
 This is the trap worth knowing. The Open Problem Library clone holds
@@ -282,20 +283,26 @@ Both take any mix of \file{.pg} files and directories, searched recursively.
 pg-profile [-n SEEDS] [--no-statement] [--tier1-only] FILE.pg|DIR ...
 \end{manexsource}
 
-Everything needed to judge one problem, on one screen: its OPL tags, the macros it loads, every answer blank, whether its checker accepts its own stated answers, a seed sweep, whether the answers vary, the state of its solution, and the full statement.
+Everything needed to judge one problem, on one screen: its OPL tags, the macros it loads, every answer blank, whether each graded answer has a box on the page, whether its checker accepts its own stated answers, a seed sweep, whether the answers vary, the state of its solution, and the full statement.
 Findings come in two tiers, and only the first is a veto.
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 Tier 1 & \emph{buggy}: errors on some seeds, a checker that rejects its own
-  answer, a macro the pinned pg clone lacks, or a problem whose every blank ---
-  a multiple-choice one included --- is the same on every seed. Sets the exit
-  status.\\
+  answer, a macro the pinned pg clone lacks, a problem whose every blank ---
+  a multiple-choice one included --- is the same on every seed, or a graded
+  answer with no box on the page. Sets the exit status.\\
 Tier 2 & \emph{editable}: a video embed, named software, a claimed attempt
   limit, a cosmetic warning, a commented-out solution stub. A reason to fork and
   edit the problem, not to reject it.\\
 \end{tabularx}
 \end{center}
+
+The \texttt{boxes} row is the hidden-blank check, added 2026-10-02.
+PG formats a solution or hint block whether or not it is shown, so an answer blank written inside one is registered and graded while invisible: the student sees one box, answers it correctly, and is told a question is unanswered.
+Every other row passes such a problem, because the hidden blank renders on every seed and accepts its own stated answer.
+The check compares the answers PG lists against the inputs in the preview \texttt{pr-pg-render -{}-html} writes with the solution hidden.
+A scaffold, which hides its later parts by design, is reported in tier 2 instead.
 
 Macros are checked against the pg clone at \env{PG\_ROOT}, the same variable \texttt{pr-pg-render} reads.
 A clean profile means the problem \emph{works}, never that it is good: correctness of the answer, clarity, and fit to the course stay human work.
@@ -323,3 +330,23 @@ The verdicts are graded exactly as \texttt{pg-profile} grades them, so the two t
 
 Until 2026-09-13 typed words did not count as choices, and any fixed choice failed; the first let a problem answering ``even'' on every seed through, and the second was stricter than \texttt{pg-profile}.
 \texttt{-n} defaults to 8 seeds, and \texttt{-q} prints only the problems that fail.
+
+\subsection*{book-exercises and apex-webwork-to-pg}
+
+Two readers of a textbook's own source, for the start of a practice set.
+Both work from a local clone of the book and take every path as an argument, so neither knows which course is running it.
+They came from MATH1003 on 2026-10-05, with the text layer, on the same reasoning: a textbook is a fact about the outside world.
+
+\begin{manexsource}
+book-exercises [--no-answers] [--groups-only] MODULE
+apex-webwork-to-pg [--list] [--out DIR] [--only PREFIX] --number N.M SECTION
+\end{manexsource}
+
+\texttt{book-exercises} prints the end-of-section exercises of an OpenStax CNXML module as readable text, with the MathML flattened.
+It is for judging the form and difficulty of each exercise group so that problems can be matched to it; the rendering is deliberately crude and is not for typesetting.
+\texttt{-{}-groups-only} prints just the direction lines and the exercise range each governs.
+
+\texttt{apex-webwork-to-pg} converts the WeBWorK exercises embedded in an APEX Calculus section's PreTeXt source into PGML \file{.pg} files, one per exercise.
+\texttt{-{}-list} prints the book number, label and group of every exercise and writes nothing.
+The clone defaults to \file{\textasciitilde/2teach/APEXCalculusPTX-clone}; the environment variable \env{APEX\_CLONE} overrides it.
+The output is a faithful conversion, not a finished problem: the book's problems still need the usual edits, recorded in each file's header.

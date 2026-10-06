@@ -1,0 +1,456 @@
+#!/usr/bin/env python3
+#
+# apex-webwork-to-pg — convert an APEX section's embedded WeBWorK exercises to .pg files
+# Usage: apex-webwork-to-pg [--list] [--out DIR] [--only PREFIX ...] [--dbchapter NAME] --number N.M SECTION
+#
+#   SECTION         the section's PreTeXt file, by path or by its bare name,
+#                   e.g. sec_limit_intro or ~/2teach/APEXCalculusPTX-clone/ptx/sec_limit_intro.ptx
+#   --number N.M    the section's number in the book, e.g. 1.1 (for the header and tags)
+#   --list          print book number, label and group of every WeBWorK exercise; write nothing
+#   --out DIR       write one LABEL.pg per exercise into DIR (created if missing)
+#   --only PREFIX   convert only exercises whose label starts with PREFIX; repeatable
+#   --dbchapter N   write a ## DBchapter(N) tag, from the OPL Taxonomy, e.g. "Limits and continuity"
+#   -h, --help      this text
+#
+#   APEX_CLONE      environment override for the book clone (default ~/2teach/APEXCalculusPTX-clone)
+#
+# WHY THIS EXISTS. APEX's end-of-section exercises ARE WeBWorK problems, but they
+# are not .pg files: each is a <webwork> element inside the section's PreTeXt
+# source, holding Perl setup code (<pg-code>) plus a statement and solution in
+# PreTeXt markup (<p>, <m>, <var>, <tabular>, <image><latex-image>). PreTeXt's own
+# tool turns these into .pg files, but it is not installed here and this is all
+# it needs to do. So: PreTeXt markup in, PGML out. Written 2026-09-30 for APEX 1.1;
+# the method is in WEBWORK/README.md, "APEX sections".
+#
+# WHAT IT DOES NOT DO. Judgement. The output is a faithful conversion, and the
+# book's problems still need the usual fork-pass edits, recorded in each file's
+# header. APEX 1.1 needed two kinds: randomisation the authors had commented out,
+# and a "Show your work" essay box that WeBWorK cannot grade.
+#
+# TWO SHAPES OF EXERCISE. 1.1 and 1.3 are one <statement> each. 1.4's are
+# multi-part: an <introduction> (the function, or its graph) and then <task>s,
+# which come out as a PGML lettered list. A graph in an introduction is the
+# question itself, so it is $graph, not $solutionGraph, and it carries the
+# book's long <description> as well as its alt text.
+#
+# The book numbers every exercise in an <exercises> division in document order,
+# including ones with no WeBWorK version (1.1's Terms and Concepts), so the
+# numbering here counts those too and matches the printed book.
+#
+# The solution graphs are TikZ, drawn by PG at render time with the styles the
+# book defines once in docinfo.ptx (firstcurvestyle, closedopen, ...). Each .pg
+# carries its own copy of that preamble, so a problem stays self-contained.
+# Rendering them locally needs PG's tmp directory to be writable, which the
+# Claude sandbox's /tmp is not; see the webwork skill.
+
+import argparse
+import os
+import pathlib
+import re
+import subprocess
+import sys
+import textwrap
+import xml.etree.ElementTree as ET
+
+CLONE = pathlib.Path(os.environ.get("APEX_CLONE", pathlib.Path.home() / "2teach/APEXCalculusPTX-clone"))
+
+
+def dedent(text):
+    """Strip the XML indentation from a block of code or TeX."""
+    return textwrap.dedent((text or "").strip("\n")).strip()
+
+
+def pgml_escape(text):
+    """Backslash the characters PGML reads as markup in plain prose."""
+    return re.sub(r"([\[\]\*_#`\\])", r"\\\1", text)
+
+
+def math_text(el, pgml=True):
+    """The TeX of an <m> or <md>, with each <var name="$x"/> as PGML's [$x].
+
+    PGML substitutes a MathObject inside math as its TeX form, so a Formula
+    prints as x^{2}+3x-5 rather than as its Perl string. With pgml=False the
+    <var> is left as bare $x, for text that Perl interpolates instead.
+    """
+    out = el.text or ""
+    for child in el:
+        if child.tag != "var":
+            raise ValueError(f"unexpected <{child.tag}> inside math")
+        name = child.get("name")
+        out += ("[" + name + "]" if pgml else name) + (child.tail or "")
+    return book_macros(re.sub(r"\s+", " ", out).strip())
+
+
+def book_macros(tex):
+    """TeX that only the book's own preamble understands, in standard TeX.
+
+    \\abs is defined in docinfo.ptx, which a .pg never sees: MathJax would print
+    it in red and a hardcopy would stop on it. A bare < or > (the XML's &lt;)
+    is spelled \\lt and \\gt, which MathJax and PG's pg.sty both define, so no
+    HTML parser ever meets one inside a formula.
+    """
+    tex = re.sub(r"\\abs\{([^{}]*)\}", r"\\left\\lvert \1\\right\\rvert", tex)
+    if r"\abs" in tex:
+        raise ValueError(r"\abs with a nested argument: " + tex)
+    return tex.replace("<", r"\lt ").replace(">", r"\gt ")
+
+
+def display_math(md, punctuation=""):
+    """The TeX of an <md>: its own text, or its <mrow>s as one aligned block.
+
+    PreTeXt writes an aligned display as one <mrow> per line, with \\amp for
+    TeX's & (a bare & is not legal XML). A row may hold several aligned pairs
+    -- 1.3's "lim f = 6   lim f = 9   f(9) = 6" -- and `aligned` sets those
+    pairs touching, so each pair after the first gets a \\qquad in front.
+    """
+    rows = md.findall("mrow")
+    if not rows:
+        return math_text(md) + punctuation
+    lines = []
+    for row in rows:
+        cells = math_text(row).split(r"\amp")
+        line = cells[0].strip()
+        for i, cell in enumerate(cells[1:], start=1):
+            # Odd separators are alignment points; even ones start a new pair.
+            line += (" & " if i % 2 else r" & \qquad ") + cell.strip()
+        lines.append(line)
+    lines[-1] += punctuation
+    return r"\begin{aligned} " + r" \\ ".join(lines) + r" \end{aligned}"
+
+
+# Cross-references the conversion can put into words: the xml:id of the section
+# being converted, filled in by main(). Anything else is an error, not a guess.
+XREFS = {}
+
+
+def answer_blank(var, blanks=True):
+    """A <var> outside math is an answer blank, or (data="pgml") inserted PGML.
+
+    With blanks=False (a solution) it is the VALUE instead, as PreTeXt prints
+    it. PG formats a solution block whether or not it is shown, so a blank
+    there is a second, invisible question: 1.1's exercise 14 showed one box,
+    graded two, and could not score above 50%.
+    """
+    if var.get("data") == "pgml":
+        return "[" + var.get("name") + "]**"
+    if not blanks:
+        return "[`[" + var.get("name") + "]`]"
+    if var.get("form"):
+        # Popups, essays and the like: none in 1.1, so not yet handled.
+        raise ValueError(f"unsupported <var form=\"{var.get('form')}\">")
+    checker = var.get("evaluator") or var.get("name")
+    return "[_]{" + checker + "}{" + var.get("width", "10") + "}"
+
+
+def inline(el, blanks=True):
+    """The inline content of a <p>, <cell> or <instruction>, as PGML.
+
+    blanks=False is passed down from a solution: see answer_blank().
+    """
+    out = pgml_escape(el.text or "")
+    for child in el:
+        if child.tag == "m":
+            # \amp is PreTeXt's & (a bare & is not legal XML): 1.4 writes its
+            # \begin{cases} functions inline, with one between formula and condition.
+            out += "[`" + math_text(child).replace(r"\amp", "&") + "`]"
+        elif child.tag == "md":
+            # Display math breaks the paragraph, as it does in the book. A full
+            # stop or comma straight after it belongs to the display, or it
+            # would be left as a paragraph of its own.
+            tail = (child.tail or "").strip()
+            punctuation = tail if tail in (".", ",") else ""
+            out += "\n\n[``" + display_math(child, punctuation) + "``]\n\n"
+            if punctuation:
+                continue
+        elif child.tag == "xref":
+            if child.get("ref") not in XREFS:
+                raise ValueError(f"<xref ref=\"{child.get('ref')}\"> has no wording")
+            out += XREFS[child.get("ref")]
+        elif child.tag == "var":
+            out += answer_blank(child, blanks)
+        elif child.tag == "c":
+            out += "[|" + (child.text or "") + "|]"
+        elif child.tag == "q":
+            out += '"' + inline(child, blanks) + '"'
+        elif child.tag == "em":
+            out += "_" + inline(child, blanks) + "_"
+        else:
+            raise ValueError(f"unexpected inline <{child.tag}>")
+        out += pgml_escape(child.tail or "")
+    # XML indentation is not meaningful; paragraph breaks from <md> are.
+    parts = [re.sub(r"\s+", " ", part).strip() for part in out.split("\n\n")]
+    return "\n\n".join(part for part in parts if part)
+
+
+def table(tabular, blanks=True):
+    """A <tabular> as a PGML table: [. cell .] ... * ends a row."""
+    rows = tabular.findall("row")
+    ncols = len(rows[0].findall("cell"))
+    lines = ["[#"]
+    for row in rows:
+        cells = " ".join("[." + inline(cell, blanks) + ".]" for cell in row.findall("cell"))
+        end = "*{ headerrow => 1 }" if row.get("header") == "yes" else "*"
+        lines.append("    " + cells + end)
+    align = "|" + "|".join("c" * ncols) + "|"
+    lines.append("#]{ center => 1, horizontalrules => 1, align => '" + align + "' }")
+    return "\n".join(lines)
+
+
+def description_text(description):
+    """An image's <description>, as the body of a double-quoted Perl string.
+
+    PG's image() takes it as long_description: an "image description" button
+    under the graph on screen, and printed under it in a hardcopy. So it must
+    read in both -- no HTML. Paragraphs are joined with $PAR, list items start
+    on a $BR, and math is \\(...\\) with each <var> left for Perl to interpolate.
+    """
+
+    def flat(el):
+        out = el.text or ""
+        for child in el:
+            if child.tag == "m":
+                out += r"\(" + math_text(child, pgml=False) + r"\)"
+            elif child.tag == "ol":
+                for i, li in enumerate(child.findall("li"), start=1):
+                    out += f"${{BR}}{i}. " + flat(li)
+            else:
+                raise ValueError(f"unexpected <{child.tag}> in an image description")
+            out += child.tail or ""
+        return re.sub(r"\s+", " ", out).strip()
+
+    text = "$PAR ".join(flat(p) for p in description.findall("p"))
+    # Neither can be backslashed: PG doubles the backslash first.
+    assert '"' not in text and "@" not in text, "image description needs quoting"
+    return text
+
+
+class Images:
+    """Collects the Perl that builds each <latex-image>, for the setup section."""
+
+    def __init__(self):
+        self.perl = []
+
+    def add(self, image, statement=False):
+        if statement:
+            return self.add_statement_graph(image)
+        n = len(self.perl) + 1
+        name = "$solutionGraph" if n == 1 else f"$solutionGraph{n}"
+        tex = dedent(image.find("latex-image").text)
+        # An interpolating heredoc, so $f and $xmin reach the TeX as values.
+        # PG doubles every backslash before Perl sees the file, so TeX's
+        # single backslashes survive the interpolation unharmed.
+        self.perl.append(
+            f"{name} = createLaTeXImage();\n"
+            f"{name}->texPackages([['xcolor', 'dvipsnames'], 'pgfplots']);\n"
+            f"{name}->addToPreamble($apexImagePreamble);\n"
+            f"{name}->tex(<<END_LATEX_IMAGE);\n{tex}\nEND_LATEX_IMAGE"
+        )
+        # Alt text is the book's <shortdescription>, variables substituted.
+        short = image.find("shortdescription")
+        alt = short.text or ""
+        for child in short:
+            alt += "[" + child.get("name") + "]" + (child.tail or "")
+        alt = re.sub(r"\s+", " ", alt).strip()
+        return ">>[!" + alt + "!]{" + name + "}{400}<<"
+
+    def add_statement_graph(self, image):
+        """A graph the QUESTION is read off (1.4's 5-12), not one in a solution.
+
+        The book gives these a <shortdescription> that only names the exercise
+        and a <description> that says what is drawn. Both are carried: the first
+        as the alt text, the second as PG's long_description, because a reader
+        who cannot see the graph has nothing else to answer from.
+        """
+        if self.perl:
+            raise ValueError("a second statement graph: name it before converting")
+        tex = dedent(image.find("latex-image").text)
+        self.perl.append(
+            "$graph = createLaTeXImage();\n"
+            "$graph->texPackages([['xcolor', 'dvipsnames'], 'pgfplots']);\n"
+            "$graph->addToPreamble($apexImagePreamble);\n"
+            f"$graph->tex(<<END_LATEX_IMAGE);\n{tex}\nEND_LATEX_IMAGE\n\n"
+            f'$graphDescription = "{description_text(image.find("description"))}";'
+        )
+        alt = re.sub(r"\s+", " ", image.find("shortdescription").text).strip()
+        # Named options: PGML fills positional ones in order, and an empty {}
+        # cannot stand in for the height that sits before long_description.
+        return (">>[!" + alt + "!]"
+                "{ source => $graph, width => 400, long_description => $graphDescription }<<")
+
+
+def block(el, images, statement=False, blanks=True):
+    """The block content of a <statement>, <introduction> or <solution>, as PGML paragraphs."""
+    out = []
+    for child in el:
+        if child.tag in ("p", "instruction"):
+            out.append(inline(child, blanks))
+        elif child.tag == "tabular":
+            out.append(table(child, blanks))
+        elif child.tag == "image":
+            out.append(images.add(child, statement))
+        else:
+            raise ValueError(f"unexpected block <{child.tag}>")
+    return "\n\n".join(out)
+
+
+def tasks(ww):
+    """The <task>s of a multi-part exercise, as a PGML lettered list.
+
+    1.4's exercises have no <statement> of their own: an <introduction> shows
+    the function, and each <task> is one expression to evaluate with its answer
+    blank. PGML letters a list whose lines begin "a. ", so a task is one line:
+    its paragraphs, joined.
+    """
+    lines = []
+    for letter, task in zip("abcdefgh", ww.findall("task")):
+        paragraphs = list(task.find("statement"))
+        if any(p.tag != "p" for p in paragraphs):
+            raise ValueError("a <task> holding more than paragraphs")
+        lines.append(f"{letter}. " + " ".join(inline(p) for p in paragraphs))
+    if len(lines) != len(ww.findall("task")):
+        raise ValueError("more than eight <task>s: 'i. ' would start a roman list")
+    return "\n\n".join(lines)
+
+
+def macros_for(code, images):
+    """The macro files the setup code needs, found by what it calls."""
+    macros = ["PGstandard.pl", "PGML.pl"]
+    needs = [
+        ("MultiAnswer", "parserMultiAnswer.pl"),
+        ("PiecewiseFunction", "contextPiecewiseFunction.pl"),
+        ("Fraction", "contextFraction.pl"),
+        ("OneOf", "parserOneOf.pl"),
+        ("PopUp", "parserPopUp.pl"),
+        ("explanation_box", "PGessaymacros.pl"),
+    ]
+    macros += [file for word, file in needs if word in code]
+    if images.perl:
+        macros.append("PGlateximage.pl")
+    return macros + ["PGcourse.pl"]
+
+
+def convert(exercise, number, intro, meta, args):
+    """One <exercise> with a <webwork> inside, as the text of a .pg file."""
+    ww = exercise.find("webwork")
+    label = exercise.get("label")
+    code = dedent(ww.find("pg-code").text)
+    images = Images()
+    if ww.find("statement") is not None:
+        statement = block(ww.find("statement"), images)
+    else:
+        # Multi-part: what the parts share, then the parts.
+        statement = block(ww.find("introduction"), images, statement=True) + "\n\n" + tasks(ww)
+    solution = ww.find("solution")
+    solution = block(solution, images, blanks=False) if solution is not None else None
+
+    loads = ",\n".join(f"    '{m}'" for m in macros_for(code, images))
+    tags = "## DBsubject(Calculus - single variable)\n"
+    if args.dbchapter:
+        tags += f"## DBchapter({args.dbchapter})\n"
+
+    src = f"""## DESCRIPTION
+## APEX Calculus {meta['section']}, {meta['title']}: exercise {number}.
+## ENDDESCRIPTION
+
+# UPSTREAM-PTX: ptx/{meta['file']}, label {label}, commit {meta['commit']}
+
+{tags}## KEYWORDS('limit')
+## Author(Gregory Hartman et al.)
+## Institution(APEX Calculus, https://github.com/APEXCalculus/APEXCalculusPTX)
+## TitleText1('APEX Calculus')
+## AuthorText1('Gregory Hartman et al.')
+## Section1('{meta['section']}')
+## Problem1('{number}')
+
+DOCUMENT();
+
+loadMacros(
+{loads}
+);
+
+Context('Numeric');
+
+{code}
+"""
+    if images.perl:
+        # A q^...^ string, NOT a <<'...' heredoc: PG doubles every backslash in
+        # the file before Perl runs it, and a quoted string collapses \\ back to
+        # \ while a single-quoted heredoc is fully literal. Found on the server:
+        # TeX got \\usepackage, a line break, and printed the preamble as text.
+        assert "^" not in meta["preamble"], "preamble contains the q^...^ delimiter"
+        src += "\n" + PREAMBLE_COMMENT + "$apexImagePreamble = q^\n" + meta["preamble"] + "\n^;\n\n"
+        src += "\n\n".join(images.perl) + "\n"
+    src += "\nBEGIN_PGML\n" + intro + "\n\n" + statement + "\nEND_PGML\n"
+    if solution:
+        src += "\nBEGIN_PGML_SOLUTION\n" + solution + "\nEND_PGML_SOLUTION\n"
+    return label, src + "\nENDDOCUMENT();\n"
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Convert an APEX section's embedded WeBWorK exercises to .pg files."
+    )
+    parser.add_argument("section", help="sec_*.ptx path, or its bare name")
+    parser.add_argument("--number", required=True, metavar="N.M", help="the section's number in the book")
+    parser.add_argument("--list", action="store_true", help="list the exercises; write nothing")
+    parser.add_argument("--out", type=pathlib.Path, help="directory to write LABEL.pg files into")
+    parser.add_argument("--only", action="append", default=[], metavar="PREFIX",
+                        help="convert only labels starting with PREFIX (repeatable)")
+    parser.add_argument("--dbchapter", help="OPL Taxonomy chapter for the ## DBchapter tag")
+    args = parser.parse_args()
+    if not args.list and not args.out:
+        parser.error("give --out DIR, or --list")
+
+    path = pathlib.Path(args.section).expanduser()
+    if not path.exists():
+        path = CLONE / "ptx" / (args.section.removesuffix(".ptx") + ".ptx")
+    root = ET.parse(path).getroot()
+
+    # A section's number is not in its own file -- the chapter file includes the
+    # sections in order -- so it is given on the command line instead.
+    commit = subprocess.run(["git", "-C", str(CLONE), "rev-parse", "HEAD"],
+                            capture_output=True, text=True, check=True).stdout.strip()
+    docinfo = ET.parse(CLONE / "ptx" / "docinfo.ptx").getroot()
+    preamble = docinfo.find(".//latex-image-preamble[@component='color']")
+    meta = {
+        "title": root.find("title").text,
+        "file": path.name,
+        "commit": commit,
+        "section": args.number,
+        "preamble": dedent(preamble.text),
+    }
+
+    XREFS[root.get(XMLID)] = f"Section {args.number}"
+
+    exercises = root.find("exercises")
+    # ElementTree has no parent pointers, so build the map once.
+    parent = {child: el for el in exercises.iter() for child in el}
+    # Number in DOCUMENT order, which is the book's. Walking group by group is
+    # not the same thing: 1.3's last exercise sits directly in its <subexercises>
+    # after the <exercisegroup>s, and a group-first walk numbered it 7, not 43.
+    for number, exercise in enumerate(exercises.iter("exercise"), start=1):
+        if exercise.find("webwork") is None:
+            continue
+        label = exercise.get("label")
+        if args.only and not any(label.startswith(p) for p in args.only):
+            continue
+        group = parent[exercise]
+        if args.list:
+            print(f"{number:3d}  {label:45s} {group.get(XMLID, '')}")
+            continue
+        # A group's <introduction> is its direction line ("Approximate the
+        # limit ..."), which the book prints once and a .pg must repeat.
+        intro = group.find("introduction")
+        intro = inline(intro.find("p")) if intro is not None else ""
+        label, src = convert(exercise, number, intro, meta, args)
+        args.out.mkdir(parents=True, exist_ok=True)
+        (args.out / f"{label}.pg").write_text(src)
+        print(f"wrote {args.out / (label + '.pg')}")
+
+
+XMLID = "{http://www.w3.org/XML/1998/namespace}id"
+
+PREAMBLE_COMMENT = '# The book\'s image styles (docinfo.ptx). A q^...^ string, not a <<\'...\' heredoc:\n# PG doubles every backslash before Perl runs, and only a quoted string\n# collapses them again -- a single-quoted heredoc is fully literal, so TeX\n# got \\\\usepackage, a line break and the word "usepackage".\n'
+
+if __name__ == "__main__":
+    sys.exit(main())

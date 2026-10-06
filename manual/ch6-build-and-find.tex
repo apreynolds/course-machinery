@@ -33,6 +33,12 @@ the repo nor the output directory -- keyed by the directory's repo-relative
 path, so two topics' same-named \file{problems/} folders never share
 latexmk state.
 
+That folder is shared with anything else that compiles the same document -- an editor's own compile, a bare latexmk wrapper -- and latexmk keeps one record in it.
+The record is shared but the PDF's destination is not: those tools leave the PDF beside the source, while \file{build-pdfs} may send it to a mirror (below).
+latexmk calls a document up to date when no input has changed since the recorded run and the PDF it is asked for exists, so after a local build of an edited source it would leave the \emph{previous} PDF in the mirror and still report success.
+\file{build-pdfs} therefore reads where the recorded run wrote its PDF, and when that is not where this run will write it, forces the build and says so (\texttt{rebuilding: \dots}).
+The one visible effect is that a save which changes nothing can still compile, once.
+
 \subsubsection{Views: one source, several PDFs}
 
 A magic comment in a source's \emph{leading} comment block (it must precede
@@ -75,7 +81,7 @@ A second key lives in the same leading block:
 %! coverpage: yes
 \end{manexsource}
 
-\noindent That writes \file{FILE_COVERPAGE.pdf} as well --- page~1 of the
+\noindent That writes \file{FILE-COVERPAGE.pdf} as well --- page~1 of the
 finished PDF on its own, for printing an assessment's cover separately from
 the paper behind it (section~\ref{sec:assessments} has the assessment-side
 account). \texttt{no}, or no line at all, is off; any other value warns.
@@ -139,6 +145,19 @@ copy never adds a build -- and the arrow is deliberate: its left side is a view
 name, its right a label, so nothing has to be guessed. (An older source may
 still carry the destination as a \texttt{:LABEL} suffix on the views line. It
 builds the view and warns you where the copy moved to.)
+
+The cover page is the one PDF that is neither \env{default} nor a view, so it
+has a name of its own on the copies line:
+
+\begin{manexsource}
+%! coverpage: yes
+%! copies: coverpage-->Print-shop
+\end{manexsource}
+
+\noindent That sends \file{FILE-COVERPAGE.pdf} to the labelled directory as
+well as the mirror. The same rule holds as for a view: the copies line never
+\emph{makes} a PDF, so without \texttt{\%! coverpage: yes} the entry warns and
+sends nothing. It can carry a date like any other entry.
 
 \paragraph{Holding a copy until a date.}
 Where a PDF goes and \emph{when} it may go are also different questions, and the

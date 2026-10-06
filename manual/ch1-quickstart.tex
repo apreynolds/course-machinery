@@ -7,20 +7,21 @@ reference layout:
 \begin{manexsource}
 course-demo/
   .course-machinery/        the toolkit (classes, packages, scripts)
-  .course-machinery-local/  machinery for THIS course, shared across files
-    books.tex               the book registry: every book the course names,
-                            with its title and URLs. Loaded into EVERY
-                            document, whole
-    textbook.tex            the text layer: what a book NAMES things -- the
-    openstax.tex            vocabulary, which is exclusive. The first is the
-                            course default; a second file is a second book,
+    texts/                  facts about textbooks, shared by every course:
+      books.tex             the book registry: each book's title and URLs.
+                            Loaded into EVERY document, whole
+      apex.tex ...          one text layer per book: what that book NAMES
+                            things -- its vocabulary, which is exclusive
+  course-info/              what is THIS course's own; visible on purpose
+    textbook.tex            the demo's own text layer, and its default
+    openstax.tex            a second, for chapters from another book,
                             chosen per document with \usetext
   .MIRRORDIR                optional PDF mirror destination
   derivatives/              a topic (a course has several, same shape)
     problems/               problem bank: one problem per file
-    lectures/               LectureNotes masters (+ .latexmkrc, which puts both
-                            machinery folders on TEXINPUTS; build-pdfs installs
-                            it, one identical copy per build directory)
+    lectures/               LectureNotes masters (+ .latexmkrc, which puts the
+                            machinery and course-info/ on TEXINPUTS; build-pdfs
+                            installs it, one identical copy per build directory)
     facts/                  fact bank: one tagged snippet per file
     images/
   _assessment/              Assessment masters (+ .latexmkrc)
@@ -54,8 +55,8 @@ Documents name their class plainly -- \cs{documentclass}\texttt
 {\{LectureNotes\}} -- and never spell out where it lives. The
 \file{.latexmkrc} in each \file{.tex}-holding directory makes that work: it
 walks up to the repo root and puts \file{.course-machinery//} and
-\file{.course-machinery-local/} on \env{TEXINPUTS} for that build --- the
-two tiers of machinery that are shared across files. Everything else a
+\file{course-info/} on \env{TEXINPUTS} for that build --- the
+two places a file is found by bare name. Everything else a
 document loads sits beside it and is found in the cwd
 (section~\ref{sec:extending}). The copies are identical, and you never plant
 them yourself: latexmk reads only the rc in its startup directory and never
@@ -68,16 +69,25 @@ source serves every consumer. A lecture and the quiz pull the \emph{same}
 beside it, \file{../derivatives/problems/} from the repo root -- and any
 images that file loads resolve against the \emph{file's own} directory.
 
-The course-wide content files are two, and the split between them is the
-one thing worth learning early. \file{.course-machinery-local/textbook.tex}
-is the \emph{text layer}: what the book \emph{names} things --- the result
+\file{course-info/} is the course's own folder.
+In a real course it holds the facts about one offering --- sections, rooms, dates, instructors --- as plain data files, with the packages that turn them into tables.
+It is visible because colleagues edit it, and it is the one folder to copy and edit for a new term.
+The demo keeps its text layer there.
+
+The textbook files are of two kinds, and the split between them is the
+one thing worth learning early. A \emph{text layer} (\file{textbook.tex}
+in the demo) says what a book \emph{names} things --- the result
 boxes it uses (APEX's ``Key Idea''), the noun lectures call an example.
 That is \emph{exclusive}, since a document cannot use two vocabularies at
 once, so \cs{usetext} picks exactly one.
-\file{.course-machinery-local/books.tex} is the \emph{book registry}:
+\file{texts/books.tex} is the \emph{book registry}:
 each book's title, publisher and URLs. That is not exclusive at all --- a
 syllabus names every book the course uses --- so it is loaded into every
 document, whole.
+
+Text layers ordinarily live in \file{texts/} in the machinery, one file per book and named for the book, because a book's vocabulary is the same in every course that teaches from it.
+A course teaching from a book already there writes \cs{usetext}\texttt{\{apex\}} and keeps no file of its own.
+The demo keeps its own two in \file{course-info/}, which is searched first, so that the whole mechanism can be read in one repository.
 
 Masters \cs{input} neither --- both are found by name and loaded
 automatically, so a lecture may sit at any depth and a new master cannot

@@ -22,14 +22,15 @@ views & \texttt{\%!\ views: solutions, hints, projector, instructor} in
 copies & \texttt{\%!\ copies: default-->TAs, instructor-->TA-dir(from
   2026-10-01)} in the same block drops those PDFs, flat, into the named
   \file{.MIRRORDIR} destinations, on top of the mirror. \env{default} is
-  the base PDF; any other name must also be on the views line.
+  the base PDF; \env{coverpage} is \file{FILE-COVERPAGE.pdf} and needs
+  the coverpage line below; any other name must also be on the views line.
   \texttt{(from \emph{date})} holds a copy until that day (inclusive):
   the build will not send it early, and the end-of-run sweep sends it
   once the date arrives. Anything malformed warns and sends nothing. A
   legacy \texttt{:LABEL} suffix on the views line warns and does not
   copy.\\
 coverpage & \texttt{\%!\ coverpage: yes} in the same block also writes
-  \file{FILE_COVERPAGE.pdf}, page~1 of the finished PDF on its own. From
+  \file{FILE-COVERPAGE.pdf}, page~1 of the finished PDF on its own. From
   the base build only, never a view; same mirror handling as that PDF.
   \texttt{no} or no line is off, any other value warns. Needs
   \texttt{gs}; without it the extract is skipped and the build still
@@ -40,7 +41,8 @@ output & nearest ancestor \file{.MIRRORDIR} (bare base path $+$ optional
   \texttt{LABEL: path} lines are the address book the \texttt{copies} row
   draws on (each must exist). \file{SAMPLE-MIRRORDIR} is the template.\\
 aux files & \file{~/.cache/latexmk/}$\langle$\emph{repo-relative
-  key}$\rangle$-$\langle$\emph{job}$\rangle$.\\
+  key}$\rangle$-$\langle$\emph{job}$\rangle$.
+  Shared with other tools that compile the document; the base build is forced when the last build recorded there wrote its PDF somewhere else.\\
 \file{.latexmkrc} & installed in each source's directory from
   \file{latexmkrc-shared} before compiling, when missing or out of date.
   A copy without the \texttt{managed by build-pdfs} marker line counts as
@@ -57,8 +59,8 @@ build-images [OPTIONS] FILE.tex ...
 One problem file in, one picture out --- for a learning-management system whose
 question pools take an image rather than text. Each input yields
 \file{NAME.pdf} and \file{NAME.png} (the question alone), plus
-\file{NAME\_SOLUTIONS.pdf} and \file{NAME\_SOLUTIONS.png} (the question with its
-worked solution), not build-pdfs' \file{-SOLUTIONS}.
+\file{NAME-SOLUTIONS.pdf} and \file{NAME-SOLUTIONS.png} (the question with its
+worked solution), reusing build-pdfs' view suffix.
 
 Those four are two independent choices, each defaulting to both, so any single
 output can be asked for on its own: \texttt{-{}-no-question} and
@@ -199,3 +201,34 @@ key schema; the reading, matching and emitting are written once. A blockless
 kind takes its own exit straight after the directory walk, so it never reaches
 either of the two block parsers. Run any shim with \texttt{-{}-help} for its concrete
 flags.
+
+\subsection*{admin/test-admin and attendance.sty}
+
+Everything a test needs on paper, in one sitting: the per-section attendance sheets, the print order, and which booklets go in which TA's envelope.
+Run it once per test, from the course's own checkout:
+
+\begin{manexsource}
+.course-machinery/admin/test-admin N [--yes] [--dry-run] [--force]
+\end{manexsource}
+
+\texttt{-{}-dry-run} goes through every step and writes nothing; \texttt{-{}-yes} answers every question with its default.
+The script is Python and declares its one dependency inline, so \texttt{uv} builds its environment on first run.
+
+It holds no fact about any one course.
+It finds the course by walking up from its own location to the first directory that holds a \file{course-info/} --- not the first that holds \file{.git}, which inside a submodule would be the machinery itself --- and reads everything from there:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\file{admin-settings.csv} & columns \texttt{setting}, \texttt{value}: \texttt{course\_number}, and \texttt{team\_dir}, the team's shared folder relative to the home directory.\\
+\file{course-sections.csv} & one row per section: its enrolment, day, room, instructor and TA.\\
+\file{print-job.csv} & the print order's fixed answers and policy numbers.\\
+\file{calendar-dates.csv} & optional; supplies the test dates.\\
+\end{tabularx}
+\end{center}
+
+Three things are still assumed in the script and are stated in its header: the subject \texttt{MATH}, Tuesday and Thursday sittings, and \file{TESTS/ADMIN/} as the directory the sheet is built in.
+
+\file{admin/attendance.sty} is the sheet's layout: one page per section, a ruled list of names with a column to tick.
+It reads no data file.
+\texttt{test-admin} writes a document that is a run of \env{attendancesheet} environments with one \cs{Student} line per name, and that generated file holds student names, so a course should git-ignore it.
+The package takes the course's name from the course's own \file{courseinfo.sty}.

@@ -83,7 +83,7 @@
 
 % \textbookref -- links into the course text. Mechanism only: the base URL and the
 % section manifest are course data, declared in the course's own text layer
-% (.course-machinery-local/textbook.tex).
+% (texts/ here, or a course's own file in its course-info/).
 % Inert until that file is \input; unresolved references print as plain text.
 \RequirePackage{TextRef}
 
@@ -113,7 +113,7 @@
 % The noun is a per-TEXT choice -- texts variously say Example / Exercise /
 % Problem, and the notes should echo whichever the students are reading. A course
 % overrides it by redefining \NotesProblemLabelWord (its home is the text layer,
-% .course-machinery-local/textbook.tex). We route \ProblemLabelWord through that
+% texts/ here, or a course's own file in its course-info/). We route \ProblemLabelWord through that
 % macro rather than setting the word directly, so a text layer shared with an
 % ASSESSMENT document can retune the notes noun without disturbing
 % Assessment.cls's fixed "Q"
@@ -427,6 +427,10 @@
 % under a title it said nothing, and it cost enough height to push a full list
 % onto a second page.
 %
+% A titled first page drops the running head (style lecturefirst, under HEADERS):
+% the title says the same thing, larger, just below it. An untitled lecture keeps
+% its head -- it has nothing else to say what it is.
+%
 % \@starttoc{toc} is the list without \tableofcontents' \section* heading.
 %
 % The trailing \clearpage does not risk a blank page when the first \subsection
@@ -434,6 +438,7 @@
 \newcommand{\LectureTitleFont}{\sffamily\bfseries\LARGE}
 \newcommand{\lecturetoc}{%
   \ifdefempty{\BookSectionTitle}{}{%
+    \thispagestyle{lecturefirst}%
     {\noindent\LectureTitleFont
      \ifdefempty{\BookSectionNumber}{}{\BookSectionNumber\quad}%
      \BookSectionTitle\par}%
@@ -448,8 +453,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % The head carries the lecture's \booksection coordinate -- "2.5: The Chain
 % Rule", linked to that section of the book (TextRef.sty). It is the document's
-% title as well as its running head, which is why it repeats on every page
-% instead of sitting once at the top: a lecture is read a page at a time, and on
+% title as well as its running head, which is why it repeats on every page after
+% the first (whose printed title \lecturetoc supplies) instead of sitting once at
+% the top: a lecture is read a page at a time, and on
 % the projector copy -- scrolled rather than paged -- persistent orientation is
 % worth more than anywhere else. (Page NUMBERS are a different matter and are
 % still dropped there: the copy is never collated, so a number is noise. That is
@@ -479,4 +485,12 @@
   \fancyfoot[C]{\small\thepage}
 \fi
 \pagestyle{fancy}
+
+% The titled first page (\lecturetoc): the big title below would only repeat the
+% head, so this style drops the head and its rule and keeps the foot. Based on
+% [fancy] explicitly, so the page number survives on the handout.
+\fancypagestyle{lecturefirst}[fancy]{%
+  \fancyhead{}%
+  \renewcommand{\headrule}{}%
+}
 

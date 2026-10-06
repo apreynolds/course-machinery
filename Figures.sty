@@ -1,0 +1,227 @@
+\ProvidesPackage{Figures}[2026/10/02 TikZ/pgfplots figures: the load and the plot-style vocabulary]
+
+%%% ===========================================================================
+%%% Figures -- everything a DRAWN figure needs: TikZ, pgfplots, and one shared
+%%% vocabulary of plot styles (curve styles, solid and hollow dots, asymptotes,
+%%% arrow tips), so that every graph in every course looks like its neighbours.
+%%%
+%%% OPT-IN, AND THAT IS THE POINT OF IT BEING A PACKAGE. No class loads this.
+%%% A document that draws says so:
+%%%
+%%%     \usepackage{Figures}
+%%%
+%%% pgfplots is the heaviest thing in the toolkit by a wide margin -- it adds
+%%% seconds to every compile, and every plot adds more -- so a lecture with no
+%%% graphs must not pay for it. This is the rule MathStuff.sty states from the
+%%% other side: notation is free and always loaded; anything that has to
+%%% \RequirePackage something nontrivial stays behind its own opt-in .sty.
+%%%
+%%% A FIGURE IS A FILE. The convention this package serves:
+%%%
+%%%     <topic>/figures/<slug>.tex      one tikzpicture, nothing else
+%%%
+%%% pulled in with a plain \import{../figures/}{<slug>.tex}. `figures/' is for
+%%% LaTeX that draws something -- not `images/' (raster) and not `passages/'
+%%% (prose). `import' resolves relative to the consuming file, so the same
+%%% figure works from a lecture and from a problem file.
+%%%
+%%% WHERE THE VOCABULARY CAME FROM. The style names below are APEX Calculus's,
+%%% taken from the <latex-image-preamble> in that book's ptx/docinfo.ptx. That
+%%% is deliberate rather than lazy: every figure in APEX is pgfplots source
+%%% written against exactly these names, so with this package loaded an APEX
+%%% figure compiles VERBATIM -- no translation step, nothing to drift. The
+%%% names are also simply good ones (soliddot, hollowdot, asymptote,
+%%% tangentline), so figures drawn from scratch use them too.
+%%%
+%%% !! LICENCE. APEX Calculus is CC BY-NC 4.0 (Hartman et al.; the PreTeXt
+%%% !! edition is the University of Lethbridge's). The style definitions in
+%%% !! sections 3-6 are adapted from it. Keep this attribution with them, and
+%%% !! keep a source line on any figure file whose code is APEX's.
+%%%
+%%% WHAT WAS LEFT BEHIND, on purpose. APEX's preamble also loads tikz-cd,
+%%% tkz-euclide and the shapes / decorations / shadows / fadings / matrix /
+%%% positioning TikZ libraries, plus the polar and decorations.softclip
+%%% pgfplots libraries. None is needed by a function graph, each costs load
+%%% time, and a figure that wants one can \usetikzlibrary it at the top of its
+%%% own file. It also redefines the colour `magenta' globally and carries a
+%%% TeX Live 2019 workaround for circles; neither is wanted here. Section 2
+%%% lists what IS loaded and what first needed it.
+%%%
+%%% COLOUR. The web edition's palette: blue, red, magenta. APEX also ships a
+%%% greyscale set for print (black, 50% and 30% grey); switching is the three
+%%% \colorlet lines in section 3 and nothing else, because every style below
+%%% is written in terms of firstcolor / secondcolor / thirdcolor.
+%%%
+%%% CONTRACT (load order): none beyond "after the class". xcolor is already
+%%% loaded by every course class; pgfplots brings tikz with it.
+%%% ===========================================================================
+
+
+%%% --- 1. The load --------------------------------------------------------------
+\RequirePackage{pgfplots}
+
+% compat is not optional: without it pgfplots runs in a backwards-compatibility
+% mode AND says so with a warning on every build, which breaks the zero-warning
+% bar. Pinned to a version rather than `newest', so that a TeX Live upgrade
+% cannot quietly move every label in every figure.
+\pgfplotsset{compat=1.18}
+
+
+%%% --- 2. Libraries --------------------------------------------------------------
+% arrows.meta   the Kite, Circle, Parenthesis and Bracket tips used by the
+%               arrow and endpoint styles in section 5.
+% fillbetween   shading the region between two curves (area figures).
+\usetikzlibrary{arrows.meta}
+\usepgfplotslibrary{fillbetween}
+
+
+%%% --- 3. Colours ----------------------------------------------------------------
+% Three roles, not three colours: a figure says `firstcolor', never `blue', so
+% the palette is changed here and nowhere else. A document can also \colorlet
+% any of these after loading the package.
+%
+% thirdcolor is APEX's own darker magenta. APEX gets it by redefining the
+% colour `magenta' itself; it is given directly here so that `magenta' still
+% means magenta everywhere else in a document.
+\colorlet{firstcolor}{blue}
+\colorlet{secondcolor}{red}
+\definecolor{thirdcolor}{rgb}{0.79216,0.12156,0.48236}
+% Greyscale, for print:
+%   \colorlet{firstcolor}{black}
+%   \colorlet{secondcolor}{black!50!white}
+%   \colorlet{thirdcolor}{black!30!white}
+
+% Three more, named for what they paint rather than for a role: the little
+% scenes in APEX's optimization and related-rates figures (a tree, a fence, a
+% field). Defined because those figures do not compile without them.
+\colorlet{treestump}{brown}
+\colorlet{treetop}{green!50!black}
+\colorlet{yellowcolfill}{yellow}
+
+
+%%% --- 4. Curves -----------------------------------------------------------------
+% The first, second and third curve on one axis. They differ in DASH PATTERN as
+% well as colour, so two curves stay distinguishable in greyscale and to a
+% colour-blind reader.
+\pgfplotsset{
+  firstcurvestyle/.style  = {color=firstcolor,  mark=none, thick, -, solid},
+  secondcurvestyle/.style = {color=secondcolor, mark=none, thick, -, dashdotted},
+  thirdcurvestyle/.style  = {color=thirdcolor,  mark=none, thick, -, dashdotdotted},
+  % A filled region: \addplot[areastyle] ... \closedcycle, or with fillbetween.
+  areastyle/.style        = {fill, opacity=0.5, draw=none},
+}
+
+% The cycle list is what makes a bare \addplot or \addplot+ pick these up in
+% order -- which is why most figure files never name a curve style at all.
+\pgfplotscreateplotcyclelist{curvestylelist}{%
+  firstcurvestyle\\%
+  secondcurvestyle\\%
+  thirdcurvestyle\\%
+}
+
+
+%%% --- 5. Lines, dots and endpoints ----------------------------------------------
+% Straight lines that are ABOUT a curve rather than being one. The ...seg
+% variants are the same line without the arrow tips: a segment, not a line.
+\pgfplotsset{
+  tangentline/.style    = {color=black, mark=none, thick, {Kite}-{Kite}, solid},
+  tangentlineseg/.style = {color=black, mark=none, thick, -, solid},
+  normalline/.style     = {color=black, mark=none, thick, {Kite}-{Kite}, dashed},
+  normallineseg/.style  = {color=black, mark=none, thick, -, dashed},
+  secantline/.style     = {color=black, mark=none, thin, {Kite}-{Kite}, dashed},
+  secantlineseg/.style  = {color=black, mark=none, thin, -, dashed},
+  asymptote/.style      = {color=black, mark=none, thick, {Kite}-{Kite}, dashed},
+  lineseg/.style        = {color=black, mark=none, solid},
+  guideline/.style      = {color=black, mark=none, -},
+  symmetryline/.style   = {color=black, mark=none, -, dashed},
+}
+
+% Points. `only marks' means the coordinates are NOT joined up:
+%   \addplot[soliddot]  coordinates {(0,0) (1,1)};   the function is defined here
+%   \addplot[hollowdot] coordinates {(1,2)};         the curve heads here, but is not here
+\pgfplotsset{
+  soliddot/.style   = {color=firstcolor, fill=firstcolor, only marks, mark=*},
+  hollowdot/.style  = {color=firstcolor, fill=white,      only marks, mark=*},
+  squaremark/.style = {color=black, fill=black, only marks, mark size=6pt, mark=square*},
+}
+
+% Arrow tips, added to a curve to say what happens at its ends. A Kite is "it
+% carries on"; a Circle is an endpoint, filled if included and open if not.
+% The `shorten' on the Circle styles pulls the tip back by its own radius, so
+% the circle is CENTRED on the endpoint rather than hanging off the end of it.
+\pgfplotsset{
+  leftarrow/.style      = {{Kite}-},
+  rightarrow/.style     = {-{Kite}},
+  infinite/.style       = {{Kite}-{Kite}},
+  infiniteleft/.style   = {{Kite}-},
+  infiniteright/.style  = {-{Kite}},
+  open/.style           = {shorten <=-2.4pt, shorten >=-2.4pt, {Circle[open]}-{Circle[open]}},
+  openclosed/.style     = {shorten <=-2.4pt, shorten >=-2.4pt, {Circle[open]}-{Circle}},
+  closed/.style         = {shorten <=-2.4pt, shorten >=-2.4pt, {Circle}-{Circle}},
+  closedopen/.style     = {shorten <=-2.4pt, shorten >=-2.4pt, {Circle}-{Circle[open]}},
+  infiniteopen/.style   = {shorten >=-2.4pt, {Kite}-{Circle[open]}},
+  openinfinite/.style   = {shorten <=-2.4pt, {Circle[open]}-{Kite}},
+  infiniteclosed/.style = {shorten >=-2.4pt, {Kite}-{Circle}},
+  closedinfinite/.style = {shorten <=-2.4pt, {Circle}-{Kite}},
+  openleft/.style       = {shorten <=-2.4pt, {Circle[open]}-},
+  openright/.style      = {shorten >=-2.4pt, -{Circle[open]}},
+  closedleft/.style     = {shorten <=-2.4pt, {Circle}-},
+  closedright/.style    = {shorten >=-2.4pt, -{Circle}},
+}
+
+% Intervals drawn on a number line, in the usual bracket notation.
+\pgfplotsset{
+  openinterval/.style   = {color=black, mark=none, ultra thick,
+                           shorten <=-2.4pt, shorten >=-2.4pt, {Parenthesis}-{Parenthesis}},
+  closedinterval/.style = {color=black, mark=none, ultra thick,
+                           shorten <=-2.4pt, shorten >=-2.4pt, {Bracket}-{Bracket}},
+}
+
+
+%%% --- 6. Axes -------------------------------------------------------------------
+% THE HOUSE DEFAULT FOR EVERY AXIS, and the one part of this package that
+% changes pgfplots' behaviour without being asked: `every axis' applies to any
+% axis environment in a document that loads Figures.
+%
+% It is what makes a figure file short. With these in force a graph needs only
+% its window (xmin, xmax, ymin, ymax) and its \addplot lines:
+%
+%   axis lines through the origin, as on a blackboard, not a box around the plot;
+%   the axes labelled x and y;
+%   one unlabelled minor tick between each pair of labelled ones;
+%   curves styled from the cycle list in section 4.
+%
+% Any of it is overridden per axis in the usual way -- xlabel={$t$} and so on.
+% `name=myplot' lets TikZ drawn after the axis refer to it (myplot.north, ...).
+\pgfplotsset{every axis/.append style = {
+  cycle list name  = curvestylelist,
+  axis x line      = middle,
+  axis y line      = middle,
+  xlabel           = {$x$},
+  ylabel           = {$y$},
+  minor x tick num = 1,
+  minor y tick num = 1,
+  name             = myplot,
+}}
+
+% A break in an axis, for a window that does not start at 0.
+\pgfplotsset{
+  xdiscontinuity/.style = {axis x discontinuity=parallel},
+  ydiscontinuity/.style = {axis y discontinuity=crunch},
+}
+
+% A number line: an axis with no y. \begin{axis}[numberline, xmin=..., xmax=...]
+\pgfplotsset{numberline/.style = {
+  xmin=-10, xmax=10,
+  minor xtick={-11,-10,...,11},
+  xtick={-10,-5,...,10},
+  axis y line=none,
+  every axis x label/.style={at={(current axis.right of origin)}, anchor=west},
+  y=15pt,
+  axis lines=middle,
+  enlarge x limits,
+  xlabel={},
+  grid=none,
+  clip=false,
+  axis background/.style={},
+}}

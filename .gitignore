@@ -15,3 +15,7 @@
 *.listing
 
 *.swp
+
+# Bytecode from admin/courseadmin.py and checkbox_xlsx.py, created the first
+# time test-admin imports them.
+__pycache__/

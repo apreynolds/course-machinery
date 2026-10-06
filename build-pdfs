@@ -67,6 +67,10 @@
 # declaring a copy never adds a build. The label must resolve to an existing
 # directory through a `LABEL: path' line in the governing .MIRRORDIR.
 #
+# `coverpage' is the one further name: `coverpage-->LABEL' ships
+# FILE-COVERPAGE.pdf, and by the same rule needs `%! coverpage: yes' (below) to
+# have made it. It takes a date like any other entry.
+#
 # `(from YYYY-MM-DD)' embargoes a copy: the destination is inert before that
 # date and an ordinary destination on and after it. Dates are compared as text,
 # which is why they must be ISO; it needs no date(1) arithmetic and so behaves
@@ -99,7 +103,7 @@
 # moved here.
 #
 # Cover page via a magic comment: a `%! coverpage: yes' line in the same leading
-# block additionally writes FILE_COVERPAGE.pdf, page 1 of the finished PDF on its
+# block additionally writes FILE-COVERPAGE.pdf, page 1 of the finished PDF on its
 # own, for printing an assessment's cover separately. `no' or no line at all is
 # off; any other value warns. It is taken from the base (student) PDF only, not
 # from any view, and follows the same mirror / BOTH handling as that PDF.
@@ -409,6 +413,52 @@ aux_key() {
   fi
 }
 
+# LATEXMK-AUX-CONTRACT -- this function is the ORIGINAL; pr-latexmk holds a
+# verbatim copy, because the same trap is set in both directions.
+#
+# Whether the last build recorded in an aux dir wrote its PDF somewhere OTHER
+# than this build is about to. True means: force this build with -g.
+#
+# The aux dir is shared (see the roster by cache_root) but the PDF's destination
+# is not. build-pdfs sends it to the mirror with -outdir; pr-latexmk and an
+# editor's own compile leave it beside the source. latexmk keeps ONE record per
+# aux dir, and its up-to-date test is "no input has changed since the recorded
+# run, and the PDF I am asked for exists". Edit a source, build it locally, and
+# both are then true of the mirror as well: nothing has changed since that run,
+# and the PREVIOUS PDF is still sitting there. So latexmk says "Nothing to do",
+# exits 0, and the mirror keeps the old paper. Nothing warns -- and the copies
+# pass then re-sends that old PDF, which stamps it with a fresh date, so the
+# destination even looks updated. latexmk does notice the changed destination
+# when it reads the record (rdb_read_set_rule) and deliberately does nothing.
+#
+# The record's rule line reads
+#     ["pdflatex"] RUN-TIME "SOURCE" "DEST" "BASE" CHECK-TIME RESULT
+# with DEST spelled exactly as this run would spell it: $outdir/JOB.pdf under
+# -outdir, the bare JOB.pdf without. So the test is whether that line carries
+# the DEST we want, quotes included. Only the "pdflatex" rule is looked for;
+# -pdf is the one mode either script runs latexmk in.
+#
+# It fails toward REBUILDING: a record whose rule line is missing or is not
+# shaped like this counts as moved. A needless compile costs seconds, a skipped
+# one ships a stale test. No record at all is NOT "moved" -- latexmk builds a
+# never-built document without being told to.
+#
+# The views need none of this: compile_view always passes -g.
+#   $1 the aux dir's .fdb_latexmk
+#   $2 the PDF this build will write, spelled as latexmk records it
+dest_moved() {
+  local fdb=$1 want=$2 line
+  [[ -f $fdb ]] || return 1
+  while IFS= read -r line; do
+    [[ $line == '["pdflatex"] '* ]] || continue
+    # $want sits inside the quoted part of the pattern, so it is matched
+    # literally -- a `*' or `[' in a directory name is not a glob here.
+    [[ $line == *" \"$want\" "* ]] && return 1
+    return 0
+  done <"$fdb"
+  return 0
+}
+
 # Read one key out of a source's leading magic-comment block. Recognises lines of
 # the form `%! KEY: value' (flexible spacing) and echoes the value, trailing
 # whitespace trimmed, one line per matching line. Scanning stops at the first
@@ -540,7 +590,8 @@ copy_is_due() {
 
 # Resolve a source's `%! copies:' entries against its own `%! views:' line and
 # echo one VALIDATED entry per line, three `|'-separated fields: the jobname
-# suffix (empty for the base PDF), the label, and the date (empty when the entry
+# suffix (empty for the base PDF, -COVERPAGE for the cover page, else the
+# view's), the label, and the date (empty when the entry
 # carries none). Anything invalid warns and is dropped here, so a caller can act
 # on every line it receives without re-checking.
 #
@@ -568,7 +619,19 @@ copies_for_file() {
     { read -r view; read -r label; read -r date; } <<<"$parsed"
 
     suffix=""
-    if [[ $view != default ]]; then
+    if [[ $view == coverpage ]]; then
+      # Not a view: the cover is page 1 lifted out of the base PDF, and what
+      # asks for it is `%! coverpage: yes', not `%! views:'. Same rule as for a
+      # view, though -- declaring a copy must never ADD a build -- so without
+      # that line there is no FILE-COVERPAGE.pdf to ship. wants_coverpage's own
+      # warning about a bad value is silenced: the build has already said it,
+      # and the sweep would otherwise repeat it on every run.
+      if ! wants_coverpage "$file" 2>/dev/null; then
+        echo "build-pdfs: $file: copies names 'coverpage', which '%! coverpage: yes' does not request, skipping" >&2
+        continue
+      fi
+      suffix="-COVERPAGE"
+    elif [[ $view != default ]]; then
       if ! spec=$(view_spec "$view"); then
         echo "build-pdfs: $file: copies names '$view', which is not a view, skipping" >&2
         continue
@@ -623,7 +686,7 @@ wants_coverpage() {
   esac
 }
 
-# Extract page 1 of a built PDF to FILE_COVERPAGE.pdf, so a test's cover can be
+# Extract page 1 of a built PDF to FILE-COVERPAGE.pdf, so a test's cover can be
 # printed on its own (a different paper, a different count) without printing the
 # paper behind it.
 #
@@ -651,7 +714,7 @@ wants_coverpage() {
 # reads as breakage.
 #   $1 directory the built PDF lives in   $2 jobname
 extract_coverpage() {
-  local pdfdir=$1 job=$2 out="$2_COVERPAGE.pdf" log
+  local pdfdir=$1 job=$2 out="$2-COVERPAGE.pdf" log
   if ! command -v gs >/dev/null 2>&1; then
     echo "build-pdfs: ghostscript (gs) not found, skipping $out" >&2
     return 0
@@ -672,7 +735,7 @@ extract_coverpage() {
 # Build one .tex file. Runs in a subshell so the cd stays local to this build.
 build_file() {
   local src=$1 dir base jobname auxkey auxdir outinfo mode outdir movedir pdfdir
-  local views view spec suffix inject varaux csuffix clabel cdate
+  local views view spec suffix inject varaux csuffix clabel cdate force
   dir=$(dirname -- "$src")
   base=$(basename -- "$src")
   jobname=${base%.tex}
@@ -709,7 +772,17 @@ build_file() {
     # interactive `?' prompt and the build hangs waiting for input. The view
     # builds already run nonstop (compile_view's -pdflatex override); this
     # keeps the base build's failure mode the same as theirs.
-    latexmk -pdf -interaction=nonstopmode -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} "$base" || exit
+    #
+    # -g only when the aux dir's last build wrote its PDF somewhere else (see
+    # dest_moved): latexmk would otherwise call this one up to date and leave
+    # the old PDF where it is. Announced, because it is the one time a save
+    # with no changes still compiles.
+    force=""
+    if dest_moved "$auxdir/$jobname.fdb_latexmk" "${movedir:+$movedir/}$jobname.pdf"; then
+      force=1
+      echo "    rebuilding: the last build of $jobname left its PDF somewhere else"
+    fi
+    latexmk -pdf ${force:+-g} -interaction=nonstopmode -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} "$base" || exit
     echo "    ok: $jobname.pdf"
     if [[ $mode == BOTH ]]; then
       cp -- "$jobname.pdf" "$outdir/" || exit
@@ -733,8 +806,8 @@ build_file() {
       # line makes this block the subshell's last statement, where a trailing
       # false would have build_file report the whole file FAILED. The -f test
       # keeps a skipped extraction (no gs) from failing the copy.
-      if [[ $mode == BOTH && -f "${jobname}_COVERPAGE.pdf" ]]; then
-        cp -- "${jobname}_COVERPAGE.pdf" "$outdir/" || exit
+      if [[ $mode == BOTH && -f "${jobname}-COVERPAGE.pdf" ]]; then
+        cp -- "${jobname}-COVERPAGE.pdf" "$outdir/" || exit
       fi
     fi
 

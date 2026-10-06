@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+#
+# book-exercises — print the end-of-section exercises of an OpenStax CNXML module
+# Usage: book-exercises [--answers/--no-answers] [--groups-only] MODULE
+#
+#   MODULE          path to a module directory or its index.cnxml, e.g.
+#                   ~/2teach/osbooks-calculus-bundle-clone/modules/m53477
+#   --no-answers    omit the book's answers (it only supplies odd-numbered ones)
+#   --groups-only   print just the direction lines and the exercise range each
+#                   governs -- the skeleton of a problem set, on one screen
+#   -h, --help      this text
+#
+# WHY THIS EXISTS. Building a WeBWorK practice set for a section starts from that
+# section's exercises, and they are the one input with no local index: see
+# WEBWORK/README.md, "Extracting the exercise groups". The CNXML wraps every symbol in MathML, so `cat` on the
+# file is unreadable -- one exercise can run to forty lines of <m:mi> tags. This
+# flattens it.
+#
+# Fetching the openstax.org page instead does NOT work: the page fetcher declines
+# to reproduce the exercise list and summarises it loosely. The CNXML in the
+# osbooks clone is the same content, complete and diffable.
+#
+# WHAT THE OUTPUT IS FOR. Judging the form and difficulty of each group so OPL
+# problems can be matched to it. The MathML rendering is deliberately crude --
+# `x^{2}`, `(a)/(b)`, `sqrt(x)` -- and is NOT suitable for typesetting or for
+# pasting into a .tex file. Tables and figures are reported as [TABLE: ...] and
+# [FIGURE: ...] carrying the book's own accessibility summary, which is usually
+# enough to tell whether an exercise depends on reading a picture.
+
+import argparse
+import pathlib
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+MATHML = "http://www.w3.org/1998/Math/MathML"
+CNXML = "http://cnx.rice.edu/cnxml"
+
+
+def render_math(el):
+    """Flatten one MathML subtree to rough infix text.
+
+    Only the constructs that actually carry meaning for judging an exercise are
+    special-cased; everything else (mrow, mstyle, semantics, ...) is handled by
+    concatenating its children, which is right for those containers.
+    """
+    tag = el.tag.split("}")[-1]
+    kids = list(el)
+
+    # Leaves: identifiers, numbers, operators, literal text.
+    if tag in ("mi", "mn", "mo", "mtext"):
+        return (el.text or "").strip()
+
+    if tag == "msup":
+        return f"{render_math(kids[0])}^{{{render_math(kids[1])}}}"
+    if tag == "msub":
+        return f"{render_math(kids[0])}_{{{render_math(kids[1])}}}"
+    if tag == "mfrac":
+        return f"({render_math(kids[0])})/({render_math(kids[1])})"
+    if tag == "msqrt":
+        return f"sqrt({''.join(render_math(k) for k in kids)})"
+    if tag == "mroot":
+        # mroot's children are (radicand, index) in that order.
+        return f"root[{render_math(kids[1])}]({render_math(kids[0])})"
+
+    return "".join(render_math(k) for k in kids)
+
+
+def text_of(el):
+    """All text under an element, with MathML flattened and media summarised."""
+    out = []
+    if el.text:
+        out.append(el.text)
+
+    for kid in el:
+        name = kid.tag.split("}")[-1]
+        if kid.tag.startswith(f"{{{MATHML}}}"):
+            out.append(render_math(kid))
+        elif name == "table":
+            # The summary is the book's accessibility text and describes the
+            # data, which is what matters here -- the cells themselves rarely
+            # change the judgement.
+            out.append(f" [TABLE: {kid.get('summary', 'no summary given')}]")
+        elif name == "media":
+            out.append(f" [FIGURE: {kid.get('alt', 'no alt text given')}]")
+        else:
+            out.append(text_of(kid))
+        if kid.tail:
+            out.append(kid.tail)
+
+    return "".join(out)
+
+
+def squash(s):
+    """One line, single-spaced -- CNXML indentation is not meaningful."""
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def find_exercises_section(root):
+    """The section carrying class="section-exercises", or None."""
+    for sec in root.iter(f"{{{CNXML}}}section"):
+        if sec.get("class") == "section-exercises":
+            return sec
+    return None
+
+
+def resolve(arg):
+    """Accept either a module directory or the index.cnxml inside it."""
+    path = pathlib.Path(arg).expanduser()
+    if path.is_dir():
+        path = path / "index.cnxml"
+    if not path.is_file():
+        sys.exit(f"book-exercises: no such file: {path}")
+    return path
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="book-exercises",
+        description="Print the end-of-section exercises of an OpenStax CNXML module.",
+    )
+    parser.add_argument("module", help="module directory, or its index.cnxml")
+    parser.add_argument(
+        "--no-answers",
+        dest="answers",
+        action="store_false",
+        help="omit the book's answers (odd-numbered exercises only)",
+    )
+    parser.add_argument(
+        "--groups-only",
+        action="store_true",
+        help="print only the direction lines and the range each governs",
+    )
+    args = parser.parse_args()
+
+    path = resolve(args.module)
+    root = ET.parse(path).getroot()
+
+    title = root.find(f".//{{{CNXML}}}title")
+    if title is not None:
+        print(f"# {squash(text_of(title))}  ({path.parent.name})\n")
+
+    section = find_exercises_section(root)
+    if section is None:
+        sys.exit(
+            f"book-exercises: no section-exercises found in {path}.\n"
+            "  Either the module has no end-of-section exercises, or OpenStax "
+            "changed the class name."
+        )
+
+    # Walking the section in document order is what pairs each direction line
+    # with the exercises it governs: the direction paragraphs are siblings of the
+    # exercises, not parents of them, so they merely precede what they introduce.
+    # (The answer paragraphs are NOT siblings -- they sit inside each exercise's
+    # <solution> -- so iterating direct children sees direction lines only.)
+    #
+    # Two shapes complicate that, both present in OS 1.1:
+    #
+    #   CONSECUTIVE PARAGRAPHS are one direction, not two. Group 7-13 is headed
+    #   by "find the values for each function" AND by a second paragraph listing
+    #   "a. f(0) b. f(1) ... f(a+h)". Treating those as separate groups reports
+    #   the first as empty and misattributes the range to the second.
+    #
+    #   TRAILING EXERCISES may have NO direction at all. OS 1.1's applications,
+    #   49-58, simply follow the composition group with no paragraph of their
+    #   own, so the last range overstates what its direction line governs. That
+    #   is the book's structure, not a parsing bug, so it is reported rather than
+    #   guessed at -- see the footer.
+    number = 0
+    direction_lines = []
+    group_start = None
+    groups = []
+
+    def close_group():
+        """Record the range the accumulated direction lines turned out to cover."""
+        if not direction_lines:
+            return
+        groups.append((group_start, number, " / ".join(direction_lines)))
+
+    for child in section:
+        tag = child.tag.split("}")[-1]
+
+        if tag == "para":
+            direction = squash(text_of(child))
+            # A paragraph arriving with no exercise since the last one continues
+            # the same direction rather than starting a new group.
+            if direction_lines and number >= (group_start or 0):
+                close_group()
+                direction_lines = []
+            direction_lines.append(direction)
+            group_start = number + 1
+            if not args.groups_only:
+                print(f"\n--- {direction}\n")
+
+        elif tag == "exercise":
+            number += 1
+            if args.groups_only:
+                continue
+            problem = child.find(f"{{{CNXML}}}problem")
+            print(f"{number}. {squash(text_of(problem)) if problem is not None else ''}")
+            if args.answers:
+                solution = child.find(f"{{{CNXML}}}solution")
+                if solution is not None:
+                    print(f"    ANS: {squash(text_of(solution))}")
+
+    close_group()
+
+    if args.groups_only:
+        for start, end, direction in groups:
+            span = f"{start}" if start == end else f"{start}-{end}"
+            print(f"  {span:<9} {direction}")
+        print(f"\n{number} exercises in {path.parent.name}")
+        print(
+            "NOTE: a section can end with exercises that no direction line "
+            "introduces\n      (OS 1.1's applications, 49-58), so the last range "
+            "may be wider than\n      its direction implies. Read the tail with "
+            "--groups-only off to check."
+        )
+
+
+if __name__ == "__main__":
+    main()

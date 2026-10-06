@@ -1,0 +1,190 @@
+% texts/books.tex -- THE BOOK REGISTRY, shared by every course on this machinery.
+%
+% Everything here answers one question: WHICH BOOKS CAN A DOCUMENT NAME, AND
+% WHERE DO THEY LIVE? Nothing else belongs in this file.
+%
+% WHY IT IS IN THE SHARED MACHINERY. A book's title, publisher and URL are facts
+% about the outside world: the same in every course that cites the book, and in
+% every term. So they live here once, and a lecture in ANY course can point a
+% student at algtrig without that course first having to declare it. A course
+% that wants a different registry puts its own books.tex in its course-info/,
+% which is searched first -- but then it gets ONLY its own, not both.
+%
+% WRITTEN FOR MATH 1003, and the comments below still speak from there: "this
+% course", the modules and the three documents named are MATH 1003's. It uses
+% three books, which is more than usual:
+%
+%   apex      APEX Calculus            the main text -- modules B, C, D
+%   openstax  Calculus, Volume 1       actually used -- module A (functions)
+%   algtrig   Algebra & Trigonometry   extra help, never taught from
+%
+% HOW IT IS LOADED, AND WHY THAT IS DIFFERENT FROM apex.tex. No master \inputs
+% this file, and no master names it either: TextRef loads it unconditionally, in
+% EVERY document, before the preamble ends. .latexmkrc puts the machinery on
+% TEXINPUTS with a trailing //, so it is found BY NAME at any depth, the same
+% way the text layers are.
+%
+% That "every document, whole" is the whole point of the file existing. Compare
+% \usetext, which loads exactly ONE text layer, because vocabulary is exclusive:
+% a document cannot call worked items "Example" and "Checkpoint" at once. A
+% book's NAME and URL are not exclusive in the least, and three ordinary
+% documents in this course prove it:
+%
+%   - the SYLLABUS names all three books, so it can be built on none of them
+%     (it has no \usetext, and there is no course default to fall back on);
+%   - ADVICE FOR STUDENTS points at algtrig throughout and at neither calculus
+%     book -- and no document will ever say \usetext{algtrig}, because no
+%     document IS an algtrig document;
+%   - the MODULE A LECTURES are built on OpenStax and still send students to
+%     algtrig for the algebra underneath.
+%
+% Before this file existed, all three were hand-typed \href URLs with the domain
+% baked in -- thirteen of them, each rotting on its own schedule, which is the
+% exact failure TextRef.sty was written to prevent.
+%
+% THE MEMBERSHIP TEST, same as the text layer's: would you look at the book to
+% decide the value? Its title, its publisher, where it lives, which page a
+% section sits on -- yes. How titles are set, what a "Key Idea" is called, the
+% noun for a worked item -- NO. The first is identity and lives here; the second
+% is vocabulary and is exclusive, so it lives in apex.tex / openstax-calculus1.tex
+% beside this file.
+%
+% WHICH IS WHY algtrig HAS NO FILE OF ITS OWN. It has identity and nothing else.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. THE MAIN TEXT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% This is the STANDARD, all-in-one APEX web build. ULeth also publishes
+% "accelerated" and split "standard" builds at sibling URLs whose chapters are
+% ORDERED DIFFERENTLY, so their section numbers do not agree with the ones the
+% lectures cite. Adopting one of those is a different base AND different pages.
+%
+% Keep the trailing slash on base -- slugs are appended verbatim.
+%
+% No publisher: APEX is Gregory Hartman's, published under a Creative Commons
+% licence and rebuilt by the University of Lethbridge, and no one of those is
+% the answer to "who publishes it". The syllabus says so in prose instead.
+%
+% No home: it defaults to base, which is right here -- the book's web edition is
+% its front door.
+\DeclareBook{apex}{%
+  short = APEX,
+  title = APEX Calculus,
+  base  = https://opentext.uleth.ca/apex-calculus/,
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. THE SECOND TEXT, FOR MODULE A
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Volume 1 of the three-volume OpenStax Calculus. Note that its page slugs carry
+% their own "pages/" segment and NO .html extension, unlike APEX's -- slug form
+% is per publisher, so do not pattern-match one book's from the other's.
+%
+% home differs from base: OpenStax gives every book a catalogue page separate
+% from the reading edition, and the catalogue page is what a student should be
+% sent to first (it offers the PDF and print options as well).
+\DeclareBook{openstax}{%
+  short     = OpenStax Calculus,
+  % Braced because of the comma: keyval would otherwise read "Volume 1" as a
+  % key of its own and stop with an undefined-key error. (OpenStax's own
+  % spelling drops the comma; the braces are here so the next title that needs
+  % one has the idiom in front of it.)
+  title     = {Calculus, Volume 1},
+  publisher = OpenStax,
+  home      = https://openstax.org/details/books/calculus-volume-1,
+  base      = https://openstax.org/books/calculus-volume-1/,
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. THE PREREQUISITE TEXT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Not taught from, ever. It is where a student is sent when the calculus is
+% sound and the algebra underneath is not -- which is the commonest way to lose
+% marks in this course, and the reason Advice for Students leans on it so hard.
+%
+% This is the book that could not exist under the old arrangement: identity with
+% no vocabulary, so no \usetext file, so no base, so every reference to it was a
+% full hand-typed URL.
+\DeclareBook{algtrig}{%
+  short     = Algebra \& Trigonometry,
+  title     = Algebra and Trigonometry 2e,
+  publisher = OpenStax,
+  home      = https://openstax.org/details/books/algebra-and-trigonometry-2e,
+  base      = https://openstax.org/books/algebra-and-trigonometry-2e/,
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. SECTIONS OF algtrig THAT THIS COURSE POINTS AT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% These are named-book \DeclareSection entries, and they live HERE rather than
+% in a text layer for the reason §3 gives: no document is built on this book, so
+% no \usetext would ever load a file holding them.
+%
+% Contrast the entries in apex.tex and openstax-calculus1.tex, which take no book name.
+% The empty name means "the book THIS DOCUMENT is built on", which is the only
+% thing a text layer can honestly say -- and the two namespaces deliberately do
+% not cross. See TextRef.sty under \DeclareSection.
+%
+% DECLARE ONLY WHAT YOU CITE. Every line below is cited by a live document; the
+% sparseness is a CHECK, not tidiness. \textbookref reports a key it cannot
+% resolve and prints the reference unlinked, so mistyping 3.2 for 3.3 is
+% something you SEE. Declare the whole book and that same typo silently emits a
+% perfect-looking link to the wrong section. One entry per line, so these stay
+% greppable without compiling anything.
+%
+% !! THE SLUGS ARE AS VERIFIED AS WHAT THEY REPLACED, AND NO MORE. Each was
+% !! lifted verbatim from a working \href in advice-for-students.tex or a
+% !! Module A lecture, so this file introduced no new 404 risk -- but it
+% !! inherited whatever was already wrong. LaTeX warns when a section KEY does
+% !! not resolve; a slug that is simply wrong still produces a perfectly
+% !! good-looking link to a 404. Check one by hand before leaning on it.
+%
+% TOPICS.tsv's [xN.M] column is the authoritative list of INTENDED pointers and
+% is longer than this. Add a line here when a document actually cites it.
+
+% --- Chapter 1: Prerequisites ---
+\DeclareSection[algtrig]{1.2}{pages/1-2-exponents-and-scientific-notation}       % Exponents and Scientific Notation
+\DeclareSection[algtrig]{1.3}{pages/1-3-radicals-and-rational-exponents}         % Radicals and Rational Exponents
+\DeclareSection[algtrig]{1.6}{pages/1-6-rational-expressions}                    % Rational Expressions
+
+% --- Chapter 3: Functions ---
+\DeclareSection[algtrig]{3.1}{pages/3-1-functions-and-function-notation}         % Functions and Function Notation
+\DeclareSection[algtrig]{3.2}{pages/3-2-domain-and-range}                        % Domain and Range
+\DeclareSection[algtrig]{3.3}{pages/3-3-rates-of-change-and-behavior-of-graphs}  % Rates of Change and Behavior of Graphs
+\DeclareSection[algtrig]{3.4}{pages/3-4-composition-of-functions}                % Composition of Functions
+\DeclareSection[algtrig]{3.5}{pages/3-5-transformation-of-functions}             % Transformation of Functions
+
+% --- Chapter 4: Linear Functions ---
+\DeclareSection[algtrig]{4.1}{pages/4-1-linear-functions}                        % Linear Functions
+
+% --- Chapter 5: Polynomial and Rational Functions ---
+\DeclareSection[algtrig]{5.1}{pages/5-1-quadratic-functions}                     % Quadratic Functions
+% 5.2 and 5.3 are the two entries in TOPICS.tsv row A.2 that had no line here,
+% so OS1.2's prepwork could not cite them. Unlike every slug above, these two
+% were NOT lifted from a working \href -- they were fetched and checked against
+% the live site (both 200, both titles matching) before being added.
+\DeclareSection[algtrig]{5.2}{pages/5-2-power-functions-and-polynomial-functions} % Power Functions and Polynomial Functions
+\DeclareSection[algtrig]{5.3}{pages/5-3-graphs-of-polynomial-functions}         % Graphs of Polynomial Functions
+\DeclareSection[algtrig]{5.5}{pages/5-5-zeros-of-polynomial-functions}           % Zeros of Polynomial Functions
+\DeclareSection[algtrig]{5.7}{pages/5-7-inverses-and-radical-functions}          % Inverses and Radical Functions
+
+% --- Chapter 6: Exponential and Logarithmic Functions ---
+\DeclareSection[algtrig]{6.1}{pages/6-1-exponential-functions}                   % Exponential Functions
+\DeclareSection[algtrig]{6.3}{pages/6-3-logarithmic-functions}                   % Logarithmic Functions
+\DeclareSection[algtrig]{6.5}{pages/6-5-logarithmic-properties}                  % Logarithmic Properties
+
+% --- Chapter 7: The Unit Circle ---
+\DeclareSection[algtrig]{7.1}{pages/7-1-angles}                                  % Angles
+\DeclareSection[algtrig]{7.3}{pages/7-3-unit-circle-sine-and-cosine-functions}   % Unit Circle: Sine and Cosine Functions
+
+% --- Chapter 8: Periodic Functions ---
+\DeclareSection[algtrig]{8.1}{pages/8-1-graphs-of-the-sine-and-cosine-functions} % Graphs of the Sine and Cosine Functions
+\DeclareSection[algtrig]{8.3}{pages/8-3-inverse-trigonometric-functions}         % Inverse Trigonometric Functions
+
+% --- Chapter 9: Trigonometric Identities and Equations ---
+\DeclareSection[algtrig]{9.1}{pages/9-1-solving-trigonometric-equations-with-identities} % Solving Trigonometric Equations with Identities
+\DeclareSection[algtrig]{9.2}{pages/9-2-sum-and-difference-identities}           % Sum and Difference Identities
