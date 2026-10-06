@@ -1,0 +1,156 @@
+% texts/openstax-calculus1.tex -- THE TEXT LAYER FOR OPENSTAX CALCULUS VOLUME 1.
+%
+% Everything here answers one question: WHAT DOES OPENSTAX CALCULUS VOLUME 1
+% NAME THINGS, AND WHERE DOES IT LIVE? Nothing else belongs in this file.
+%
+% THE FILE IS NAMED FOR THE BOOK, NOT THE PUBLISHER. It was openstax.tex while
+% it lived in one course. In the shared machinery a name must be unique across
+% every course, and OpenStax publishes many books -- Algebra and Trigonometry
+% among them, which this same course cites. THE BOOK'S KEY IS STILL `openstax':
+% \booktitle{openstax}, \SetDefaultText{openstax} below and the \DeclareBook in
+% books.tex are unchanged. Only the argument of \usetext follows the file name.
+%
+% WRITTEN FOR MATH 1003, and the comments below still speak from there: "this
+% course" and its modules are MATH 1003's. There, this is the text for MODULE A
+% ONLY -- the five review lectures on functions (TOPICS.tsv rows A.1-A.5, src
+% O1.1-O1.5). Modules B, C and D are APEX and use apex.tex beside this one.
+%
+% WHY THERE ARE TWO FILES HERE. The noun for a worked item and the result
+% vocabulary below are DOCUMENT-WIDE settings, so a document has to pick one
+% book; the two files cannot be merged. \usetext is that pick, and it is why
+% every Module A master carries
+%
+%   \usetext{openstax-calculus1}
+%
+% There is no course default to fall back on: textbook.tex was deleted when this
+% file was split out, precisely so that naming the book is mandatory. A master
+% that names nothing gets no vocabulary and no base, and says so.
+%
+% Because only one of these files is ever loaded into a document, the two may
+% freely disagree -- different nouns, and result environments of the same or
+% different names -- with no risk of collision. The corollary bites in one place
+% and is easy to forget: a Module A lecture never loads apex.tex, so APEX's
+% cross-reference list is not available to it, and vice versa. See §4.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. WHAT THE TEXT NAMES ITS RESULTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TWO ARE DECLARED, at the foot of this section: Rule and Strategy, each added
+% when a Module A lecture first needed it. The Checkpoint is still NOT declared,
+% and that is a decision rather than an omission.
+%
+% Deliberately NOT "Key Idea": that is APEX's word, declared in apex.tex, and a
+% document built from this file has no \keyidea at all. OpenStax's own flagged,
+% numbered result is the Checkpoint -- the prompt that follows each worked
+% Example -- and the line to add, if a lecture ever wants one, is:
+%
+%   \NewTextResult[cbdefn]{checkpoint}{Checkpoint}{cb/textresult}
+%
+% (cbdefn, upright body, rather than cbthm's italic: a checkpoint is a prompt to
+% stop and try something, not a stated result.)
+%
+% It stays commented because no Module A lecture uses one. The old ch0 sources
+% reach for \begin{definition} and for undifferentiated coloured boxes, and the
+% coloured ones are being read case by case during conversion -- most land on
+% CourseBoxes' own vocabulary (definition, definition*, remark*) or on an aside
+% (takeaway, tip). Declare a Checkpoint when a lecture actually needs one, on
+% the same "declare only what you cite" discipline as §4.
+%
+% GUARDED, if it is ever uncommented: \NewTextResult comes from CourseBoxes.sty,
+% which Assessment.cls does not load. The guard lets this file be \input by ANY
+% master.
+%
+\ifdefined\NewTextResult
+  \NewTextResult[cbdefn]{Rule}{Rule}{cb/textresult}
+\fi
+\ifdefined\NewTextResult
+  \NewTextResult[cbdefn]{strategy}{Strategy}{cb/textresult}
+\fi
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. WHAT THE TEXT CALLS A WORKED ITEM
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OpenStax says Example, which is already the machinery's default -- the same
+% answer APEX gives, arrived at independently. So this stays commented, here as
+% the documented place to change it rather than as a setting that needs making.
+% \renewcommand{\NotesProblemLabelWord}{Exercise}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. WHICH BOOK THIS DOCUMENT IS BUILT ON
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% One line, and it is a statement about the DOCUMENT, not about the book: every
+% \booksection and \textbookref that names no book resolves against this one.
+%
+% THE BASE URL IS NOT HERE ANY MORE -- it moved to books.tex, which every
+% document loads whole. Where OpenStax lives is a fact about OpenStax; only the
+% pick of vocabulary is exclusive to a document, and this line is that pick.
+%
+% (The observation that travelled to books.tex with the URL: OpenStax page slugs
+% carry their own "pages/" segment and NO .html extension, unlike APEX's. Slug
+% form is per publisher -- do not pattern-match one book's from the other's.)
+\SetDefaultText{openstax}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. SECTIONS CROSS-REFERENCED IN THIS TEXT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LIVE ENTRIES GO HERE, and there are none yet. A lecture's OWN section needs no
+% line -- it is declared in the lecture, with \booksection. These are only for
+% \textbookref, pointing at some OTHER section.
+%
+% THESE BELONG TO THE TEXT, NOT TO THE COURSE, which is the easy thing to get
+% wrong. A Module A lecture never loads apex.tex, so every OpenStax section a
+% Module A lecture cites has to be declared HERE, even if apex.tex's commented
+% table happens to list something with the same number.
+%
+% To add one, copy a line up from the reference block at the foot of this file,
+% DELETING THE LEADING "%   ". One entry per line, so these stay greppable
+% without compiling anything.
+%
+% DECLARE ONLY WHAT YOU CITE. The sparseness is a CHECK: \textbookref reports a
+% key it cannot resolve and prints the reference unlinked, so a typo is
+% something you SEE. Declare the whole book and that same typo silently emits a
+% perfect-looking link to the wrong section.
+%
+% THE GAP THIS FILE USED TO RECORD IS CLOSED. It said that TOPICS.tsv has APEX
+% lectures citing OpenStax sections (B.3 cites O1.2, B.4 cites O1.1) and every
+% Module A row citing the OpenStax Algebra & Trigonometry text (the [xN.M]
+% refs), and that \textbookref could express neither, so a cross-book pointer
+% had to be a hand-typed \href in the lecture's prepwork box.
+%
+% \textbookref now takes the book: \textbookref[algtrig]{3.2}{\S3.2}. Sections
+% of a book NO document is built on are declared in books.tex, beside the
+% \DeclareBook they qualify; sections of THIS book stay here, unnamed. The
+% Module A prepwork boxes were converted when that landed.
+%
+% Going the other way -- an APEX lecture citing an OpenStax section -- add a
+% \DeclareSection[openstax] line to books.tex when a lecture actually cites one.
+% It does not belong here, because the document that needs it never loads this
+% file.
+
+
+% ---------------------------------------------------------------------------
+% REFERENCE -- MODULE A'S SECTIONS, DELIBERATELY COMMENTED OUT
+% ---------------------------------------------------------------------------
+% NOTHING BELOW IS LIVE. It is data: the copy-paste source for §4 above, and
+% what each Module A lecture's \booksection link= value was taken from.
+%
+% Only chapter 1 is listed. This course teaches nothing else from OpenStax, so
+% unlike apex.tex's whole-book table there is no reason to carry the rest.
+%
+% !! 1.3 IS VERIFIED -- it was lifted from a live \href in last year's
+% !! os1-3content.tex. The other four are pattern-derived from OpenStax's slug
+% !! convention (section number, then the hyphenated section title) and are
+% !! UNVERIFIED against the live site. A wrong slug still produces a perfectly
+% !! good-looking link to a 404, so check one by hand before leaning on it in
+% !! front of a class.
+%
+% --- Chapter 1: Functions and Graphs ---
+%   \DeclareSection{1.1}{pages/1-1-review-of-functions}                      % Review of Functions
+%   \DeclareSection{1.2}{pages/1-2-basic-classes-of-functions}               % Basic Classes of Functions
+%   \DeclareSection{1.3}{pages/1-3-trigonometric-functions}                  % Trigonometric Functions   [VERIFIED]
+%   \DeclareSection{1.4}{pages/1-4-inverse-functions}                        % Inverse Functions
+%   \DeclareSection{1.5}{pages/1-5-exponential-and-logarithmic-functions}    % Exponential and Logarithmic Functions

@@ -89,10 +89,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LOADING THE COURSE'S TEXT LAYER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% The data this package resolves against is course-side, conventionally in
-% .course-machinery-local/ -- the course's second tier of machinery: specific to
-% one course, but shared across files and so kept findable from any depth. NO
-% MASTER \inputs IT BY PATH: .latexmkrc puts that directory on TEXINPUTS, so the
+% The data this package resolves against lives in texts/, beside this file: one
+% file per BOOK (apex.tex, openstax-calculus1.tex) plus the registry, books.tex.
+% A book's name, URL and vocabulary are the same in every course that uses it,
+% so they are shared like the rest of the machinery. A course may still keep a
+% text layer of its own in its course-info/, which is searched first. NO
+% MASTER \inputs IT BY PATH: .latexmkrc puts both places on TEXINPUTS, so the
 % file is found BY NAME. That is what frees a lecture to sit anywhere in the tree
 % -- there is no ../.. in a master to keep true to the folder layout, and a
 % master that is moved deeper or shallower still builds.
@@ -167,9 +169,9 @@
   \IfFileExists{#1.tex}%
     {\input{#1.tex}}%
     {\PackageWarning{TextRef}{No text layer `#1.tex' found on
-       TEXINPUTS.\MessageBreak It is conventionally
-       .course-machinery-local/#1.tex at the\MessageBreak course root, put on the
-       path by .latexmkrc; references\MessageBreak will print as plain text}}%
+       TEXINPUTS.\MessageBreak It is conventionally texts/#1.tex in
+       the\MessageBreak machinery, named for its book and put on the\MessageBreak
+       path by .latexmkrc; references will print\MessageBreak as plain text}}%
 }
 \AtEndPreamble{%
   \TextRef@loadbooks

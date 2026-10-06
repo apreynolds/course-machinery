@@ -1,0 +1,296 @@
+% texts/apex.tex -- THE APEX TEXT LAYER, for any course taught from APEX Calculus.
+%
+% Everything here answers one question: WHAT DOES APEX CALCULUS NAME THINGS, AND
+% WHERE DOES IT LIVE? Nothing else belongs in this file.
+%
+% IN THE SHARED MACHINERY because a book's vocabulary is a fact about the book,
+% not about a course or a term. Each text layer is named for its BOOK, since the
+% name has to be unique across every course: that is why OpenStax's Calculus
+% Volume 1 is openstax-calculus1.tex and not openstax.tex.
+%
+% WRITTEN FOR MATH 1003, and the comments below still speak from there: "this
+% course" and its modules are MATH 1003's, and the history is that course's.
+% There, this is the text for modules B, C and D. Module A is taught from
+% OpenStax and has its own file, openstax-calculus1.tex, beside this one.
+%
+% THE MEMBERSHIP TEST, in two steps now that books.tex sits beside this file.
+% First: would you go and look at the textbook to decide the value? Your
+% identity colour, your hint wording, your layout -- NO. Those are your voice,
+% and they stay in the machinery. Then, of what survives: is it EXCLUSIVE -- can
+% a document only have one of it? What the book calls its flagged results, the
+% noun it uses for a worked item -- yes, and they belong here. Its title, its
+% publisher, where it lives on the web -- no, any document may need those about
+% any book, and they belong in books.tex.
+%
+% WHY THIS EXISTS RATHER THAN A SHARED MANIFEST. It used to be the latter: the
+% section -> URL map lived in a submodule at .apex/ and every master said
+% \input{../../.apex/apex}. It does not any more. Each lecture declares its own
+% coordinate with \booksection, so those ~90 \DeclareSection lines had nothing
+% left to serve and were being read into every compile for the two live lines
+% below. The submodule is retired. The table itself is not lost: it is parked at
+% the foot of this file, COMMENTED OUT, as a copy-paste source (see §4).
+%
+% HOW IT IS LOADED. No master \inputs this file. .latexmkrc puts the machinery
+% on TEXINPUTS with a trailing //, so it is found BY NAME and loaded by the
+% master's \usetext{apex} -- early enough for \NewTextResult, which
+% declares theorem environments and must run before \begin{document}. Safe in ANY
+% master: the box factory is guarded, and the rest ships in TextRef.sty, which
+% all three classes load.
+%
+% WHERE IT HAS LIVED. In a course-side .textbook/, then in the course's hidden
+% .course-machinery-local/, and now here in texts/ -- each move for the same
+% reason: its readers turned out to be wider than the place it sat. It needs to
+% be findable by bare name from any depth because every lecture in every topic
+% submodule loads it.
+%
+% That is why no lecture carries a ../.. to this file, and why a lecture can sit
+% at any depth -- which matters, since the topics are separate repos.
+%
+% NEVER PUT A textbook.tex IN THIS FOLDER. TextRef loads a file of that name as
+% the default for any master with no \usetext, and the // on the machinery's
+% path would make one here the default text of EVERY course at once. A course
+% that wants a default keeps its own textbook.tex in its course-info/.
+%
+% ch0 HAS ARRIVED, AND THIS FILE IS THE SPLIT. It used to be textbook.tex, the
+% course default that a master got by saying nothing. Module A is OpenStax, so
+% the file was split in two -- apex.tex and what is now openstax-calculus1.tex,
+% side by side -- and textbook.tex was DELETED rather than kept as a default. That deletion is the
+% load-bearing part: with no textbook.tex on the path, TextRef falls through to
+% nothing, so a master that names no book gets no vocabulary and no base, and
+% \booksection reports it. Naming the book is now mandatory rather than merely
+% possible. Every master therefore carries exactly one \usetext line:
+%
+%   \usetext{apex}       modules B, C, D  (limits, derivatives, applications)
+%   \usetext{openstax-calculus1}   module A   (functions)
+%
+% The commented reference table at the foot travelled with this half: it
+% describes APEX and no other book.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. WHAT THE TEXT NAMES ITS RESULTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Vocabulary every text has (theorem, definition, example, ...) ships in
+% CourseBoxes.sty, and the pedagogical asides are the AUTHOR's voice and ship
+% there too. Declare here only the results THIS text names for itself.
+%
+% APEX flags "Key Idea" as a numbered, boxed result. Note that only the NAME is
+% the book's -- cbnote and cb/note are house styling.
+%
+% GUARDED: \NewTextResult comes from CourseBoxes.sty, which Assessment.cls does
+% not load. The guard lets this one file be \input by ANY master.
+\ifdefined\NewTextResult
+  \NewTextResult[cbnote]{keyidea}{Key Idea}{cb/note}
+\fi
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. WHAT THE TEXT CALLS A WORKED ITEM
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APEX says Example, which is already the machinery's default, so this stays
+% commented -- it is here as the documented place to change it, not as a setting
+% that needs making. Safe to set unconditionally: Assessment.cls fixes its own
+% label to "Q" and never reads this macro.
+% \renewcommand{\NotesProblemLabelWord}{Exercise}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. WHICH BOOK THIS DOCUMENT IS BUILT ON
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% One line, and it is a statement about the DOCUMENT, not about the book: every
+% \booksection and \textbookref that names no book resolves against this one.
+%
+% THE BASE URL IS NOT HERE ANY MORE. It moved to books.tex, which every document
+% loads whole, because where APEX lives is a fact about APEX and nothing about
+% this document's vocabulary -- the syllabus needs it too, and the syllabus has
+% no \usetext at all. What is left in this file is exactly what IS exclusive: a
+% document must pick one set of result names, and this is the pick.
+%
+% (Details about the particular web build -- ULeth publishes "accelerated" and
+% split "standard" ones whose chapters are ordered differently, so their section
+% numbers do not match the ones the lectures cite -- travelled to books.tex with
+% the URL they describe.)
+\SetDefaultText{apex}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. SECTIONS THIS COURSE CROSS-REFERENCES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LIVE ENTRIES GO HERE, and there are none, which is normal. A lecture's OWN
+% section needs no line: it is declared in the lecture, with \booksection. These
+% are only for \textbookref, which points at some OTHER section, typically a
+% prerequisite:
+%
+%   \DeclareSection{1.3}{sec_limit_analytically.html}
+%   ...then in a lecture:  re-read \textbookref{1.3}{\S1.3} in the text
+%
+% To add one, find it in the reference table at the foot of this file and copy
+% the line up here, DELETING THE LEADING "%   ". One entry per line, so these
+% stay greppable without compiling anything.
+%
+% NO BOOK NAME ON THESE, and that is right: an unnamed \DeclareSection means "a
+% section of the book THIS DOCUMENT is built on", which is the only thing a file
+% loaded by \usetext can honestly say. The named form,
+% \DeclareSection[algtrig]{3.2}{...}, is for a book no document is built on, and
+% lives in books.tex beside the \DeclareBook it qualifies. The two namespaces do
+% not cross -- see TextRef.sty under \DeclareSection.
+%
+% DECLARE ONLY WHAT YOU CITE -- do not uncomment the table wholesale. The
+% sparseness is a CHECK, not just tidiness. \textbookref reports a key it cannot
+% resolve (one \PackageInfo per key, then a single end-of-run warning) and prints
+% the reference unlinked, so mistyping 2.6 for 2.5 is something you SEE. With the
+% whole book declared, that same typo silently emits a perfect-looking link to
+% the wrong section. TextRef.sty puts it plainly: the manifest "only ever needs
+% the handful of sections a course actually cross-references."
+
+
+% ---------------------------------------------------------------------------
+% REFERENCE TABLE -- THE WHOLE APEX BOOK, DELIBERATELY COMMENTED OUT
+% ---------------------------------------------------------------------------
+% NOTHING BELOW IS LIVE. It is data, parked where it is useful: the copy-paste
+% source for §4 above, the authoritative numbering to check a lecture's
+% \booksection against, and where to look up a lecture's link= value by hand
+% (no script reads this table). It was a submodule (.apex/, remote apreynolds/apex-specs)
+% back when it was \input as the text layer; it is commentary now.
+%
+% WHICH BUILD. The STANDARD, all-in-one APEX build (ptx/apex.ptx ->
+% opentext.uleth.ca/apex-calculus), matching the base declared in §3. ULeth also
+% publishes "accelerated" and split "standard" builds at sibling URLs whose
+% chapters are ORDERED DIFFERENTLY, so their section numbers do not agree with
+% these. Adopting one is a different text layer, not an edit to this table.
+%
+% PROVENANCE. Generated from the PreTeXt sources in ../APEXCalculusPTX-clone:
+% chapter order from ptx/apex.ptx, section order from each chapter file, slug
+% from each division's @label. On a new edition, regenerate the same way and
+% diff. The slug -> URL step assumes the published chunking puts each section on
+% its own page.
+%
+% !! THE SLUGS ARE UNVERIFIED against the live site, and knowingly so -- there is
+% !! no checker that visits them. Note which failure that leaves open: LaTeX
+% !! warns when a section KEY does not resolve, but a slug that is simply wrong
+% !! still produces a perfectly good-looking link to a 404. Check the one you
+% !! copy, by hand, before leaning on it in front of a class.
+%
+% The WHOLE book is here, chapters 11-15 included, from when the table was shared
+% with the multivariable course. Single-variable stops after chapter 10.
+%
+% --- Chapter 1: Limits ---
+%   \DeclareSection{1.1}{sec_limit_intro.html}                 % An Introduction To Limits
+%   \DeclareSection{1.2}{sec_limit_def.html}                   % Epsilon-Delta Definition of a Limit
+%   \DeclareSection{1.3}{sec_limit_analytically.html}          % Finding Limits Analytically
+%   \DeclareSection{1.4}{sec_limits_one_sided.html}            % One-Sided Limits
+%   \DeclareSection{1.5}{sec_continuity.html}                  % Continuity
+%   \DeclareSection{1.6}{sec_limits_infty.html}                % Limits Involving Infinity
+%
+% --- Chapter 2: Derivatives ---
+%   \DeclareSection{2.1}{sec_derivative.html}                  % Instantaneous Rates of Change: The Derivative
+%   \DeclareSection{2.2}{sec_interp_deriv.html}                % Interpretations of the Derivative
+%   \DeclareSection{2.3}{sec_basic_diff_rules.html}            % Basic Differentiation Rules
+%   \DeclareSection{2.4}{sec_prod_quot_rules.html}             % The Product and Quotient Rules
+%   \DeclareSection{2.5}{sec_chainrule.html}                   % The Chain Rule
+%   \DeclareSection{2.6}{sec_imp_deriv.html}                   % Implicit Differentiation
+%   \DeclareSection{2.7}{sec_deriv_inverse_function.html}      % Derivatives of Inverse Functions
+%
+% --- Chapter 3: The Graphical Behavior of Functions ---
+%   \DeclareSection{3.1}{sec_extreme_values.html}              % Extreme Values
+%   \DeclareSection{3.2}{sec_mvt.html}                         % The Mean Value Theorem
+%   \DeclareSection{3.3}{sec_incr_decr.html}                   % Increasing and Decreasing Functions
+%   \DeclareSection{3.4}{sec_concavity.html}                   % Concavity and the Second Derivative
+%   \DeclareSection{3.5}{sec_sketch.html}                      % Curve Sketching
+%
+% --- Chapter 4: Applications of the Derivative ---
+%   \DeclareSection{4.1}{sec_newton.html}                      % Newton's Method
+%   \DeclareSection{4.2}{sec_related_rates.html}               % Related Rates
+%   \DeclareSection{4.3}{sec_optimization.html}                % Optimization
+%   \DeclareSection{4.4}{sec_differentials.html}               % Differentials
+%
+% --- Chapter 5: Integration ---
+%   \DeclareSection{5.1}{sec_antider.html}                     % Antiderivatives and Indefinite Integration
+%   \DeclareSection{5.2}{sec_def_int.html}                     % The Definite Integral
+%   \DeclareSection{5.3}{sec_riemann.html}                     % Riemann Sums
+%   \DeclareSection{5.4}{sec_FTC.html}                         % The Fundamental Theorem of Calculus
+%   \DeclareSection{5.5}{sec_numerical_integration.html}       % Numerical Integration
+%
+% --- Chapter 6: Techniques of Antidifferentiation ---
+%   \DeclareSection{6.1}{sec_substitution.html}                % Substitution
+%   \DeclareSection{6.2}{sec_IBP.html}                         % Integration by Parts
+%   \DeclareSection{6.3}{sec_trigint.html}                     % Trigonometric Integrals
+%   \DeclareSection{6.4}{sec_trig_sub.html}                    % Trigonometric Substitution
+%   \DeclareSection{6.5}{sec_partial_fraction.html}            % Partial Fraction Decomposition
+%   \DeclareSection{6.6}{sec_hyperbolic.html}                  % Hyperbolic Functions
+%   \DeclareSection{6.7}{sec_lhopitals_rule.html}              % L'Hospital's Rule
+%   \DeclareSection{6.8}{sec_improper_integration.html}        % Improper Integration
+%
+% --- Chapter 7: Applications of Integration ---
+%   \DeclareSection{7.1}{sec_ABC.html}                         % Area Between Curves
+%   \DeclareSection{7.2}{sec_disk.html}                        % Volume by Cross-Sectional Area; Disk and Washer Methods
+%   \DeclareSection{7.3}{sec_shell_method.html}                % The Shell Method
+%   \DeclareSection{7.4}{sec_arc_length.html}                  % Arc Length and Surface Area
+%   \DeclareSection{7.5}{sec_work.html}                        % Work
+%   \DeclareSection{7.6}{sec_fluid_force.html}                 % Fluid Forces
+%
+% --- Chapter 8: Differential Equations ---
+%   \DeclareSection{8.1}{sec_Graphical_Numerical.html}         % Graphical and Numerical Solutions to Differential Equations
+%   \DeclareSection{8.2}{sec_Separable.html}                   % Separable Differential Equations
+%   \DeclareSection{8.3}{sec_Linear.html}                      % First Order Linear Differential Equations
+%   \DeclareSection{8.4}{sec_Modeling.html}                    % Modeling with Differential Equations
+%
+% --- Chapter 9: Sequences and Series ---
+%   \DeclareSection{9.1}{sec_sequences.html}                   % Sequences
+%   \DeclareSection{9.2}{sec_series.html}                      % Infinite Series
+%   \DeclareSection{9.3}{sec_int_comp_tests.html}              % Integral and Comparison Tests
+%   \DeclareSection{9.4}{sec_ratio_root_tests.html}            % Ratio and Root Tests
+%   \DeclareSection{9.5}{sec_alt_series.html}                  % Alternating Series and Absolute Convergence
+%   \DeclareSection{9.6}{sec_power_series.html}                % Power Series
+%   \DeclareSection{9.7}{sec_taylor_poly.html}                 % Taylor Polynomials
+%   \DeclareSection{9.8}{sec_taylor_series.html}               % Taylor Series
+%
+% --- Chapter 10: Curves in the Plane ---
+%   \DeclareSection{10.1}{sec_conic_sections.html}             % Conic Sections
+%   \DeclareSection{10.2}{sec_param_eqs.html}                  % Parametric Equations
+%   \DeclareSection{10.3}{sec_par_calc.html}                   % Calculus and Parametric Equations
+%   \DeclareSection{10.4}{sec_polar.html}                      % Introduction to Polar Coordinates
+%   \DeclareSection{10.5}{sec_polarcalc.html}                  % Calculus and Polar Functions
+%
+% --- Chapter 11: Vectors ---
+%   \DeclareSection{11.1}{sec_space_coord.html}                % Introduction to Cartesian Coordinates in Space
+%   \DeclareSection{11.2}{sec_vector_intro.html}               % An Introduction to Vectors
+%   \DeclareSection{11.3}{sec_dot_product.html}                % The Dot Product
+%   \DeclareSection{11.4}{sec_cross_product.html}              % The Cross Product
+%   \DeclareSection{11.5}{sec_lines.html}                      % Lines
+%   \DeclareSection{11.6}{sec_planes.html}                     % Planes
+%
+% --- Chapter 12: Vector Valued Functions ---
+%   \DeclareSection{12.1}{sec_vvf.html}                        % Vector-Valued Functions
+%   \DeclareSection{12.2}{sec_vvf_calc.html}                   % Calculus and Vector-Valued Functions
+%   \DeclareSection{12.3}{sec_vvf_motion.html}                 % The Calculus of Motion
+%   \DeclareSection{12.4}{sec_tan_norm.html}                   % Unit Tangent and Normal Vectors
+%   \DeclareSection{12.5}{sec_curvature.html}                  % The Arc Length Parameter and Curvature
+%
+% --- Chapter 13: Functions of Several Variables ---
+%   \DeclareSection{13.1}{sec_multi_intro.html}                % Introduction to Multivariable Functions
+%   \DeclareSection{13.2}{sec_multi_limit.html}                % Limits and Continuity of Multivariable Functions
+%   \DeclareSection{13.3}{sec_partial_derivatives.html}        % Partial Derivatives
+%   \DeclareSection{13.4}{sec_total_differential.html}         % Differentiability and the Total Differential
+%   \DeclareSection{13.5}{sec_multi_chain.html}                % The Multivariable Chain Rule
+%   \DeclareSection{13.6}{sec_directional_derivative.html}     % Directional Derivatives
+%   \DeclareSection{13.7}{sec_multi_tangent.html}              % Tangent Lines, Normal Lines, and Tangent Planes
+%   \DeclareSection{13.8}{sec_multi_extreme_values.html}       % Extreme Values
+%
+% --- Chapter 14: Multiple Integration ---
+%   \DeclareSection{14.1}{sec_iterated_integrals.html}         % Iterated Integrals and Area
+%   \DeclareSection{14.2}{sec_double_int_volume.html}          % Double Integration and Volume
+%   \DeclareSection{14.3}{sec_double_int_polar.html}           % Double Integration with Polar Coordinates
+%   \DeclareSection{14.4}{sec_center_of_mass.html}             % Center of Mass
+%   \DeclareSection{14.5}{sec_surface_area.html}               % Surface Area
+%   \DeclareSection{14.6}{sec_triple_int.html}                 % Volume Between Surfaces and Triple Integration
+%   \DeclareSection{14.7}{sec_cylindrical_spherical.html}      % Triple Integration with Cylindrical and Spherical Coordinates
+%
+% --- Chapter 15: Vector Analysis ---
+%   \DeclareSection{15.1}{sec_line_int_intro.html}             % Introduction to Line Integrals
+%   \DeclareSection{15.2}{sec_vector_fields.html}              % Vector Fields
+%   \DeclareSection{15.3}{sec_line_int_vf.html}                % Line Integrals over Vector Fields
+%   \DeclareSection{15.4}{sec_greensthm.html}                  % Flow, Flux, Green's Theorem and the Divergence Theorem
+%   \DeclareSection{15.5}{sec_parametric_surfaces.html}        % Parametrized Surfaces and Surface Area
+%   \DeclareSection{15.6}{sec_surface_integral.html}           % Surface Integrals
+%   \DeclareSection{15.7}{sec_stokes_divergence.html}          % The Divergence Theorem and Stokes' Theorem
