@@ -11,6 +11,7 @@ build-pdfs [FILE.tex ...]    # no args: every .tex in the cwd
 build-pdfs --release         # send due copies, build nothing
 build-pdfs --release --dry-run   # ...and report instead of sending
 build-pdfs --no-release FILE.tex # build without the end-of-run sweep
+build-pdfs --serial FILE.tex     # one PDF at a time, not side by side
 \end{manexsource}
 
 \begin{center}

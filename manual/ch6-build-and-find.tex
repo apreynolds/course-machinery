@@ -69,6 +69,17 @@ so the call site needs no class option:
     tier).
 \end{itemize}
 
+\textbf{The base PDF and its views build side by side.} They are separate
+\file{latexmk} runs that share nothing -- each has its own aux directory and
+job name -- so a lecture with two views takes about as long as its slowest
+build, not the sum of three: the instructor copy you are editing against is
+ready as soon as \emph{it} is. Each run's output is held back and printed
+whole, base first, so the terminal stays readable; nothing scrolls while they
+work. A failure in any one fails the document, but every run is still waited
+for, so no log is left half-written. \texttt{-{}-serial} goes back to one
+after another, stopping at the first failure -- for reading a failing build
+as it happens, or for a machine short of cores.
+
 An unrecognised view name warns and is skipped; the student PDF always
 builds. Under the default overlay mode, every view of a document has
 identical page breaks (section~\ref{sec:overlay}).

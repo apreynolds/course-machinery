@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # build-pdfs — compile course .tex files into PDFs with latexmk
-# Usage: build-pdfs [--release [--dry-run]] [--no-release] [FILE.tex ...]
+# Usage: build-pdfs [--release [--dry-run]] [--no-release] [--serial] [FILE.tex ...]
 #
 # With no arguments, compiles every *.tex file in the current directory.
 # Each source FILE.tex produces FILE.pdf.
@@ -9,6 +9,11 @@
 #                 `%! copies:' below). What a scheduler or sync script calls.
 #   --dry-run     with --release, report what would be sent and send nothing.
 #   --no-release  skip the due-check that otherwise ends every run.
+#   --serial      build a document's PDFs one after another, not side by side.
+#
+# A document's base PDF and its views are built AT THE SAME TIME (see build_file),
+# so a three-view lecture takes about as long as its slowest view. Each build's
+# output is held back and printed whole, base first, when the build is collected.
 #
 # Output mirror via a top-level .MIRRORDIR file: build-pdfs looks upward from the
 # build directory for a .MIRRORDIR (at the repo top level, found the way .latexmkrc
@@ -736,6 +741,7 @@ extract_coverpage() {
 build_file() {
   local src=$1 dir base jobname auxkey auxdir outinfo mode outdir movedir pdfdir
   local views view spec suffix inject varaux csuffix clabel cdate force
+  local b_pid b_out b_pdf b_line build_failed i pdf
   dir=$(dirname -- "$src")
   base=$(basename -- "$src")
   jobname=${base%.tex}
@@ -782,34 +788,58 @@ build_file() {
       force=1
       echo "    rebuilding: the last build of $jobname left its PDF somewhere else"
     fi
-    latexmk -pdf ${force:+-g} -interaction=nonstopmode -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} "$base" || exit
-    echo "    ok: $jobname.pdf"
-    if [[ $mode == BOTH ]]; then
-      cp -- "$jobname.pdf" "$outdir/" || exit
-    fi
+    # THE BUILDS RUN SIDE BY SIDE. The base PDF and every view are separate
+    # latexmk runs that share nothing -- each has its own aux dir and its own
+    # jobname -- so they are all started here and collected below, and the whole
+    # set takes about as long as its slowest member instead of their sum. That
+    # is the point: the view you are editing against (usually the instructor
+    # copy, the last one built in the old one-after-another order) is ready as
+    # soon as IT is, not after the two builds in front of it.
+    #
+    # Each run's output goes to a file in its own aux dir and is printed when
+    # the run is collected, in a fixed order (base, then the views as listed),
+    # so three compilers never write over one another on the terminal. The price
+    # is that nothing scrolls while they work.
+    #
+    # The base build always runs, and always at the same time as the views:
+    # vim's quickfix reads the BASE log and nothing else, so a view must never
+    # be able to finish, or fail, ahead of a base log that is still stale.
+    #
+    # --serial restores one-after-another, stopping at the first failure. Use it
+    # to read a failing build's output as it happens, or on a machine that
+    # cannot spare the cores.
+    #
+    # Four parallel arrays, one slot per build:
+    #   b_pid   the background job to wait for (empty once collected)
+    #   b_out   the file holding its output
+    #   b_pdf   the PDF it makes, for the BOTH copy
+    #   b_line  what to print when it succeeds
+    b_pid=(); b_out=(); b_pdf=(); b_line=()
+    # If this script is stopped, stop the compilers it started.
+    trap 'kill ${b_pid[@]+"${b_pid[@]}"} 2>/dev/null' INT TERM
 
-    # Where the built PDFs actually live, for the flat `:LABEL' copies below: the
-    # mirror dir in MOVE mode, else the local build dir (BOTH keeps a local copy;
-    # no .MIRRORDIR builds locally).
-    pdfdir="."; [[ -n $movedir ]] && pdfdir="$movedir"
-
-    # Cover page requested via `%! coverpage: yes'. Taken from the BASE build
-    # only, never from a view -- a solutions or instructor cover is the same
-    # sheet of paper, and it is the student cover that gets printed on its own.
-    # Placed here, before the views loop, for that reason: it belongs to the
-    # build just finished. $pdfdir is already the right directory in both output
-    # modes, so only the extra BOTH copy needs a mode test.
-    if wants_coverpage "$base"; then
-      extract_coverpage "$pdfdir" "$jobname"
-      # An `if' (not `&&') for the same reason as at the end of the views loop
-      # below -- and it matters more here, since a source with no `%! views:'
-      # line makes this block the subshell's last statement, where a trailing
-      # false would have build_file report the whole file FAILED. The -f test
-      # keeps a skipped extraction (no gs) from failing the copy.
-      if [[ $mode == BOTH && -f "${jobname}-COVERPAGE.pdf" ]]; then
-        cp -- "${jobname}-COVERPAGE.pdf" "$outdir/" || exit
+    # Collect build $1: wait for it, print what it said, then one status line.
+    # Returns false if the build failed. A slot already collected is skipped.
+    collect_build() {
+      local i=$1 rc=0
+      [[ -n ${b_pid[$i]} ]] || return 0
+      wait "${b_pid[$i]}" || rc=$?
+      b_pid[$i]=""
+      cat -- "${b_out[$i]}"
+      if (( rc == 0 )); then
+        echo "${b_line[$i]}"
+      else
+        echo "build-pdfs: ${b_pdf[$i]} did not build" >&2
       fi
-    fi
+      return "$rc"
+    }
+
+    # The base build.
+    b_out+=("$auxdir/build-pdfs.out"); b_pdf+=("$jobname.pdf"); b_line+=("    ok: $jobname.pdf")
+    latexmk -pdf ${force:+-g} -interaction=nonstopmode -auxdir="$auxdir" ${movedir:+"-outdir=$movedir"} "$base" \
+      >"$auxdir/build-pdfs.out" 2>&1 &
+    b_pid+=("$!")
+    if [[ -n $serial ]]; then collect_build 0 || exit; fi
 
     # Extra views requested via `%! views: ...' in the source's leading comment.
     # A view is just a jobname SUFFIX plus the \def(s) to inject -- view_spec
@@ -821,7 +851,7 @@ build_file() {
     # mapfile, not `for view in $(...)': read_views emits one token per line,
     # and word-splitting would glob-expand any stray * against the build dir.
     mapfile -t views < <(read_views "$base")
-    for view in "${views[@]}"; do
+    for view in ${views[@]+"${views[@]}"}; do
       # The `:LABEL' suffix moved to `%! copies:'. Strip it so the view still
       # builds, and say so -- an unmigrated source loses its copy loudly.
       if [[ $view == *:* ]]; then
@@ -841,13 +871,49 @@ build_file() {
       { read -r suffix; read -r inject; } <<<"$spec"
       varaux="$cache_root/latexmk/$auxkey-$jobname$suffix"
       mkdir -p "$varaux" || exit
-      compile_view "$jobname" "$base" "$varaux" "$suffix" "$inject" "$movedir" || exit
-      echo "    + $jobname$suffix.pdf ($view)"
-      # An `if' (not `&&') so a MOVE-mode build leaves exit status 0: this is the
-      # loop's last statement, and a trailing false here would make build_file
-      # wrongly report the whole file FAILED.
-      if [[ $mode == BOTH ]]; then cp -- "$jobname$suffix.pdf" "$outdir/" || exit; fi
+      b_out+=("$varaux/build-pdfs.out"); b_pdf+=("$jobname$suffix.pdf"); b_line+=("    + $jobname$suffix.pdf ($view)")
+      compile_view "$jobname" "$base" "$varaux" "$suffix" "$inject" "$movedir" >"$varaux/build-pdfs.out" 2>&1 &
+      b_pid+=("$!")
+      if [[ -n $serial ]]; then collect_build $(( ${#b_pid[@]} - 1 )) || exit; fi
     done
+
+    # Collect them all, in order. Every build is waited for even after one has
+    # failed, so no compiler is left running behind a script that has returned
+    # and every log is complete; only then does a failure end this file.
+    build_failed=""
+    for i in "${!b_pid[@]}"; do
+      collect_build "$i" || build_failed=1
+    done
+    trap - INT TERM
+    [[ -z $build_failed ]] || exit 1
+
+    # BOTH mode: the builds were local, so copy each PDF to the mirror.
+    if [[ $mode == BOTH ]]; then
+      for pdf in "${b_pdf[@]}"; do
+        cp -- "$pdf" "$outdir/" || exit
+      done
+    fi
+
+    # Where the built PDFs actually live, for the flat `:LABEL' copies below: the
+    # mirror dir in MOVE mode, else the local build dir (BOTH keeps a local copy;
+    # no .MIRRORDIR builds locally).
+    pdfdir="."; [[ -n $movedir ]] && pdfdir="$movedir"
+
+    # Cover page requested via `%! coverpage: yes'. Taken from the BASE build
+    # only, never from a view -- a solutions or instructor cover is the same
+    # sheet of paper, and it is the student cover that gets printed on its own.
+    # $pdfdir is already the right directory in both output modes, so only the
+    # extra BOTH copy needs a mode test.
+    if wants_coverpage "$base"; then
+      extract_coverpage "$pdfdir" "$jobname"
+      # An `if' (not `&&'): a source with no `%! copies:' line can make this
+      # block the subshell's last statement, where a trailing false would have
+      # build_file report the whole file FAILED. The -f test keeps a skipped
+      # extraction (no gs) from failing the copy.
+      if [[ $mode == BOTH && -f "${jobname}-COVERPAGE.pdf" ]]; then
+        cp -- "${jobname}-COVERPAGE.pdf" "$outdir/" || exit
+      fi
+    fi
 
     # Copies requested via `%! copies: ...'. Last, so every PDF an entry can name
     # has been built by now. Additive like the mirror, never a replacement, and
@@ -941,13 +1007,14 @@ release_sweep() {
 # Flags, then files. A plain loop rather than getopts: the options are few and
 # long-only, and anything unrecognised must stay a filename so the existing
 # "every argument is a source" rule is undisturbed.
-release_only=""; dry=""; auto_release=1
+release_only=""; dry=""; auto_release=1; serial=""
 args=()
 for arg in "$@"; do
   case $arg in
     --release)    release_only=1 ;;
     --dry-run)    dry=1 ;;
     --no-release) auto_release=0 ;;
+    --serial)     serial=1 ;;
     *)            args+=("$arg") ;;
   esac
 done
