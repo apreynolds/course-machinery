@@ -1,0 +1,2276 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = ["openpyxl"]
+# ///
+#
+# openpyxl reads the shared sac-students.xlsx, which the other instructors edit
+# in Teams and which therefore cannot be a .csv, and writes the workbook below.
+# uv builds and caches the environment on first run, so the script is still
+# started by name. See courseadmin.py's read_sac_students.
+#
+# test-admin — everything a test needs on paper, in one sitting
+# Usage: test-admin N [--yes] [--dry-run] [--force] [--spare N] [--sac N]
+#                     [--pages P] [--keep-tex] [--roster-dir DIR]
+#                     [--stale-days DAYS]
+#
+#   N              the test number. A positive whole number; it names the outputs.
+#   --yes          answer every question with its default, asking nothing. The
+#                  steps done by hand are then listed, not asked about.
+#   --dry-run      go through every step but write no files at all.
+#   --force        replace an existing test-N.xlsx, losing its `Scanned' ticks.
+#   --spare        extra booklets per section, without being asked (default:
+#                  print-job.csv's spare_per_section)
+#   --sac          booklets for the Student Accessibility Centre, the same number
+#                  each day, without being asked (default: count
+#                  sac-students.xlsx and add print-job.csv's sac_cushion)
+#   --pages        pages in one booklet, for when the test PDFs cannot be
+#                  measured (default: the page count of each day's test PDF)
+#   --keep-tex     keep the generated attendance-sheet .tex after a good build.
+#   --roster-dir   where the class-list exports are (default: the shared
+#                  OneDrive folder, exported-classlists)
+#   --stale-days   flag a class list older than this (default 21 -- the ask is
+#                  an export every week or two)
+#
+# RUN ONCE PER TEST, a few days before it, when the test itself is finished. It
+# walks through the job in the order it has to happen and stops to ask before
+# each step that depends on a judgement:
+#
+#   1. THE TEST FILES   are both days' PDFs built, with solutions?        (ask)
+#   2. THE CLASS LISTS  how old is each instructor's newest export?       (ask)
+#   3. ENROLMENT        correct course-sections.csv from the class lists? (ask)
+#   4. THE NUMBERS      spare booklets per section, and the SAC's block   (ask)
+#   5. the attendance sheets are built
+#   6. the workbook is written
+#   7. THE FOLLOW-THROUGH  the steps done by hand, one at a time, each     (ask)
+#      waiting for a `y': set up Crowdmark, label the questions, split its
+#      PDFs, place both orders, drop the files, hand out the cover page
+#
+# and produces two files in the Team's Tests/ADMIN folder (courseadmin's
+# OUTPUT_DIR):
+#
+#   test-N-attendance-sheet.pdf  one page per tutorial section, in the order
+#                                course-sections.csv lists them, each with that
+#                                section's students and a column to tick
+#   test-N.xlsx                  four sheets, two per lecture day:
+#                                  `Tue envelopes'  which booklets go in which
+#                                  `Thu envelopes'  TA's envelope, with a box
+#                                                   to tick once its tests have
+#                                                   been scanned and uploaded
+#                                  `Tue order'      the answers the Print
+#                                  `Thu order'      Services web form asks for,
+#                                                   one cell each
+#
+# THE NUMBERS ARE FIXED AT THE MOMENT OF THE RUN. A student or three may drop
+# between the run and the test, and that is fine: the sheets, the envelopes and
+# the order all describe the same stack of paper, and that agreement matters
+# more than being current. So there is no "refresh" mode, and a rerun stops
+# rather than overwrite a workbook whose boxes may already be ticked (--force).
+#
+# ONE ORDER PER LECTURE DAY. The course tutors on Tuesday and Thursday and a
+# different version of the test is written on each, so there are two print jobs,
+# two stacks of paper and two sets of envelopes. Everything is computed per day.
+#
+# WHY THE CLASS LISTS NEED A SCRIPT -- the registrar's export is awkward in one
+# specific way. Downloading the class list for ANY ONE of an instructor's
+# sections returns the students of ALL of that instructor's sections in a single
+# file, with no section column. Which section a student is in is encoded like
+# this:
+#
+#   "Last, First"                                    -> the section NAMED IN THE
+#                                                       FILENAME
+#   "Last, First cross-listed as MATH*1003*FR02A"    -> FR02A
+#
+# ("Cross-listed" is the registrar's word for it, not a real cross-listing.)
+#
+# So one download per instructor covers the whole course -- and THE FILENAME IS
+# DATA. It is the only record of where the un-suffixed students belong, so a
+# colleague who downloads their FR09A list rather than FR07A makes FR09A the
+# bare-name section, and renaming a file casually would silently mis-assign every
+# section that instructor teaches. That is why the downloads are meant to be
+# dropped in UNRENAMED.
+#
+# THE FOLDER ACCUMULATES. Each instructor exports a fresh list every week or two
+# and NOBODY DELETES ANYTHING -- the one instruction that stays reliable over a
+# term, and the only safe one, since every alternative invites a rename. The
+# filename also carries the export time, so this script takes the newest list per
+# instructor and ignores the rest.
+#
+# THE ATTENDANCE SHEET IS BUILT IN THE REPO, DELIVERED TO THE TEAM. Its .tex is
+# written to TESTS/ADMIN/ and compiled there with pr-latexmk, because the
+# .latexmkrc that finds the machinery only works inside the course tree; the
+# finished PDF is then moved out. The .tex is DELETED once the PDF is built and
+# its page count verified: it is build residue, and a second plaintext copy of
+# every student's name. It survives whenever that verification did not pass, and
+# under --keep-tex, so it is still git-ignored. --keep-tex is for correcting a
+# name or adding a late student by hand and recompiling.
+#
+# WHAT THIS REPLACED. Two scripts, make-attendance-sheets and make-print-job,
+# which were always run minutes apart and each needed telling what the other
+# already knew. Before them, the ADMIN-10x3.xlsx `testN' sheets. Two deliberate
+# differences from that spreadsheet survive:
+#
+#   SPARES.  It ordered enrolment + ROUNDUP(enrolment * 5%), so a 35-seat section
+#            got two spares and a 16-seat section got one. A flat spare per
+#            section is what is actually wanted.
+#
+#   THE SAC. Its "Special notes" read "set aside the **last** 11 tests (test #1
+#            to test #11)" -- the parenthetical restarted its count at 1 and so
+#            contradicted the word "last". Booklets are numbered continuously
+#            here, SAC block included, and the note says the same thing once.
+#
+# PORTING TO ANOTHER COURSE. Nothing in these scripts is edited: they are shared,
+# in the machinery submodule, and run as .course-machinery/admin/test-admin from
+# the course's own checkout. Everything about the course's shape -- how many
+# sections, their order, rooms, TAs, who teaches them -- is read from
+# course-sections.csv, and section codes are not pattern-matched. (See the
+# PORTING block below for the two things still assumed: the subject MATH, and
+# Tuesday/Thursday tutorials.) The new course's course-info/ needs:
+#
+#   admin-settings.csv    columns setting, value: course_number and team_dir
+#   course-sections.csv   columns Section, Enrolment, Day, Room, Instructor, TA
+#   print-job.csv         columns field, label, value  (see read_print_job)
+#   calendar-dates.csv    columns week, date, id, tutorial  (optional)
+#   courseinfo.sty        for \coursenum in the sheet's heading
+#
+# courseadmin.py, checkbox_xlsx.py and the sheet's layout, attendance.sty, sit
+# beside this script; the last is found by LaTeX on TEXINPUTS.
+#
+# plus a TESTS/ADMIN/ in that repo to build in (holding a .latexmkrc), a
+# .MIRRORDIR at the repo's top level saying where built PDFs go, pr-latexmk and
+# pdfinfo on PATH, a Team folder for the output, and .gitignore entries for the
+# class lists and the generated test*-attendance-sheet.tex, both of which hold
+# student names. Write those entries UNANCHORED: they guard against a file
+# appearing rather than tracking one that exists, so a path-anchored pattern
+# stops guarding the next time the tree is rearranged, and does it silently.
+
+import argparse
+import csv
+import re
+import shutil
+import subprocess
+import unicodedata
+from collections import OrderedDict
+from datetime import date, datetime
+from pathlib import Path
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, Side
+
+# openpyxl cannot write Excel's native in-cell checkboxes; this sibling module
+# post-processes the saved workbook to add them. See its header.
+import checkbox_xlsx
+
+# The sibling module holding the plumbing: where things are, the deferred
+# report, and the readers for the data files. Python puts a script's own
+# directory first on sys.path, so this resolves with no path setup and no
+# installation. Its header says what it holds and what it deliberately does not.
+from courseadmin import (
+    BUILD_DIR,
+    COURSE_NUMBER,
+    DATA_DIR,
+    DEFAULT_ROSTER_DIR,
+    OUTPUT_DIR,
+    PRINT_JOB_CSV,
+    REPO_ROOT,
+    SAC_STUDENTS_XLSX,
+    SCRIPT_DIR,
+    SECTIONS_CSV,
+    count_warning,
+    die,
+    ensure_output_dir,
+    find_mirror_dir,
+    flush_report,
+    fold_name,
+    paint,
+    parse_test_number,
+    read_print_job,
+    read_sac_students,
+    read_sections,
+    say,
+    warn,
+)
+
+# ---------------------------------------------------------------------------
+# PORTING: what is specific to a course.
+#
+# COURSE_NUMBER is not set here any more: it comes from the course's own
+# course-info/admin-settings.csv, by way of courseadmin.py, because this script
+# is shared across courses. What IS still assumed here is the subject, MATH --
+# in COURSE_NAME below and in the two patterns that recognise the registrar's
+# exports (ROSTER_GLOB, FILENAME_SECTION_RE and its cross-listing twin) -- and
+# the Tuesday/Thursday tutorial days in DAYS.
+#
+# Everything else adapts on its own. How many sections there are, what order the
+# pages come in, who the instructors are, how many sections each of them has, and
+# how many pages the finished PDF should have are ALL read from
+# course-sections.csv -- so a course with sixteen sections across three
+# instructors, or uneven groups, needs no change here. Section codes are not
+# pattern-matched either (see FILENAME_SECTION_RE).
+# ---------------------------------------------------------------------------
+COURSE_NAME = f"MATH {COURSE_NUMBER}"
+
+# What the reminder tells you to check the new figures against. A name and not
+# a link on purpose: the registrar's enrolment page is reached by menu-diving
+# and has no address worth pasting. If one ever turns up, it goes here.
+CATALOG_HINT = "UNB's Course Catalog Data"
+
+# DAYS is keyed by the exact strings the Day column of course-sections.csv uses,
+# because that column is what the whole order is split on. They are abbreviations
+# a human chose ("Tues", not "Tuesday"), so they are declared rather than parsed
+# -- and a section whose Day is not one of these keys is a fatal error, not a
+# section quietly left out of the count. For each day:
+#
+#   short     how it reads in the form's description   "TUE"
+#   long      how it heads a table                     "TUESDAY"
+#   calendar  how it starts a date in calendar-dates.csv ("Tue 29 Sep"), and
+#             the name of its sheets in the workbook   ("Tue envelopes")
+#   file      how the test's own files end             "test-2a-tue.pdf"
+#
+# A course tutoring on other days, or on one day only, edits this table and
+# nothing else: the order of the keys is the order everything is written in.
+DAYS = OrderedDict([
+    ("Tues",  {"short": "TUE", "long": "TUESDAY",  "calendar": "Tue", "file": "tue"}),
+    ("Thurs", {"short": "THU", "long": "THURSDAY", "calendar": "Thu", "file": "thu"}),
+])
+# ---------------------------------------------------------------------------
+
+# How old an export may be before the freshness report calls it stale. The ask to
+# colleagues is "every week or two", so three weeks means someone has missed a
+# turn rather than merely being a few days late.
+DEFAULT_STALE_DAYS = 21
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% ASKING
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Every question has a default, shown in capitals or in brackets, and Enter takes
+# it. --yes takes all of them without asking, which is also what makes the script
+# runnable where there is no keyboard to answer on.
+#
+# THE REPORT IS FLUSHED BEFORE EVERY QUESTION. say() and warn() hold their lines
+# back so that they are not lost above a wall of build output; a question is the
+# moment they have to be on screen, because they are what is being asked about.
+ASSUME_YES = False
+
+
+def read_answer(prompt):
+    """One line typed at the keyboard, stripped; "" under --yes."""
+    flush_report(tally=False)
+    if ASSUME_YES:
+        return ""
+    try:
+        return input(prompt).strip()
+    except EOFError:
+        # No keyboard: run from a script, or with input redirected. Guessing an
+        # answer here would be answering for someone who was never asked.
+        print()
+        die("there is no terminal to answer on. Rerun with --yes to accept "
+            "every default.")
+    except KeyboardInterrupt:
+        print()
+        die("stopped. Nothing further was written.")
+
+
+def confirm(question, default=True):
+    """A yes/no question -> True or False. Enter gives the default."""
+    hint = "[Y/n]" if default else "[y/N]"
+    while True:
+        answer = read_answer(f"{question} {hint} ").casefold()
+        if answer == "":
+            return default
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("  Please answer y or n.")
+
+
+def proceed_or_stop(question):
+    """Ask whether to carry on; a no ends the run here, cleanly."""
+    if not confirm(question):
+        print("Stopped. Nothing further was written.")
+        raise SystemExit(0)
+
+
+def ask_number(question, default, note=""):
+    """A whole number, zero or more. Enter gives the default.
+
+    `note' says where the default came from -- "4 yes + 3 unknown + 5 cushion"
+    -- so that accepting it is a decision and not a shrug.
+    """
+    shown = f"{default} = {note}" if note else str(default)
+    while True:
+        answer = read_answer(f"{question} [{shown}]: ")
+        if answer == "":
+            return default
+        if answer.isdigit():
+            return int(answer)
+        print("  Please type a whole number, or press Enter for the default.")
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE TEST FILES
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# A test is two documents, one per lecture day: test-2a-tue and test-2b-thu. Each
+# is a .tex in the repo's TESTS/ and, once built, a PDF and a -SOLUTIONS PDF in
+# the mirror -- the directory tree .MIRRORDIR names, which is where build-pdfs
+# sends everything it builds.
+#
+# THE PDF IS LOOKED AT FOR ONE NUMBER: how many pages a booklet has. That used
+# to be typed on the command line every time, on the grounds that it could not
+# be derived; it can, because the booklet Crowdmark produces has exactly the
+# pages of the PDF it was given. Measuring it also means it cannot be stale.
+
+def pdf_page_count(pdf_path):
+    """How many pages a PDF has, by asking pdfinfo -> an int, or None.
+
+    None covers every way of not knowing: no pdfinfo on this machine (it is
+    poppler's, not a given), a file it cannot read, output with no Pages line.
+    The callers decide what not knowing costs.
+    """
+    try:
+        result = subprocess.run(
+            ["pdfinfo", str(pdf_path)], capture_output=True, text=True, check=True
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    for line in result.stdout.splitlines():
+        if line.startswith("Pages:"):
+            text = line.split(":", 1)[1].strip()
+            return int(text) if text.isdigit() else None
+    return None
+
+
+def modified(path):
+    """When a file was last written, as a datetime."""
+    return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+def find_test_files(test_number, pages_override):
+    """Look at each day's test PDF -> {day key: pages in one booklet}.
+
+    Says what it found, one row per day, and warns about what is not ready:
+
+      no PDF            the test has not been built; nothing to measure
+      PDF older than    the .tex was edited after the build, so the PDF -- and
+      its .tex          the one already uploaded anywhere -- is not the test
+      no -SOLUTIONS     wanted eventually, but the order does not wait on it
+
+    A MISSING PDF IS FATAL unless --pages was given, because the page count is
+    multiplied into the order and there is no honest guess at it. With --pages
+    everything here is advice and the number typed is used for both days.
+    """
+    mirror = find_mirror_dir()
+    tests_dir = mirror / "TESTS" if mirror else None
+    say(paint(f"test {test_number}'s files in "
+              f"{tests_dir if tests_dir else '(no mirror found)'}", "bold"))
+    if mirror is None:
+        warn(
+            f"no usable .MIRRORDIR at {REPO_ROOT}, so the built test PDFs "
+            f"cannot be found. It names the directory build-pdfs sends PDFs to."
+        )
+
+    pages = {}
+    for key, day in DAYS.items():
+        # test-2?-tue.pdf: the letter is the version (a, b) and is whatever the
+        # test was called, so it is matched and not assumed. The pattern ends at
+        # the day, so -SOLUTIONS and -COVERPAGE files do not match it.
+        pattern = f"test-{test_number}?-{day['file']}.pdf"
+        found = sorted(tests_dir.glob(pattern)) if tests_dir else []
+
+        if not found:
+            say(f"  {day['calendar']}  " + paint(f"no {pattern}", "red"))
+            if pages_override is None:
+                die(
+                    f"no {pattern} in {tests_dir}. Build the test first "
+                    f"(build-pdfs), or pass --pages P to say how many pages a "
+                    f"booklet has and carry on without it."
+                )
+            count_warning()
+            pages[key] = pages_override
+            continue
+
+        if len(found) > 1:
+            warn(
+                f"{len(found)} files match {pattern} "
+                f"({', '.join(p.name for p in found)}); using {found[0].name}."
+            )
+        pdf = found[0]
+        built = modified(pdf)
+        measured = pdf_page_count(pdf)
+        notes = []
+
+        # The .tex has the PDF's name. Edited after the build means the PDF is
+        # not the current test -- the commonest way to print the wrong thing.
+        tex = (REPO_ROOT / "TESTS" / pdf.with_suffix(".tex").name) if REPO_ROOT else None
+        if tex is None or not tex.exists():
+            notes.append(paint("no .tex in the repo's TESTS/", "yellow"))
+            count_warning()
+        elif modified(tex) > built:
+            notes.append(paint(
+                f".tex EDITED SINCE ({modified(tex).strftime('%-d %b %H:%M')}) "
+                f"-- rebuild", "red"))
+            count_warning()
+
+        solutions = pdf.with_name(pdf.stem + "-SOLUTIONS.pdf")
+        if not solutions.exists():
+            notes.append(paint("no -SOLUTIONS yet", "yellow"))
+            count_warning()
+        elif tex is not None and tex.exists() and modified(tex) > modified(solutions):
+            notes.append(paint("-SOLUTIONS older than the .tex", "yellow"))
+            count_warning()
+        else:
+            notes.append(paint("with -SOLUTIONS", "green"))
+
+        if pages_override is not None:
+            pages[key] = pages_override
+            if measured is not None and measured != pages_override:
+                warn(
+                    f"--pages {pages_override} was given, but {pdf.name} has "
+                    f"{measured} pages. Using {pages_override}, as told."
+                )
+        elif measured is None:
+            die(
+                f"could not count the pages of {pdf.name} (is pdfinfo "
+                f"installed? it comes with poppler). Pass --pages P to say how "
+                f"many pages a booklet has."
+            )
+        else:
+            pages[key] = measured
+
+        say(
+            f"  {day['calendar']}  {pdf.name:<20} {pages[key]:>2} pages  "
+            f"built {built.strftime('%-d %b %H:%M')}  " + ", ".join(notes)
+        )
+
+        # The job is ordered double-sided, so an odd count leaves a blank side
+        # and makes "N leaves" in the description a rounded number.
+        if pages[key] % 2:
+            warn(
+                f"{pdf.name} has {pages[key]} pages, which is odd, but the job "
+                f"is ordered double-sided: the last leaf prints on one side "
+                f"only. Check the booklet."
+            )
+
+    return pages
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE CLASS LISTS
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+# What the class lists are called, e.g.
+#   section-rosters_MATH_1003_FR01A_2026-08-23_9_06 PM.csv
+ROSTER_GLOB = f"section-rosters_MATH_{COURSE_NUMBER}_*.csv"
+
+# The nominal section AND the export time, both taken from that filename.
+#
+# See WHY THIS SCRIPT EXISTS above for why the section here is load-bearing. The
+# timestamp is what lets the shared folder simply accumulate: the newest export
+# per instructor wins and nobody has to delete anything.
+#
+# THE SECTION CODE IS CAPTURED GENERICALLY, not matched against a pattern. It
+# used to be FR\d{2}A, which is right for this course and wrong for the next one
+# along -- MATH 1013's sections are FR01B, so that pattern would match nothing
+# and the run would end at "no class lists in ...", a message pointing nowhere
+# near the cause. What vouches for a code now is membership in
+# course-sections.csv, tested in select_current_exports; that check is the only
+# validation left, so do not weaken it.
+#
+# Nothing anchors the end, so a second download in one browser session --
+# "... 9_06 PM (1).csv" -- still parses.
+FILENAME_SECTION_RE = re.compile(
+    rf"section-rosters_MATH_{COURSE_NUMBER}_([A-Z0-9]+)_"
+    rf"(\d{{4}}-\d{{2}}-\d{{2}}_\d{{1,2}}_\d{{2}} [AP]M)"
+)
+
+# The registrar's timestamp format: 2026-08-23_9_06 PM. %I is the 12-hour clock
+# and tolerates the unpadded hour.
+EXPORT_TIME_FORMAT = "%Y-%m-%d_%I_%M %p"
+
+# The suffix that overrides it. The asterisks are literal in the export, hence
+# the escaping; the trailing $ anchors it so a student whose name somehow
+# contained the phrase mid-string would not be silently truncated.
+CROSSLIST_RE = re.compile(
+    rf"\s+cross-listed as MATH\*{COURSE_NUMBER}\*([A-Z0-9]+)\s*$"
+)
+
+# Characters TeX would read as markup if a name contained them. Applied one
+# character at a time (see latex_escape), which is what keeps the backslash rule
+# from then mangling the backslashes the other rules just introduced.
+LATEX_SPECIALS = {
+    "\\": r"\textbackslash{}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+}
+
+
+def latex_escape(text):
+    """Make a student's name safe to typeset.
+
+    One pass, character by character, so a replacement's own backslash is never
+    re-escaped by a later rule. Accented letters pass straight through: the
+    course builds with pdflatex under T1 (Typefaces.sty:26), which handles them
+    from UTF-8 source. Scripts outside the Latin alphabet do NOT survive that,
+    so they are flagged separately in check_typesettable.
+    """
+    return "".join(LATEX_SPECIALS.get(ch, ch) for ch in text)
+
+
+def check_typesettable(name, section):
+    """Warn about characters pdflatex+T1 cannot set, before the build fails.
+
+    T1 covers the Latin alphabet and its accents. A name in Greek, Cyrillic,
+    Chinese or Arabic would stop the compile with an error naming a font, not a
+    student, so it is worth saying plainly here whose name it was.
+    """
+    for ch in name:
+        if ord(ch) < 128:
+            continue
+        try:
+            unicode_name = unicodedata.name(ch)
+        except ValueError:
+            unicode_name = "unnamed character"
+        if not unicode_name.startswith("LATIN"):
+            warn(
+                f"{section}: {name!r} contains {ch!r} ({unicode_name}), which "
+                f"pdflatex with T1 fonts cannot typeset -- the build may fail"
+            )
+            return
+
+
+def export_time(path, stamp_text):
+    """When this class list was exported.
+
+    The filename's timestamp is preferred because it records when the registrar
+    produced the data, which is the thing that goes stale. The file's mtime only
+    records when the file happened to land in the folder -- a re-sync or a copy
+    between machines can move it, and OneDrive is exactly that kind of folder.
+    mtime is the fallback for when the registrar changes the filename format.
+    """
+    try:
+        return datetime.strptime(stamp_text, EXPORT_TIME_FORMAT)
+    except ValueError:
+        warn(
+            f"{path.name}: cannot read the export time {stamp_text!r}; falling "
+            f"back to the file's modification time, which may be later than the "
+            f"actual export"
+        )
+        return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+def select_current_exports(roster_dir, sections):
+    """Pick the newest class list per INSTRUCTOR from a folder that accumulates.
+
+    Instructors drop a fresh export in every week or two and never delete
+    anything, so the folder holds many generations at once. Returns
+    {instructor: (path, nominal_section, exported)}.
+
+    GROUPED BY INSTRUCTOR, NOT BY SECTION CODE, and that is the whole subtlety.
+    An instructor's export covers all of their sections whichever one it is
+    nominally named for, so the same instructor may file FR07A in September and
+    FR09A in October. Keyed by section code those look like two independent
+    sources and both would be read, silently double-counting every section that
+    instructor teaches. Keyed by instructor, October simply supersedes September.
+    """
+    if not roster_dir.is_dir():
+        die(
+            f"class-list folder not found:\n  {roster_dir}\n"
+            f"If this is the shared OneDrive folder, it may not be mounted or "
+            f"synced yet. Pass --roster-dir to build from somewhere else -- but "
+            f"note that an old local copy will produce confidently wrong sheets."
+        )
+
+    roster_files = sorted(roster_dir.glob(ROSTER_GLOB))
+    # The anonymised sample is not a class list.
+    roster_files = [p for p in roster_files if not p.stem.endswith("-DEMO")]
+    if not roster_files:
+        die(f"no {ROSTER_GLOB} files in {roster_dir}")
+
+    current = {}
+    for path in roster_files:
+        match = FILENAME_SECTION_RE.search(path.name)
+        if not match:
+            # A WARNING, NOT AN ERROR: this is a shared folder that will collect
+            # stray files over a term, and one of them must not stop the build.
+            # Safe to be lenient because a class list skipped here is not lost
+            # quietly -- that instructor's sections turn up in the freshness
+            # report as absent and in the PDF as "No class-list data" pages.
+            warn(
+                f"{path.name}: not a recognisable class-list filename, skipped. "
+                f"If this is a class list that was renamed, restore the "
+                f"registrar's original name -- the filename is the only record "
+                f"of which section the un-suffixed students belong to."
+            )
+            continue
+
+        nominal_section, stamp_text = match.group(1), match.group(2)
+        if nominal_section not in sections:
+            warn(
+                f"{path.name}: section {nominal_section} is not in "
+                f"course-sections.csv, skipped"
+            )
+            continue
+
+        instructor = sections[nominal_section]["instructor"] or nominal_section
+        exported = export_time(path, stamp_text)
+        if instructor not in current or exported > current[instructor][2]:
+            current[instructor] = (path, nominal_section, exported)
+
+    if not current:
+        die(f"no usable class lists in {roster_dir}")
+
+    return current, len(roster_files)
+
+
+def report_freshness(current, sections, stale_days, total_files, roster_dir):
+    """Say which lists were used, how old they are, and who has not filed one.
+
+    Printed every run rather than only on trouble: the point of asking several
+    people to export regularly is that some of them will forget, so this is the
+    nudge list. It also makes clear that superseded files were ignored, not lost.
+    """
+    # Every instructor named in course-sections.csv, in the order the sections
+    # appear, so the report reads FR01A-group first and is stable run to run.
+    instructors = []
+    for info in sections.values():
+        if info["instructor"] and info["instructor"] not in instructors:
+            instructors.append(info["instructor"])
+
+    say(paint(
+        f"using {len(current)} of {total_files} class list(s) in {roster_dir}",
+        "bold",
+    ))
+
+    # The freshness table is a table, so its rows carry no "!" marker even when
+    # they are the problem -- routing the bad ones through warn() would put a
+    # marker on some rows of a table and not others. They still count towards the
+    # tally, via count_warning(); they say so in the column where the eye is
+    # already looking.
+    today = datetime.now()
+
+    for instructor in instructors:
+        if instructor not in current:
+            say(
+                f"  {instructor:<14} {'--':<7} "
+                + paint("NO CLASS LIST -- ask for an export", "red")
+            )
+            count_warning()
+            continue
+
+        _path, nominal_section, exported = current[instructor]
+        age = (today - exported).days
+        line = f"  {instructor:<14} {nominal_section:<7} exported {exported.strftime('%-d %b')}"
+        if age < 0:
+            # Not worth a real code path, but "(-21 days ago)" reads as a bug.
+            # A future date means a clock or a filename is wrong, so say that.
+            line += paint("  (dated in the future -- check the filename)", "red")
+            count_warning()
+        elif age > stale_days:
+            line += paint(f"  ({age} days ago)  STALE", "yellow")
+            count_warning()
+        else:
+            line += paint(f"  ({age} days ago)", "green")
+        say(line)
+
+
+def collect_students(current, known_sections):
+    """Read the selected class lists and sort the students into sections.
+
+    Returns {section: [(display_name, student_id), ...]}. Sections with no
+    students are simply absent; the caller still gives them a page.
+    """
+    students = {}
+    # (section, student id) already taken. Selection should already have removed
+    # superseded generations, so this is a safety net rather than the mechanism.
+    seen = set()
+
+    for path, nominal_section, _exported in current.values():
+        rows_read = 0
+        rows_duplicate = 0
+
+        # utf-8-sig: the export carries a byte-order mark, which would otherwise
+        # ride along on the first column name and break the DictReader lookup.
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                raw_name = (row.get("Student Name") or "").strip()
+                if not raw_name:
+                    continue  # the export ends with a blank line
+                rows_read += 1
+
+                student_id = (row.get("Student ID") or "").strip()
+
+                suffix = CROSSLIST_RE.search(raw_name)
+                if suffix:
+                    section = suffix.group(1)
+                    display_name = raw_name[: suffix.start()].strip()
+                else:
+                    section = nominal_section
+                    display_name = raw_name
+
+                if section not in known_sections:
+                    warn(
+                        f"{path.name}: student in section {section}, which is "
+                        f"not in course-sections.csv -- skipped"
+                    )
+                    continue
+
+                key = (section, student_id or display_name.casefold())
+                if key in seen:
+                    rows_duplicate += 1
+                    continue
+                seen.add(key)
+
+                check_typesettable(display_name, section)
+                students.setdefault(section, []).append((display_name, student_id))
+
+        if rows_duplicate:
+            # Reported per file rather than per row: the case this catches is a
+            # stale download sitting beside a fresh one, where every row is a
+            # duplicate and one line is more use than two hundred.
+            warn(
+                f"{path.name}: {rows_duplicate} of {rows_read} rows were already "
+                f"seen in another file"
+                + (
+                    " -- this looks like a second copy of a list already read; "
+                    "consider removing the older download"
+                    if rows_duplicate == rows_read
+                    else ""
+                )
+            )
+
+    # Sorted by the name as printed, which is "Last, First", so this is a sort by
+    # last name. casefold rather than lower so it behaves on accented capitals.
+    for section in students:
+        students[section].sort(key=lambda entry: entry[0].casefold())
+
+    # A student in two sections is a registrar problem worth seeing, and it is
+    # cheap to look for now that everything is in one place.
+    id_owner = {}
+    for section, entries in students.items():
+        for display_name, student_id in entries:
+            if not student_id:
+                continue
+            if student_id in id_owner:
+                other_section, other_name = id_owner[student_id]
+                if other_section != section:
+                    warn(
+                        f"student ID {student_id} appears in both "
+                        f"{other_section} ({other_name}) and {section} "
+                        f"({display_name})"
+                    )
+            else:
+                id_owner[student_id] = (section, display_name)
+
+    return students
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% ENROLMENT
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# course-sections.csv says how many are registered in each section, and every
+# number in the order is computed from it. It is hand-maintained, so it drifts;
+# the class lists just read are the correction. The disagreements are shown and
+# the file is rewritten only on a yes.
+
+def plan_enrolment_updates(sections, students, current, stale_days):
+    """What the class lists say course-sections.csv has wrong. Applies nothing.
+
+    THE EXPORT IS THE AUTHORITY ONLY WHERE THERE IS ONE. A section is considered
+    only when its instructor filed a class list; otherwise its count is UNKNOWN,
+    which is not the same as zero and must not be written as one. That distinction
+    is the whole safety of this function: one absent download covers all of that
+    instructor's sections at once, so guessing there would empty six full rooms
+    on paper and order them a single spare booklet each.
+
+    A SECTION WHOSE LIST WAS READ AND HOLDS NOBODY GOES TO 0. The export is
+    trusted that far, deliberately -- see the plan's note. It still earns a line
+    in the table, because a section emptying out is worth seeing rather than
+    inferring from a number that quietly became zero.
+
+    Staleness is carried, not acted on: an old export still updates, and says how
+    old it was, so a figure taken from a download predating a hand-correction is
+    visible in the same glance as everything else being checked.
+    """
+    updates, agreed, unchecked = [], 0, 0
+    today = datetime.now()
+
+    for section, info in sections.items():
+        instructor = info["instructor"]
+        if instructor not in current:
+            unchecked += 1
+            continue
+
+        live = len(students.get(section, []))
+        if live == info["registered"]:
+            agreed += 1
+            continue
+
+        _path, _nominal, exported = current[instructor]
+        age = (today - exported).days
+        updates.append({
+            "section": section,
+            "old": info["registered"],
+            "new": live,
+            "instructor": instructor,
+            "exported": exported,
+            "age": age,
+            "stale": age > stale_days,
+        })
+
+    return updates, agreed, unchecked
+
+
+def write_enrolment(updates):
+    """Rewrite just the Enrolment cells the class lists corrected.
+
+    LINE-ORIENTED, NOT A CSV ROUND-TRIP. course-sections.csv is hand-maintained
+    and tracked, so the diff after a run should be the rows that actually moved
+    and nothing else. Rewriting it through csv.writer would be simpler and would
+    also requote, reorder or re-line-end the whole file at the first difference of
+    opinion about dialect -- turning a two-line correction into a 25-line diff
+    that nobody can review. This is only safe because the file has been checked to
+    hold no field containing a comma or a quote; if that ever changes, this has to
+    become a real CSV rewrite.
+
+    THE CAPACITY HALF IS PRESERVED. The cell is `registered/capacity' and a class
+    list knows nothing about capacity, so only the left half is ever touched.
+
+    Written to a temporary file and moved into place, so an interrupted run
+    cannot leave a half-written section list -- this is the course's definition of
+    itself, and every other script reads it.
+    """
+    if not updates:
+        return
+
+    lines = SECTIONS_CSV.read_text(encoding="utf-8").split("\n")
+    wanted = {u["section"]: u for u in updates}
+
+    for index, line in enumerate(lines):
+        if not line.strip():
+            continue
+        fields = line.split(",")
+        update = wanted.pop(fields[0].strip(), None)
+        if update is None:
+            continue
+        capacity = fields[1].split("/", 1)[1] if "/" in fields[1] else ""
+        fields[1] = f"{update['new']}/{capacity}" if capacity else str(update["new"])
+        lines[index] = ",".join(fields)
+
+    if wanted:
+        # Never a partial write: the file this script is about to replace is the
+        # one that says which sections exist.
+        die(
+            f"{SECTIONS_CSV.name} has no row for "
+            f"{', '.join(sorted(wanted))}, so it was left untouched. The section "
+            f"list changed underneath this run."
+        )
+
+    scratch = SECTIONS_CSV.with_suffix(".csv.new")
+    scratch.write_text("\n".join(lines), encoding="utf-8")
+    scratch.replace(SECTIONS_CSV)
+
+
+def apply_enrolment(sections, updates):
+    """Carry the corrections into the section list already in memory.
+
+    So that everything computed after this -- the booklets, the envelopes, the
+    figure in each sheet's heading -- uses the corrected numbers without the
+    file being read a second time. Separate from write_enrolment because a dry
+    run wants exactly this half: the numbers a real run would produce, with
+    nothing written.
+    """
+    for update in updates:
+        sections[update["section"]]["registered"] = update["new"]
+
+
+def report_enrolment(updates, agreed, unchecked):
+    """Say what the class lists would change, before anything is changed.
+
+    THE THREE COUNTS ARE KEPT APART. "Already correct" and "unchecked" are
+    different claims -- one means a class list agreed, the other means no class
+    list existed to ask -- and adding them together would overstate how much of
+    the file has actually been verified.
+    """
+    if not updates:
+        say(paint(f"course-sections.csv: {agreed} section(s) already correct"
+                  + (f", {unchecked} unchecked (no class list filed)"
+                     if unchecked else ""), "green"))
+        return
+
+    say(paint(
+        f"course-sections.csv disagrees with the class lists in "
+        f"{len(updates)} section(s)", "bold"))
+    for u in updates:
+        old = "?" if u["old"] is None else u["old"]
+        # A negative age is a clock or a filename, not a fresh export -- the same
+        # case report_freshness flags. "(-1 days)" reads as an arithmetic bug, so
+        # say what it actually means.
+        when = (
+            paint("(dated in the future)", "red") if u["age"] < 0
+            else f"({u['age']} days)"
+        )
+        line = (
+            f"    {u['section']:<7} {old:>3} -> {u['new']:<3}  "
+            f"{u['instructor']}, exported {u['exported'].strftime('%-d %b')} "
+            f"{when}"
+        )
+        if u["stale"]:
+            line += paint("  STALE", "yellow")
+        say(line)
+    say(
+        f"    {agreed} section(s) already correct"
+        + (f"; {unchecked} unchecked (no class list filed)." if unchecked else ".")
+    )
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE ATTENDANCE SHEETS
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def match_elsewhere(students, sac_marked):
+    """Which listed names belong to students writing elsewhere -> {section: {name}}.
+
+    TWO FILES, TWO SPELLINGS OF THE SAME PERSON. The registrar gives one display
+    string, "Barrios Martinez, Danna X."; sac-students.xlsx is typed by hand into
+    separate last and first columns. So the comparison is folded (case and
+    accents dropped, see fold_name) and the first name is allowed to be a PREFIX
+    on either side, which is what lets a recorded "Danna" find a listed
+    "Danna X." without also letting "Dan" find her.
+
+    SCOPED TO THE SECTION, always. The section is recorded beside the name, two
+    students in a course of 634 may well share one, and a cross-section match
+    would silently mark the wrong person's row.
+
+    THE WARNINGS ARE THE POINT of doing this at all. A row that matches nobody
+    means a typo, a withdrawal, or a section change -- and in the last case the
+    order takes a booklet off the wrong section's stack. A row
+    that matches two people cannot be resolved from what is written down, so it
+    marks neither and says so.
+    """
+    marked = {}
+    for section, wanted in sac_marked.items():
+        listed = students.get(section, [])
+        for last, first in wanted:
+            fold_last, fold_first = fold_name(last), fold_name(first)
+            hits = []
+            for display_name, _student_id in listed:
+                their_last, _, their_first = display_name.partition(",")
+                if fold_name(their_last) != fold_last:
+                    continue
+                theirs = fold_name(their_first)
+                if (
+                    theirs == fold_first
+                    or theirs.startswith(fold_first + " ")
+                    or fold_first.startswith(theirs + " ")
+                ):
+                    hits.append(display_name)
+
+            if not hits:
+                if not listed:
+                    # The class list for this section is missing entirely, which
+                    # is already reported once. Saying it again per student would
+                    # bury the freshness table under a name for every SAC row.
+                    continue
+                warn(
+                    f"{SAC_STUDENTS_XLSX.name}: {last}, {first} is recorded in "
+                    f"{section} but no one of that name is on {section}'s class "
+                    f"list -- withdrawn, a typo, or in a different section now. "
+                    f"The order still takes a booklet off {section} for them."
+                )
+            elif len(hits) > 1:
+                warn(
+                    f"{SAC_STUDENTS_XLSX.name}: {last}, {first} matches "
+                    f"{len(hits)} students in {section}; none marked on the "
+                    f"sheet. Add a middle initial to tell them apart."
+                )
+            else:
+                marked.setdefault(section, set()).add(hits[0])
+    return marked
+
+
+def check_one_page_per_sheet(pdf_path, expected_pages):
+    """Verify the finished PDF really is one page per section.
+
+    This is the only thing that catches the sheet's worst failure, and LaTeX will
+    not do it. A tabular is an unbreakable box: a table too tall for its page is
+    not reported as an Overfull \\vbox, it is silently moved to the next page,
+    stranding its heading and making the document one page longer. No warning is
+    issued anywhere. The usual trigger is a long name wrapping in the name
+    column, since a wrapped row is taller -- see TUNING in attendance.sty.
+
+    Counting pages tests the invariant itself rather than any one cause, so it
+    also catches whatever the next edit breaks.
+
+    RETURNS TRUE ONLY WHEN IT POSITIVELY VERIFIED the count, because the caller
+    deletes the generated .tex on the strength of it. Every other outcome --
+    wrong count, unreadable output, no pdfinfo at all -- returns False and keeps
+    the source. Unverified is not success: a missing tool must not be able to
+    masquerade as a clean build and take the evidence with it.
+    """
+    pages = pdf_page_count(pdf_path)
+    if pages is None:
+        # Losing the check is worth saying out loud, because its silence is
+        # otherwise indistinguishable from a pass.
+        warn(
+            "could not count the attendance sheet's pages with pdfinfo, so the "
+            "one-page-per-section check was SKIPPED -- count them by hand "
+            "before printing"
+        )
+        return False
+    if pages != expected_pages:
+        warn(
+            f"the PDF has {pages} pages but there are {expected_pages} sections. "
+            f"A section's table did not fit its page and moved to the next one, "
+            f"stranding its heading -- most likely a long name wrapping in a "
+            f"nearly full section. Widen \\attnamewidth or shave \\attrowheight "
+            f"in attendance.sty, and DO NOT print until the count matches."
+        )
+        return False
+    return True
+
+
+def compile_sheet(tex_path):
+    """Build the PDF beside the .tex with pr-latexmk -> True if it worked.
+
+    pr-latexmk rather than a bare latexmk call because the aux-dir path is a
+    contract shared with vimtex and build-pdfs (LATEXMK-AUX-CONTRACT in its
+    header); calling it keeps this script from becoming one more place that
+    derives that path. Everything but the PDF goes to ~/.cache/latexmk/.
+
+    ITS OUTPUT IS HELD BACK, and shown only if the build fails. pdflatex writes
+    several hundred lines for this document, none of them of interest when it
+    works, and they would push the questions already answered off the screen.
+    """
+    try:
+        result = subprocess.run(
+            ["pr-latexmk", tex_path.name],
+            cwd=tex_path.parent,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,   # one stream, in the order it was written
+            text=True,
+        )
+    except FileNotFoundError:
+        die(
+            f"pr-latexmk is not on PATH, so {tex_path.name} cannot be compiled. "
+            f"It lives in ~/.local/bin."
+        )
+    if result.returncode != 0:
+        print(result.stdout)
+    return result.returncode == 0
+
+
+def render_tex(test_number, sections, students, entries_by_section, elsewhere):
+    """Build the whole document: a preamble and one sheet per section.
+
+    THE BOOKLET COUNT IS THE ENVELOPE'S, not the number of names on the page.
+    `entries_by_section' is the very rows the envelope sheets are written from,
+    so the heading states the figure that is in the TA's envelope by
+    construction rather than by a second copy of the arithmetic. The "writing
+    elsewhere" figure is likewise the recorded tally rather than the number of
+    names actually greyed out below: when a name fails to match, the envelope is
+    still short by it, and match_elsewhere has already said so.
+    """
+    lines = [
+        f"% GENERATED by test-admin on {date.today().isoformat()}.",
+        "% Do not edit -- rerun the script instead. Git-ignored because it holds",
+        "% student names; the layout lives in the tracked attendance.sty.",
+        "\\documentclass[11pt,lining]{CourseDocument}",
+        "",
+        "% attendance.sty owns the page and pulls in courseinfo itself, so there is",
+        "% nothing to set here -- see THE PAGE and TUNING in that file.",
+        "\\usepackage{attendance}",
+        "",
+        "\\begin{document}",
+        "% empty, not plain: no page number. Titling.sty installs no pagestyle and",
+        "% CourseDocument activates neither of its two fancy ones, so this is bare.",
+        "\\pagestyle{empty}",
+        "",
+    ]
+
+    for section, info in sections.items():
+        entries = students.get(section, [])
+        ta_name = latex_escape(info["ta"]) or "---"
+        envelope = entries_by_section[section]
+        booklets = envelope["copies"]
+        away = envelope["at_sac"]
+        marked = elsewhere.get(section, set())
+        lines.append(
+            f"\\begin{{attendancesheet}}{{{test_number}}}{{{section}}}"
+            f"{{{ta_name}}}{{{len(entries)}}}{{{booklets}}}{{{away}}}"
+        )
+        if entries:
+            for display_name, _student_id in entries:
+                macro = "StudentElsewhere" if display_name in marked else "Student"
+                lines.append(f"  \\{macro}{{{latex_escape(display_name)}}}")
+        else:
+            lines.append("  \\NoRosterData")
+        lines.append("\\end{attendancesheet}")
+        lines.append("")
+
+    lines.append("\\end{document}")
+    return "\n".join(lines) + "\n"
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE CALENDAR
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+CALENDAR_CSV = (DATA_DIR or SCRIPT_DIR) / "calendar-dates.csv"
+
+# Spelt out for the form's Date Required: "Monday 28 September" rather than
+# "Mon 28 Sep". calendar-dates.csv abbreviates because it is building a table
+# where the column is narrow; an answer on a form is not.
+MONTHS = {
+    "Jan": "January", "Feb": "February", "Mar": "March", "Apr": "April",
+    "May": "May", "Jun": "June", "Jul": "July", "Aug": "August",
+    "Sep": "September", "Oct": "October", "Nov": "November", "Dec": "December",
+}
+
+# How a test announces itself in the `tutorial' column of calendar-dates.csv.
+# The trailing number is captured rather than matched so that it can be compared
+# as a number: searching for test 1 must not find "TEST 10". IGNORECASE because
+# that column is prose for the printed schedule, not a machine field.
+TEST_IN_TUTORIAL_RE = re.compile(r"\btest\s*0*(\d+)\b", re.IGNORECASE)
+
+
+def read_calendar():
+    """calendar-dates.csv -> a list of rows, or [] if it is not there.
+
+    NOT FATAL WHEN ABSENT. Every number in the order comes from
+    course-sections.csv; the calendar contributes only the two test dates and the
+    Monday the order is wanted by, which are nice to have printed and are not worth refusing
+    to produce an order over. An unmarked test is reported by find_test_days.
+    """
+    if not CALENDAR_CSV.exists():
+        return []
+    with CALENDAR_CSV.open(encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def find_test_days(calendar, test_number):
+    """Which dates test N is written on -> {day key: "Tue 22 Sep"}, and its week.
+
+    READS THE `tutorial' COLUMN, which already says what happens in that slot --
+    "Help session" most weeks, "TEST 1" when there is a test. That column is not
+    a marker invented for this script: coursetables.sty prints it in the schedule
+    table, so marking a test there is one edit that both moves the deadline here
+    and tells students in the printed schedule. A `test' column of its own would
+    have been a second place to record the same fact, and two places drift.
+
+    MATCHED CASE-INSENSITIVELY, and loosely. That cell is prose bound for a
+    printed table, so its capitalisation belongs to whoever is writing the
+    schedule -- "TEST 1" reads best there and the script has no business
+    insisting on it. The number is parsed out and compared as a number rather
+    than matched as text, so looking for test 1 never matches "TEST 10", and
+    trailing detail ("TEST 1 -- Ch. 1-3") does not stop it being found.
+
+    ONLY THE TUESDAY ROW IS MARKED, because that is how the tutorial column
+    already works: the pair of rows share one slot id (tut02 on both Tue 22 Sep
+    and Thu 24 Sep) and the schedule table emits the cell once for the week. So
+    the marked row gives the slot, and THE SLOT GIVES BOTH DATES -- see the
+    pairing below.
+
+    A test that has not been marked yet is a warning and not an error; see MONDAY
+    in the deadline code for what is lost. Returns ({}, None) in that case.
+    """
+    if not calendar:
+        return {}, None
+
+    marked = []
+    for row in calendar:
+        found = TEST_IN_TUTORIAL_RE.search((row.get("tutorial") or ""))
+        if found and int(found.group(1)) == int(test_number):
+            marked.append(row)
+
+    if not marked:
+        warn(
+            f"test {test_number} is not marked in {CALENDAR_CSV.name}, so its "
+            f"dates and the date the order is required are left generic. Put "
+            f"`TEST {test_number}' in the `tutorial' column of the row it is "
+            f"written on -- the same column that says `Help session' in the "
+            f"weeks without a test."
+        )
+        return {}, None
+
+    if len(marked) > 1:
+        warn(
+            f"{CALENDAR_CSV.name} marks test {test_number} on "
+            f"{len(marked)} rows "
+            f"({', '.join((r.get('date') or '?').strip() for r in marked)}); "
+            f"using the first."
+        )
+    row = marked[0]
+    slot = (row.get("id") or "").strip()
+    week = (row.get("week") or "").strip()
+
+    # THE PAIRING. A tutorial slot is two rows sharing an id -- tut02 is both
+    # Tue 22 Sep and Thu 24 Sep -- so the id is what says "the same tutorial,
+    # the other day", which is exactly the question being asked. Falling back to
+    # the week when there is no usable id (week 1's placeholder id is `---')
+    # keeps a marked test from losing its dates over a detail of the calendar.
+    if slot and slot != "---":
+        partners = [r for r in calendar if (r.get("id") or "").strip() == slot]
+    else:
+        partners = [
+            r for r in calendar
+            if (r.get("week") or "").strip() == week
+            and (r.get("type") or "").strip() == "tutorial"
+        ]
+
+    dates = {}
+    for partner in partners:
+        stamp = (partner.get("date") or "").strip()
+        for key, day in DAYS.items():
+            if stamp.startswith(day["calendar"] + " "):
+                dates.setdefault(key, stamp)
+                break
+
+    for key, day in DAYS.items():
+        if key not in dates:
+            warn(
+                f"{CALENDAR_CSV.name} has no {day['calendar']} row for test "
+                f"{test_number}'s tutorial slot, though the course tutors that "
+                f"day. That day's order is dated generically."
+            )
+
+    return dates, week or None
+
+
+def find_monday(calendar, week):
+    """The Monday of a week, spelt out -> "Monday 28 September", or None.
+
+    MONDAY. The order is wanted by the Monday before the test, and that needs no date
+    arithmetic and no year: that Monday is ALREADY A ROW of calendar-dates.csv,
+    so it is looked up rather than computed. Nothing here has to know that 2026
+    is not a leap year or that the term starts in September.
+
+    Two weeks in a term break the lookup, and both are warned about rather than
+    papered over: a week whose Monday is a holiday (the pickup would fall on a
+    closed campus), and a week with no Monday row at all (the fall break is one
+    merged `9--13 Nov' row).
+    """
+    if not calendar or week is None:
+        return None
+
+    for row in calendar:
+        if (row.get("week") or "").strip() != week:
+            continue
+        stamp = (row.get("date") or "").strip()
+        if not stamp.startswith("Mon "):
+            continue
+        if (row.get("type") or "").strip() == "no class":
+            note = (row.get("note") or "").strip() or "no class"
+            warn(
+                f"the Monday before this test is {stamp} -- {note}. Date "
+                f"Required says so anyway; choose another day on the form "
+                f"if Print Services is closed."
+            )
+        parts = stamp.split()
+        if len(parts) == 3 and parts[2] in MONTHS:
+            return f"Monday {parts[1]} {MONTHS[parts[2]]}"
+        return stamp
+
+    warn(
+        f"week {week} of {CALENDAR_CSV.name} has no Monday row, so Date "
+        f"Required is left generic. (The fall break is one merged row, which is "
+        f"the usual cause.)"
+    )
+    return None
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE ARITHMETIC
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+# The label a SAC row carries in the tables. Not a section, so it has no TA, no
+# room of ours and no enrolment -- see build_day for why it is a row at all.
+SAC_LABEL = "SAC"
+
+# A print-job.csv value mentioning any of these is ABOUT the SAC block, and is
+# left out of the order entirely when a day has no such block. The alternative
+# is a form field reading "set aside the last 0 booklets (booklets 0 to 0 of
+# 393)", which is worse than saying nothing: it is an instruction, it is
+# addressed to someone who will act on it, and it is nonsense.
+SAC_PLACEHOLDERS = ("{sac}", "{sac_first}", "{sac_last}")
+
+
+def split_by_day(sections):
+    """course-sections.csv's order, partitioned on the Day column.
+
+    STRICT ON PURPOSE. A Day this does not recognise is fatal, because the
+    alternative is the failure this whole script exists to avoid: a section
+    silently absent from its day's count, an order short by thirty booklets, and
+    nothing anywhere saying so until a TA is handed an envelope too thin. The
+    section order WITHIN a day is the CSV's own, which is what makes the booklet
+    numbering reproducible -- rerun it and the same section gets the same range.
+    """
+    by_day = OrderedDict((key, []) for key in DAYS)
+    for code, info in sections.items():
+        day = info["day"]
+        if day not in by_day:
+            die(
+                f"{code} has Day {day!r} in course-sections.csv, which is not "
+                f"one of {', '.join(repr(k) for k in DAYS)}. Fix the spelling "
+                f"-- a day this script does not recognise would leave the "
+                f"section out of the order entirely."
+            )
+        if info["registered"] is None:
+            die(
+                f"{code} has no readable enrolment in course-sections.csv. The "
+                f"column is \"registered/capacity\", e.g. 22/25."
+            )
+        by_day[day].append((code, info))
+
+    for day, rows in by_day.items():
+        if not rows:
+            warn(f"no sections have Day {day!r}; that day's order will be empty.")
+    return by_day
+
+
+def size_sac_block(rows, sac_counts, cushion):
+    """How many booklets the SAC needs for one day -> (number, how it was reached).
+
+    Every `yes' plus every `unknown' in the day's sections, then the cushion --
+    a small margin for a booking made after the order went in, or a student who
+    changes their mind on the morning. The cushion is what the flat ballpark used
+    to be, shrunk to the size of the uncertainty that is actually left.
+
+    The second value spells the sum out ("4 yes + 3 unknown + 5 cushion"), for
+    the question that offers this number as a default.
+    """
+    yes = unknown = 0
+    for code, _info in rows:
+        tally = sac_counts.get(code, {})
+        yes += tally.get("yes", 0)
+        unknown += tally.get("unknown", 0)
+    return (
+        yes + unknown + cushion,
+        f"{yes} yes + {unknown} unknown + {cushion} cushion",
+    )
+
+
+def build_day(day_key, rows, spare, sac_counts, sac_block, pages):
+    """One day's booklet plan: a row per section, then the SAC block, then totals.
+
+    THE STACK IS THE POINT. What comes back from Print Services is one pile of
+    identical booklets per day, so the only thing that divides it is counting
+    from the top. Every row therefore carries a contiguous range, they abut
+    exactly, the first starts at 1 and the last ends at the total.
+
+    A SECTION IS SHORT BY ITS SAC WRITERS. Someone who writes at the SAC needs a
+    booklet at the SAC and not one in their tutorial room, so they come out of
+    their section's count and go into the block below. Students whose column is
+    still blank do NOT come out -- they are counted in both places, deliberately;
+    see WHO WRITES AT THE SAC in courseadmin.py.
+
+    THE SAC BLOCK IS LAST so that its instruction to Print Services can be "the
+    last N booklets" -- a thing someone can do at the end of a run without
+    counting past it. It is a row in the same table, sharing the same numbering,
+    because a separate count is what made the spreadsheet's note contradict
+    itself.
+    """
+    entries, cursor = [], 1
+    enrolled = at_sac = 0
+    for code, info in rows:
+        leaving = sac_counts.get(code, {}).get("yes", 0)
+        # Never below zero, however wrong the shared file is: a section with more
+        # SAC rows than registered students is a data error worth surviving, and
+        # read_sac_students has already said so.
+        copies = max(0, info["registered"] - leaving) + spare
+        entries.append({
+            "label": code,
+            "ta": info["ta"] or "--",
+            "room": info["room"] or "--",
+            "enrolled": info["registered"],
+            "at_sac": leaving,
+            "copies": copies,
+            "first": cursor,
+            "last": cursor + copies - 1,
+        })
+        enrolled += info["registered"]
+        at_sac += leaving
+        cursor += copies
+
+    sac_entry = None
+    if sac_block:
+        sac_entry = {
+            "label": SAC_LABEL,
+            "ta": "--",
+            "room": SAC_LABEL,
+            "enrolled": None,
+            "at_sac": 0,
+            "copies": sac_block,
+            "first": cursor,
+            "last": cursor + sac_block - 1,
+        }
+        entries.append(sac_entry)
+        cursor += sac_block
+
+    return {
+        "key": day_key,
+        "short": DAYS[day_key]["short"],
+        "long": DAYS[day_key]["long"],
+        "calendar": DAYS[day_key]["calendar"],
+        "entries": entries,
+        "sac": sac_entry,
+        "sections": len(rows),
+        "enrolled": enrolled,
+        "at_sac": at_sac,
+        "spare": spare,
+        "booklets": cursor - 1,
+        # Pages in ONE booklet, and so the last page of this day's whole stack:
+        # the Crowdmark PDF is the booklet repeated, so booklet 403 of an 8-page
+        # test ends on page 3224. That is where the PDF is split.
+        "pages": pages,
+        "last_page": (cursor - 1) * pages,
+    }
+
+
+def split_instruction(plan):
+    """Where to cut one day's Crowdmark PDF, as a sentence.
+
+    Crowdmark can only generate a test for the whole course, so each day's
+    download holds a booklet for every student -- several hundred more than that
+    day needs. Only the first `booklets' of them are printed.
+
+    TWO WAYS TO SAY IT, and no tool named. Splitting the PDF first is kinder to
+    Print Services, who then print the file they were sent; telling them where
+    to stop does the same job with nothing but the page number. Either way the
+    number is the same, and it is all this script contributes.
+    """
+    return (
+        f"Split the Crowdmark PDF after page {plan['last_page']} (the end of "
+        f"booklet {plan['booklets']}), or ask Print Services to print pages "
+        f"1-{plan['last_page']} only."
+    )
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE OUTPUT
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# NOTHING IS HARD-WRAPPED. Every answer in an order sits on one logical
+# line however long it is, because these lines exist to be selected and pasted
+# into a web form: a description broken over two lines pastes as a description
+# with a newline in it. The terminal may soft-wrap them, which costs nothing.
+
+def placeholders(plan, test_number, test_date, monday):
+    """Everything a print-job.csv value may interpolate, for one day."""
+    return {
+        "course": COURSE_NAME,
+        "test": test_number,
+        "day": plan["short"],
+        "day_long": plan["long"],
+        "date": test_date or plan["long"].capitalize(),
+        "sections": plan["sections"],
+        "enrolled": plan["enrolled"],
+        "at_sac": plan["at_sac"],
+        "spare": plan["spare"],
+        "sac": plan["sac"]["copies"] if plan["sac"] else 0,
+        "sac_first": plan["sac"]["first"] if plan["sac"] else 0,
+        "sac_last": plan["sac"]["last"] if plan["sac"] else 0,
+        "booklets": plan["booklets"],
+        "pages": plan["pages"],
+        # Sheets of paper in one booklet: half the pages, rounded up.
+        "leaves": -(-plan["pages"] // 2),
+        "last_page": plan["last_page"],
+        # Left generic when the calendar cannot say, which is exactly what the
+        # spreadsheet always did -- see find_test_days.
+        "monday": monday or "Monday",
+    }
+
+
+def fill(template, values, field):
+    """Interpolate one print-job.csv value, or say precisely what is wrong with it.
+
+    A bad placeholder in a data file must not surface as a bare KeyError
+    traceback: the person who typed it is editing a CSV, not reading Python.
+    """
+    try:
+        return template.format(**values)
+    except KeyError as unknown:
+        die(
+            f"{PRINT_JOB_CSV.name}: field `{field}' uses {{{unknown.args[0]}}}, "
+            f"which is not a thing this script can fill in. Available: "
+            f"{', '.join('{' + k + '}' for k in sorted(values))}."
+        )
+    except (IndexError, ValueError):
+        die(
+            f"{PRINT_JOB_CSV.name}: field `{field}' has a stray {{ or }} in its "
+            f"value. Double them ({{{{ and }}}}) to mean a literal brace."
+        )
+
+
+def render_envelopes(plans, test_number, dates):
+    """The TA split: one table per day, columns sized to the data."""
+    out = [
+        f"{COURSE_NAME} -- Test {test_number} -- ENVELOPE SPLIT",
+        f"Generated by test-admin on {date.today().isoformat()}. "
+        f"Do not edit -- rerun the script.",
+        "",
+        "Each day's print job comes back as ONE stack of identical booklets.",
+        "Count from the top: every section's range below is contiguous with the",
+        "next, and the SAC block is the tail of the stack.",
+        "",
+        "atSAC is how many of that section write at the SAC instead; their",
+        "booklets are in the SAC block, not the section's envelope.",
+    ]
+
+    for plan in plans:
+        entries = plan["entries"]
+        stamp = dates.get(plan["key"])
+        heading = plan["long"] + (f" -- {stamp}" if stamp else "")
+
+        # Sized to the widest cell rather than fixed, so a course with longer TA
+        # names or room codes still lines up.
+        w_sec = max(7, max(len(e["label"]) for e in entries))
+        w_ta = max(2, max(len(e["ta"]) for e in entries))
+        w_room = max(4, max(len(e["room"]) for e in entries))
+        w_num = max(len(str(plan["booklets"])), 3)
+
+        # Built once so the rule under the table and the totals row can be laid
+        # out against the header rather than against a recount of the widths.
+        head = (
+            f"  {'Section':<{w_sec}}  {'TA':<{w_ta}}  {'Room':<{w_room}}  "
+            f"{'Enrol':>5}  {'atSAC':>5}  {'Copies':>6}"
+        )
+        names_width = w_sec + w_ta + w_room + 4
+
+        out += ["", heading, "-" * len(heading), head + "  Booklets"]
+        for entry in entries:
+            enrolled = "-" if entry["enrolled"] is None else str(entry["enrolled"])
+            span = f"{entry['first']:>{w_num}}-{entry['last']:>{w_num}}"
+            at_sac = "-" if entry["enrolled"] is None else str(entry["at_sac"])
+            out.append(
+                f"  {entry['label']:<{w_sec}}  {entry['ta']:<{w_ta}}  "
+                f"{entry['room']:<{w_room}}  {enrolled:>5}  {at_sac:>5}  "
+                f"{entry['copies']:>6}  {span}"
+            )
+        total_label = f"{plan['sections']} sections"
+        out.append("  " + "-" * (len(head) - 2))
+        out.append(
+            f"  {total_label:<{names_width}}  "
+            f"{plan['enrolled']:>5}  {plan['at_sac']:>5}  {plan['booklets']:>6}"
+        )
+
+    return "\n".join(out) + "\n"
+
+
+def print_job_days(plans, fields, test_number, dates, monday):
+    """Each day's order as data: a title, summary lines, the form's answers.
+
+    One list feeds both outputs -- the text a dry run prints and the workbook --
+    so the two cannot disagree about what was ordered.
+    """
+    days = []
+    for plan in plans:
+        stamp = dates.get(plan["key"])
+        values = placeholders(plan, test_number, stamp, monday)
+        rows = [
+            (label, fill(template, values, name))
+            for name, label, template in fields
+            if plan["sac"] or not any(p in template for p in SAC_PLACEHOLDERS)
+        ]
+        days.append({
+            "sheet": f"{plan['calendar']} order",
+            "title": plan["long"] + (f" -- {stamp}" if stamp else ""),
+            "summary": [
+                f"{plan['booklets']} booklets x {plan['pages']} pages "
+                f"= {plan['last_page']} pages to print",
+                f"({plan['enrolled']} enrolled"
+                + (f" - {plan['at_sac']} at SAC" if plan["at_sac"] else "")
+                + f" + {plan['spare']} spare x {plan['sections']} sections"
+                + f" + {plan['sac']['copies'] if plan['sac'] else 0} for the SAC)",
+                split_instruction(plan),
+            ],
+            "rows": rows,
+        })
+    return days
+
+
+# The settings of print-job.csv worth showing above an order, and what to call
+# them. Not form answers -- these are where the form IS, and who the file drop
+# is addressed to.
+ORDER_LINKS = (
+    ("form_url", "Form"),
+    ("filedrop_url", "File drop"),
+    ("filedrop_recipients", "Send to"),
+)
+
+
+def render_print_job(days, settings, test_number):
+    """The web form's answers as text, for a dry run's terminal."""
+    out = [f"{COURSE_NAME} -- Test {test_number} -- PRINT SERVICES ORDER"]
+    for name, caption in ORDER_LINKS:
+        if settings.get(name):
+            out.append(f"{caption + ':':<11}{settings[name]}")
+    out += [
+        "",
+        f"{len(days)} SEPARATE ORDERS, one per lecture day. The file you upload is",
+        "the booklet repeated, so Quantity stays 1 and the booklet count is stated",
+        "in the description instead.",
+        "",
+        "Values are never wrapped: each sits on one line, ready to copy whole.",
+    ]
+
+    for day in days:
+        rule = "=" * 70
+        out += ["", rule, day["title"]]
+        out += ["  " + line for line in day["summary"]]
+        out.append(rule)
+        for label, value in day["rows"]:
+            out += ["", label, "    " + value]
+
+    return "\n".join(out) + "\n"
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE WORKBOOK
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# What is written to disk: one workbook, TWO SHEETS PER DAY, because each day is
+# its own order and its own stack of paper.
+#
+# THE ENVELOPE SHEETS COME FIRST. An order sheet is read once, on the day the
+# order is placed; an envelope sheet is opened again and again for the rest of
+# the test's life, as booklets are handed out and then ticked off. The sheets a
+# workbook opens on should be the ones it is opened for.
+#
+# The envelope sheets are not only output: their `Scanned' column is ticked by
+# hand as each section's tests are scanned and uploaded, which is why main()
+# refuses to overwrite the workbook without --force.
+
+# The column of an envelope sheet that holds the checkboxes, and the row its
+# header sits on. Named because checkbox_xlsx addresses cells by coordinate.
+SCANNED_COLUMN = "I"
+HEADER_ROW = 4
+
+BOLD = Font(bold=True)
+TITLE = Font(bold=True, size=14)
+DIM = Font(italic=True, color="666666")
+
+
+def add_envelope_sheet(workbook, plan, test_number, stamp, generated):
+    """One day's TA split, as a sheet -> (its name, the cells to make checkboxes).
+
+    The cells are returned rather than converted here because checkbox_xlsx works
+    on the SAVED file: openpyxl cannot write a checkbox, so the workbook is saved
+    with plain booleans and the boxes are added afterwards.
+    """
+    sheet = workbook.create_sheet(f"{plan['calendar']} envelopes")
+    sheet["A1"] = (
+        f"{COURSE_NAME} -- Test {test_number} -- {plan['long']}"
+        + (f" -- {stamp}" if stamp else "")
+    )
+    sheet["A1"].font = TITLE
+    sheet["A2"] = (
+        f"Generated by test-admin on {generated}. Count from the top of "
+        f"the stack: each range follows on from the one above, and the SAC "
+        f"block is the tail."
+    )
+    sheet["A2"].font = DIM
+
+    headers = ["Section", "TA", "Room", "Enrol", "atSAC", "Copies",
+               "First", "Last", "Scanned"]
+    for column, text in enumerate(headers, start=1):
+        cell = sheet.cell(row=HEADER_ROW, column=column, value=text)
+        cell.font = BOLD
+        cell.border = Border(bottom=Side(style="thin"))
+
+    row = HEADER_ROW
+    cells = []
+    for entry in plan["entries"]:
+        row += 1
+        is_sac = entry["enrolled"] is None
+        sheet.append([
+            entry["label"],
+            None if is_sac else entry["ta"],
+            None if is_sac else entry["room"],
+            None if is_sac else entry["enrolled"],
+            None if is_sac else entry["at_sac"],
+            entry["copies"],
+            entry["first"],
+            entry["last"],
+            # A real boolean: the checkbox is only a way of displaying it.
+            False,
+        ])
+        sheet[f"{SCANNED_COLUMN}{row}"].alignment = Alignment(horizontal="center")
+        cells.append(f"{SCANNED_COLUMN}{row}")
+
+    # The totals, as numbers rather than formulas: they describe an order
+    # that has been placed, and must not change if someone edits a row.
+    row += 1
+    sheet.append([f"{plan['sections']} sections", None, None,
+                  plan["enrolled"], plan["at_sac"], plan["booklets"]])
+    for cell in sheet[row]:
+        cell.font = BOLD
+        cell.border = Border(top=Side(style="thin"))
+
+    for letter, width in zip("ABCDEFGHI", (10, 18, 16, 7, 7, 8, 7, 7, 10)):
+        sheet.column_dimensions[letter].width = width
+    sheet.freeze_panes = f"A{HEADER_ROW + 1}"
+    return sheet.title, cells
+
+
+def add_order_sheet(workbook, day, settings, test_number, generated):
+    """One day's answers to the web form, as a sheet: one cell per answer.
+
+    Two columns, the form's question and its answer, in the form's own order:
+    reading down the sheet and down the web page is the same motion. Copying a
+    cell copies its whole value, so the long ones are wrapped for reading
+    without any risk of a newline reaching the form.
+    """
+    sheet = workbook.create_sheet(day["sheet"])
+    sheet["A1"] = f"{COURSE_NAME} -- Test {test_number} -- {day['title']}"
+    sheet["A1"].font = TITLE
+    for line in day["summary"]:
+        sheet.append([line])
+    sheet.append([f"Generated by test-admin on {generated}."])
+    sheet.cell(row=sheet.max_row, column=1).font = DIM
+
+    # The links, as live hyperlinks: the form is the next thing opened.
+    sheet.append([])
+    for name, caption in ORDER_LINKS:
+        if not settings.get(name):
+            continue
+        target = settings[name]
+        sheet.append([caption, target])
+        cell = sheet.cell(row=sheet.max_row, column=2)
+        # Anything that is not a web address is one or more email addresses;
+        # a mailto: link takes several, separated by commas and no spaces.
+        if "://" in target:
+            cell.hyperlink = target
+        else:
+            cell.hyperlink = "mailto:" + target.replace(" ", "")
+        cell.style = "Hyperlink"
+
+    sheet.append([])
+    sheet.append(["Form field", "Value"])
+    for cell in sheet[sheet.max_row]:
+        cell.font = BOLD
+        cell.border = Border(bottom=Side(style="thin"))
+    for label, value in day["rows"]:
+        sheet.append([label, value])
+        for cell in sheet[sheet.max_row]:
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+    sheet.column_dimensions["A"].width = 44
+    sheet.column_dimensions["B"].width = 90
+
+
+def write_workbook(path, plans, days, settings, test_number, dates, generated):
+    """test-N.xlsx: every day's envelope sheet, then every day's order sheet.
+
+    `generated' is the date printed on each sheet.
+    """
+    workbook = Workbook()
+    # A new Workbook arrives holding one empty sheet; every sheet here is named,
+    # so that one goes.
+    workbook.remove(workbook.active)
+
+    checkbox_cells = {}
+    for plan in plans:
+        name, cells = add_envelope_sheet(
+            workbook, plan, test_number, dates.get(plan["key"]), generated
+        )
+        checkbox_cells[name] = cells
+    for day in days:
+        add_order_sheet(workbook, day, settings, test_number, generated)
+
+    workbook.save(path)
+    for sheet_name, cells in checkbox_cells.items():
+        checkbox_xlsx.add_checkboxes(path, sheet_name, cells)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE FOLLOW-THROUGH
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# The files are the easy half. What actually gets a test printed is a handful of
+# things done by hand on three websites, in an order that matters, a few times a
+# term -- rarely enough to forget one. So the run does not end when the workbook
+# is written: it walks through those steps one at a time and waits at each.
+#
+# NOTHING HERE IS CHECKED. The script cannot see Crowdmark or Print Services; a
+# `y' is taken on trust. The point is only that each step is put in front of
+# whoever is running this, with the numbers it needs, and cannot be passed
+# without being answered.
+
+def find_coverpages(test_number):
+    """The test's cover-page PDFs in the mirror -> a list of paths, maybe empty.
+
+    The cover page is a view of the test (build-pdfs' `coverpage'), handed to
+    students ahead of time. Matched loosely -- test-2a-tue-COVERPAGE.pdf and
+    test-1a-tue_COVERPAGE.pdf have both been its name.
+    """
+    mirror = find_mirror_dir()
+    if mirror is None:
+        return []
+    return sorted((mirror / "TESTS").glob(f"test-{test_number}*COVERPAGE.pdf"))
+
+
+def follow_through_steps(test_number, plans, settings, workbook_path):
+    """What is left to do by hand -> a list of (title, [detail lines]).
+
+    In the order it has to happen: the file must exist before it can be named on
+    the order form, and the order is what tells Print Services a file is coming.
+    """
+    day_names = " and ".join(f"Test {test_number} ({plan['calendar']})"
+                             for plan in plans)
+    order_sheets = " and ".join(f"`{plan['calendar']} order'" for plan in plans)
+    pages_per_day = [
+        f"{plan['calendar']}  pages 1-{plan['last_page']}  "
+        f"(booklets 1-{plan['booklets']})"
+        for plan in plans
+    ]
+
+    steps = [
+        (
+            "Set the test up in Crowdmark and download the booklets",
+            [
+                f"One assessment per day: {day_names}.",
+                "Crowdmark makes a booklet for every student in the course on "
+                "each, so both downloads are far longer than what gets printed.",
+            ],
+        ),
+        (
+            "Label the questions in Crowdmark",
+            [f"In both assessments: {day_names}."],
+        ),
+        (
+            "Split each Crowdmark PDF",
+            [
+                "Keep the first part of each; the rest is spare booklets.",
+                *pages_per_day,
+                "(Or leave the PDFs whole and tell Print Services to print "
+                "only those pages.)",
+            ],
+        ),
+        (
+            f"Place both orders with Print Services -- {len(plans)} separate orders",
+            [
+                settings.get("form_url", ""),
+                f"The answers are in {workbook_path.name}, sheets {order_sheets}.",
+                f"({workbook_path.parent})",
+            ],
+        ),
+        (
+            "Drop the files",
+            [
+                settings.get("filedrop_url", ""),
+                f"Send to: {settings.get('filedrop_recipients', '')}",
+                "One file per day -- the split PDFs from step 3.",
+            ],
+        ),
+    ]
+
+    coverpages = find_coverpages(test_number)
+    if coverpages:
+        detail = [str(path) for path in coverpages]
+    else:
+        detail = [
+            paint(f"No test-{test_number}*COVERPAGE.pdf was found in the "
+                  f"mirror's TESTS/.", "red"),
+            "Build it first (build-pdfs, with `coverpage' among the test's "
+            "views), then hand it out.",
+        ]
+    steps.append(("Make the cover page available to students", detail))
+
+    # A setting missing from print-job.csv leaves an empty line; drop those
+    # rather than print a blank where a link should be.
+    return [(title, [line for line in lines if line.strip()])
+            for title, lines in steps]
+
+
+def show_step(number, total, title, lines, lead="NEXT STEP"):
+    """Print one step: a numbered heading, then its details indented."""
+    print()
+    print(paint(f"{lead} ({number} of {total}): {title}", "bold"))
+    for line in lines:
+        print(f"    {line}")
+
+
+def walk_follow_through(steps, asking):
+    """Put each step on screen and wait for it to be done.
+
+    THERE IS NO DEFAULT. Every other question in this script takes Enter for
+    its usual answer; here Enter alone asks again, because the one thing this
+    must not do is let a step go by on a reflex. The answers are:
+
+      y   done -- on to the next step
+      s   skip: not done, carry on anyway. It is listed again at the end.
+      q   stop here. The steps not reached are printed in full, so they are
+          still on the screen to work from.
+
+    `asking' is False for --yes and --dry-run. Neither can vouch that a step
+    was done, so every step is printed as still to do and none is asked about.
+    """
+    total = len(steps)
+    if not asking:
+        print()
+        print(paint("STILL TO DO, by hand:", "bold"))
+        for number, (title, lines) in enumerate(steps, start=1):
+            show_step(number, total, title, lines, lead="STEP")
+        return
+
+    not_done = []
+    for number, (title, lines) in enumerate(steps, start=1):
+        show_step(number, total, title, lines)
+        answer = ""
+        while answer not in ("y", "s", "q"):
+            try:
+                answer = input(
+                    "  Enter y once this is done  (s = skip for now, "
+                    "q = stop here): "
+                ).strip().casefold()
+            except (EOFError, KeyboardInterrupt):
+                # Ctrl-D or Ctrl-C at this point means "stop", not "crash".
+                print()
+                answer = "q"
+
+        if answer == "s":
+            not_done.append(title)
+        elif answer == "q":
+            # This step and everything after it, in full: stopping must not
+            # cost the instructions for what is left.
+            remaining = steps[number:]
+            if remaining:
+                print()
+                print(paint("Stopped. Also still to do:", "yellow"))
+                for later, (later_title, later_lines) in enumerate(
+                        remaining, start=number + 1):
+                    show_step(later, total, later_title, later_lines,
+                              lead="STEP")
+            not_done.append(title)
+            not_done += [later_title for later_title, _lines in remaining]
+            break
+
+    print()
+    if not_done:
+        print(paint(f"NOT DONE YET ({len(not_done)} of {total}):", "yellow"))
+        for title in not_done:
+            print(f"    {title}")
+    else:
+        print(paint(f"All {total} steps done.", "green"))
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE RUN
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def parse_count(value):
+    """An argument that must be a whole number, zero or more."""
+    if value.isdigit():
+        return int(value)
+    raise argparse.ArgumentTypeError(
+        f"{value!r} is not a whole number, zero or more"
+    )
+
+
+def parse_pages(value):
+    """Check --pages before it multiplies into a page count."""
+    if value.isdigit() and int(value) > 0:
+        return int(value)
+    raise argparse.ArgumentTypeError(
+        f"{value!r} is not a positive whole number of pages, e.g. 8"
+    )
+
+
+def main():
+    global ASSUME_YES
+
+    parser = argparse.ArgumentParser(
+        description=f"Everything {COURSE_NAME} test N needs on paper: the "
+        f"per-section attendance sheets, the Print Services order, and which "
+        f"booklets go in which TA's envelope.",
+        epilog="Run once per test. It asks before each step that needs a "
+        "decision; Enter accepts the default shown, and --yes accepts them "
+        "all. Instructors drop their class-list exports in the shared folder "
+        "UNRENAMED and delete nothing; the newest per instructor is used.",
+    )
+    parser.add_argument(
+        "test_number",
+        metavar="N",
+        type=parse_test_number,
+        help="test number, e.g. 2 (a positive whole number)",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="answer every question with its default, asking nothing; the "
+        "steps done by hand are then listed rather than asked about",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="go through every step and print the result, but write no files "
+        "-- not the workbook, not the attendance sheets, not "
+        "course-sections.csv",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace an existing test-N.xlsx, losing any `Scanned' ticks in it",
+    )
+    parser.add_argument(
+        "--spare",
+        type=parse_count,
+        metavar="N",
+        help="extra booklets per section, without being asked (default: "
+        "print-job.csv's spare_per_section)",
+    )
+    parser.add_argument(
+        "--sac",
+        type=parse_count,
+        metavar="N",
+        help="the SAC block, exactly N on each day, without being asked "
+        "(default: count sac-students.xlsx and add sac_cushion)",
+    )
+    parser.add_argument(
+        "--pages",
+        type=parse_pages,
+        metavar="P",
+        help="pages in one booklet, for when the test PDFs cannot be measured "
+        "(default: the page count of each day's test PDF)",
+    )
+    parser.add_argument(
+        "--keep-tex",
+        action="store_true",
+        help="keep the generated attendance-sheet .tex after a good build, so "
+        "a sheet can be hand-corrected and recompiled",
+    )
+    parser.add_argument(
+        "--roster-dir",
+        type=Path,
+        default=DEFAULT_ROSTER_DIR,
+        help="where the class-list exports are (default: the shared OneDrive "
+        "folder, exported-classlists)",
+    )
+    parser.add_argument(
+        "--stale-days",
+        type=int,
+        default=DEFAULT_STALE_DAYS,
+        metavar="DAYS",
+        help=f"flag a class list older than this (default: {DEFAULT_STALE_DAYS})",
+    )
+    args = parser.parse_args()
+    ASSUME_YES = args.yes
+    test_number = args.test_number
+
+    fields, settings = read_print_job()
+    sections = read_sections()
+
+    # ASKED FOR FIRST, before any question, so that a run which is going to be
+    # refused is refused before anyone has answered four prompts. A dry run
+    # writes nothing and so has nothing to be refused over.
+    workbook_path = OUTPUT_DIR / f"test-{test_number}.xlsx"
+    if not args.dry_run:
+        ensure_output_dir()
+        if workbook_path.exists() and not args.force:
+            die(
+                f"{workbook_path.name} already exists in {OUTPUT_DIR}, and may "
+                f"have `Scanned' boxes ticked in it. This is run once per test. "
+                f"Rerun with --dry-run to see today's figures without writing "
+                f"anything, or with --force to replace the workbook and lose "
+                f"its ticks."
+            )
+
+    # --- 1. THE TEST FILES ---------------------------------------------------
+    pages = find_test_files(test_number, args.pages)
+    proceed_or_stop("Are these the tests to print?")
+
+    # --- 2. THE CLASS LISTS --------------------------------------------------
+    current, total_files = select_current_exports(args.roster_dir, sections)
+    report_freshness(current, sections, args.stale_days, total_files, args.roster_dir)
+    proceed_or_stop("Carry on with these class lists?")
+    students = collect_students(current, sections)
+
+    # --- 3. ENROLMENT --------------------------------------------------------
+    # CORRECTED BEFORE ANYTHING IS COUNTED, so the sheets, the envelopes and the
+    # order are all computed from one set of numbers. A no leaves the file as it
+    # is and orders from what it says -- the file is the authority either way,
+    # and the only question is whether to bring it up to date first.
+    updates, agreed, unchecked = plan_enrolment_updates(
+        sections, students, current, args.stale_days
+    )
+    report_enrolment(updates, agreed, unchecked)
+    if updates:
+        if confirm(f"Update {SECTIONS_CSV.name} with these?"):
+            apply_enrolment(sections, updates)
+            if args.dry_run:
+                say(f"  dry run: {SECTIONS_CSV.name} not written, but the "
+                    f"figures below use the corrected numbers.")
+            else:
+                write_enrolment(updates)
+                say(f"  {SECTIONS_CSV.name} updated. Now double-check these "
+                    f"against {CATALOG_HINT}.")
+        else:
+            say(f"  {SECTIONS_CSV.name} left as it is; the order uses its "
+                f"figures.")
+
+    # --- 4. THE NUMBERS ------------------------------------------------------
+    by_day = split_by_day(sections)
+
+    # WHERE THE SAC NUMBER COMES FROM, in order of preference: --sac if it was
+    # given, then what is typed at the question, whose default is the shared
+    # file's count plus the cushion -- or print-job.csv's ballpark when that
+    # file cannot be read. The ballpark over-prints on purpose: a missing shared
+    # file should waste paper, not strand a student.
+    sac_counts, sac_marked, sac_available = read_sac_students(sections)
+    if not sac_available:
+        sac_counts = {}
+    # Matched now rather than when the sheets are built, so a SAC row that fits
+    # nobody on a class list is on screen while the SAC numbers are being chosen.
+    elsewhere = match_elsewhere(students, sac_marked)
+
+    cushion = int(settings["sac_cushion"])
+    if args.spare is not None:
+        spare = args.spare
+    else:
+        spare = ask_number(
+            "Spare booklets per section", int(settings["spare_per_section"])
+        )
+
+    blocks = {}
+    for key, rows in by_day.items():
+        if args.sac is not None:
+            blocks[key] = args.sac
+            continue
+        if sac_available:
+            default, note = size_sac_block(rows, sac_counts, cushion)
+        else:
+            default = int(settings["sac_fallback"])
+            note = f"the ballpark; {SAC_STUDENTS_XLSX.name} could not be read"
+        blocks[key] = ask_number(
+            f"SAC booklets, {DAYS[key]['long'].capitalize()}", default, note
+        )
+
+    plans = [
+        build_day(key, rows, spare, sac_counts, blocks[key], pages[key])
+        for key, rows in by_day.items()
+    ]
+
+    if all(not plan["sac"] for plan in plans):
+        warn(
+            "no SAC copies are being ordered, so the print-job.csv fields that "
+            "describe the SAC block are left out of the order. Check that no "
+            "student has arranged to write at the SAC for this test."
+        )
+
+    calendar = read_calendar()
+    dates, week = find_test_days(calendar, test_number)
+    monday = find_monday(calendar, week)
+    days = print_job_days(plans, fields, test_number, dates, monday)
+
+    # The envelope split, as text: what the numbers just chosen come to.
+    flush_report(tally=False)
+    print()
+    print(render_envelopes(plans, test_number, dates))
+
+    # The size of each day's order, in one line each. Said just before the
+    # follow-through, whose steps are the numbers put to use.
+    def say_orders():
+        say(paint(f"test {test_number}", "bold"))
+        for plan in plans:
+            say(
+                f"  {plan['long']:<10} {plan['sections']:>2} sections  "
+                f"{plan['enrolled']:>4} enrolled  "
+                + paint(f"{plan['booklets']:>4} booklets", "bold")
+                + f" x {plan['pages']} pages = {plan['last_page']} pages"
+            )
+
+    steps = follow_through_steps(test_number, plans, settings, workbook_path)
+
+    # THE SHEET STATES WHAT IS IN THE ENVELOPE. Each section's row of the
+    # envelope split is handed to its attendance sheet, so the booklet count in
+    # the heading is the envelope's by construction. The SAC's row is not a
+    # section and has no sheet.
+    entries_by_section = {
+        entry["label"]: entry
+        for plan in plans
+        for entry in plan["entries"]
+        if entry["enrolled"] is not None
+    }
+    tex = render_tex(test_number, sections, students, entries_by_section,
+                     elsewhere)
+
+    if args.dry_run:
+        print(render_print_job(days, settings, test_number))
+        say_orders()
+        say("")
+        say("dry run: nothing written, so the steps below are only listed.")
+        flush_report()
+        walk_follow_through(steps, asking=False)
+        return
+
+    # --- 5. THE ATTENDANCE SHEETS ---------------------------------------------
+    BUILD_DIR.mkdir(exist_ok=True)
+    tex_path = BUILD_DIR / f"test-{test_number}-attendance-sheet.tex"
+    tex_path.write_text(tex, encoding="utf-8")
+    print(f"building {tex_path.stem}.pdf ({len(sections)} sheets) ...")
+
+    pdf_path = tex_path.with_suffix(".pdf")
+    if not compile_sheet(tex_path) or not pdf_path.exists():
+        die(
+            f"pr-latexmk failed -- read its log above, and inspect "
+            f"{tex_path.name}, which is still there. The workbook was not "
+            f"written."
+        )
+
+    # Checked where it was built, then moved whatever the verdict: a PDF with a
+    # stranded heading is still worth looking at, and the warning says not to
+    # print it. The page count only decides what happens to the .tex below.
+    verified = check_one_page_per_sheet(pdf_path, len(sections))
+    delivered = OUTPUT_DIR / pdf_path.name
+    shutil.move(str(pdf_path), str(delivered))
+
+    # THE SOURCE GOES WHEN THE PDF IS PROVEN GOOD, and only then. It is pure build
+    # residue -- reproducible from the class lists by rerunning, read by nothing
+    # else, and a second plaintext copy of every student's name that no longer has
+    # to sit on the disk once the PDF it exists to make is verified.
+    #
+    # KEPT WHENEVER THE GUARD DID NOT PASS, including when it could not run at
+    # all. A wrong page count is exactly the moment the source is worth having:
+    # it is the one failure LaTeX reports nowhere, and the fix is a length in
+    # attendance.sty followed by a look at what actually overflowed.
+    if args.keep_tex:
+        kept = f"{tex_path.name} kept (--keep-tex)"
+    elif verified:
+        tex_path.unlink()
+        kept = None
+    else:
+        kept = None
+        warn(
+            f"{tex_path.name} was KEPT rather than cleaned up, because the "
+            f"page-count check above did not pass. Fix what it reports, then "
+            f"rerun with --force."
+        )
+
+    # --- 6. THE WORKBOOK -----------------------------------------------------
+    write_workbook(workbook_path, plans, days, settings, test_number, dates,
+                   date.today().isoformat())
+
+    say_orders()
+    say("")
+    say(paint(f"written to {OUTPUT_DIR}", "bold"))
+    say(f"  {delivered.name}")
+    say(f"  {workbook_path.name}")
+    if kept:
+        say(f"  ({kept})")
+    # The tally of warnings goes out HERE, before the first step: "check before
+    # printing" is advice about the order that is about to be placed.
+    flush_report()
+
+    # --- 7. THE FOLLOW-THROUGH -----------------------------------------------
+    # --yes cannot vouch that anything was done by hand, so it lists the steps
+    # rather than waving them through.
+    walk_follow_through(steps, asking=not args.yes)
+
+
+if __name__ == "__main__":
+    main()

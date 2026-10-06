@@ -95,9 +95,15 @@ which one:
 - `apex-webwork-to-pg` — convert the WeBWorK exercises embedded in an APEX
   Calculus section's PreTeXt source into PGML `.pg` files. Reads a local clone
   of the book (`APEX_CLONE` overrides where).
+- `admin/test-admin` — everything a test needs on paper, in one sitting: the
+  per-section attendance sheets, the Print Services order and the envelope
+  split, from the registrar's class-list exports. Run once per test from a
+  course's own checkout; it finds the course by its `course-info/` folder and
+  reads the course number and Team folder from `admin-settings.csv` there.
+  `courseadmin.py` and `checkbox_xlsx.py` are its two modules.
 - `admin/attendance.sty` — the layout of per-section test attendance sheets:
   one page per section, a ruled list of names with a column to tick. Reads no
-  data; a generator supplies the names as `\Student{…}` calls.
+  data; `test-admin` supplies the names as `\Student{…}` calls.
 - `webwork-check` / `webwork-deploy` — verify a course's WeBWorK set
   definitions and problem trees, and build one uploadable tarball per topic.
   Only useful to a course that assigns WeBWorK, but many do.
