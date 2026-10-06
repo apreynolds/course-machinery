@@ -8,7 +8,7 @@ defined, which the build's \env{instructor} view injects
 copy \emph{is} the staff copy (TAs included); anything unfit for a TA stays
 out of the source.
 
-\subsection*{The three shapes}
+\subsection*{The three note shapes}
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
@@ -22,6 +22,42 @@ out of the source.
   (via \cs{marginnote}, so it never floats).\\
 \end{tabularx}
 \end{center}
+
+\subsection*{The textbook's prose: \env{textprose}}
+
+A fourth environment on the same flag, for a different job. A lecture built
+text-first boxes the book's definitions, theorems and examples; the paragraphs
+\emph{between} them go in \env{textprose}, so the instructor copy reads like
+the section it was built from, and the source folds to its structure -- one
+fold per passage. It takes no arguments:
+
+\begin{manexample}
+\instructornotestrue
+\begin{textprose}
+  Continuous functions are important as they behave in a
+  predictable fashion: functions attain the value they approach.
+\end{textprose}
+\end{manexample}
+
+It looks different on purpose -- no fill, a thin slate rule, the document's
+own serif in slate -- because it is the book talking, not a note to self.
+
+Unlike \env{InstructorBox} it prints at \textbf{natural height}: a passage is
+paragraphs long and has no workspace under it, so as an overlay it would print
+over whatever follows. Two consequences:
+
+\begin{itemize}
+  \item \textbf{The instructor copy grows.} A lecture that uses \env{textprose}
+    has more pages in its instructor view than in the others -- the one
+    sanctioned exception to the same-page-count check of
+    section~\ref{sec:overlay}.
+  \item \textbf{Keep it clear of overlays.} Never put one between a
+    \env{solution} or \env{InstructorBox} and the workspace it paints into,
+    nor after a \cs{workspace*} on the same page (the fill shrinks, and a tall
+    solution above then overprints). When a page is already full, set the
+    passage between two \cs{FreshPage}s: they collapse to one break in the
+    other views and give it an instructor page of its own.
+\end{itemize}
 
 Everything is slate (\env{InstructorInk}) on purpose: staff content is
 ``editorial, behind the scenes,'' one neutral colour with one meaning --

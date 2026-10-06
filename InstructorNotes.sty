@@ -100,6 +100,34 @@
 }
 \NewEnviron{InstructorBox}[1][note]{\ifinstructornotes\instr@sidebar{#1}\fi}
 
+%%% --- textprose: the textbook's own running prose, kept in a lecture ----------
+%%% A lecture built text-first boxes the book's definitions, theorems and
+%%% examples; the paragraphs BETWEEN them go here, so the instructor copy reads
+%%% like the section and the source folds to its structure (one fold per passage).
+%%%
+%%% Same gate as the notes above -- dropped entirely when the layer is off -- but
+%%% two deliberate differences from InstructorBox:
+%%%   * NATURAL HEIGHT, not \WSZeroHeight. A passage is paragraphs long and has no
+%%%     workspace reserved under it, so as an overlay it would print over whatever
+%%%     follows. The price: the instructor copy of a lecture that uses textprose
+%%%     has MORE PAGES than the other views -- the one sanctioned break of the
+%%%     overlay contract's same-page-count rule.
+%%%   * A different look. No fill, a thin slate rule, and the document's own serif
+%%%     in slate: it is the book talking, not a note to self, so it must not be
+%%%     mistaken for an InstructorBox.
+\NewEnviron{textprose}{%
+  \ifinstructornotes
+    \begin{tcolorbox}[enhanced, breakable, parbox=false,
+      frame hidden, boxrule=0pt, sharp corners,
+      colback=white,
+      borderline west={1.5pt}{0pt}{InstructorInk},  % the thin slate rule
+      left=8pt, right=0pt, top=2pt, bottom=2pt,
+      before upper={\color{InstructorInk}}]
+      \BODY
+    \end{tcolorbox}%
+  \fi
+}
+
 %%% --- margin note: slate bold sans in the margin (unified with the layer) -----
 \newcommand\InstructorMargin[1]{%
   \ifinstructornotes
