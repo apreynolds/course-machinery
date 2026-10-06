@@ -143,18 +143,17 @@ out_dir=$(cd "$out_dir" && pwd)
 # ---------------------------------------------------------------------------
 # This script LIVES in the machinery, so there is no need to repeat the walk-up
 # search in latexmkrc-shared -- the answer is its own directory. The course's
-# own directories, where it has them, sit beside that and are added flat.
+# own course-info/, if it has one, sits beside that and is added flat.
 #
-# SAME ORDER AS latexmkrc-shared: course-info/, then .course-machinery-local/,
-# then the machinery, so a course's own file wins over a same-named vendored
-# one here exactly as it does in a document build. Each is PREPENDED for that
-# reason. (The trailing colon keeps TeX's own default path at the end.)
+# SAME ORDER AS latexmkrc-shared: course-info/, then the machinery, so a
+# course's own file wins over a same-named vendored one here exactly as it does
+# in a document build. It is PREPENDED for that reason. (The trailing colon
+# keeps TeX's own default path at the end.)
 
 machinery=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 course_root=$(dirname "$machinery")
 texinputs="$machinery//:"
-[ -d "$course_root/.course-machinery-local" ] && texinputs="$course_root/.course-machinery-local:$texinputs"
-[ -d "$course_root/course-info" ]             && texinputs="$course_root/course-info:$texinputs"
+[ -d "$course_root/course-info" ] && texinputs="$course_root/course-info:$texinputs"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/build-images.XXXXXX") || exit 1
 [ "$keep" -eq 0 ] && trap 'rm -rf "$work"' EXIT
