@@ -35,6 +35,8 @@
 
 \RequirePackage[most]{tcolorbox}   % the note boxes
 \RequirePackage{environ}           % \NewEnviron: drop a block's body when off
+\RequirePackage{keyval}            % \define@key / \setkeys: textprose's print key
+\RequirePackage{etoolbox}          % \ifstrequal, for print=false
 \RequirePackage{marginnote}        % \marginnote: margin placement without floating
 
 %%% --- The layer flag (same idiom as Exercises.sty / ProblemMeta.sty) ---------
@@ -115,8 +117,20 @@
 %%%   * A different look. No fill, a thin slate rule, and the document's own serif
 %%%     in slate: it is the book talking, not a note to self, so it must not be
 %%%     mistaken for an InstructorBox.
-\NewEnviron{textprose}{%
-  \ifinstructornotes
+%%%
+%%% ONE KEY, print: \begin{textprose}[print=false] (or the flag form, [noprint])
+%%% keeps a passage in the source and off every copy -- the same two spellings,
+%%% with the same meaning, as on \importproblem and notesproblem. It is the
+%%% editing verdict "read, not wanted on the page": the passage stays foldable
+%%% in the source without being deleted. Anything but "false" reads as true.
+\newif\iftextprose@print
+\define@key{textprose}{noprint}[true]{\textprose@printfalse}
+\define@key{textprose}{print}[true]{%
+  \ifstrequal{#1}{false}{\textprose@printfalse}{\textprose@printtrue}}
+\NewEnviron{textprose}[1][]{%
+  \textprose@printtrue  % the default, reset per passage (local: the environment is a group)
+  \setkeys{textprose}{#1}%
+  \ifinstructornotes\iftextprose@print
     \begin{tcolorbox}[enhanced, breakable, parbox=false,
       frame hidden, boxrule=0pt, sharp corners,
       colback=white,
@@ -125,7 +139,7 @@
       before upper={\color{InstructorInk}}]
       \BODY
     \end{tcolorbox}%
-  \fi
+  \fi\fi
 }
 
 %%% --- margin note: slate bold sans in the margin (unified with the layer) -----

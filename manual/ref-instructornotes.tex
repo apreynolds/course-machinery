@@ -29,7 +29,7 @@ A fourth environment on the same flag, for a different job. A lecture built
 text-first boxes the book's definitions, theorems and examples; the paragraphs
 \emph{between} them go in \env{textprose}, so the instructor copy reads like
 the section it was built from, and the source folds to its structure -- one
-fold per passage. It takes no arguments:
+fold per passage:
 
 \begin{manexample}
 \instructornotestrue
@@ -38,6 +38,12 @@ fold per passage. It takes no arguments:
   predictable fashion: functions attain the value they approach.
 \end{textprose}
 \end{manexample}
+
+One key, \texttt{print}: \verb|\begin{textprose}[print=false]| (or the flag
+form, \texttt{[noprint]}) keeps a passage in the source and off every copy --
+the same two spellings as on \cs{importproblem}. It is for the editing pass:
+read each passage, lift what belongs in the lecture into ordinary text or an
+\env{InstructorBox}, and switch off what is left without deleting it.
 
 It looks different on purpose -- no fill, a thin slate rule, the document's
 own serif in slate -- because it is the book talking, not a note to self.
