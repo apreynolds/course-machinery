@@ -287,8 +287,13 @@ Four modes round it out:
     it is extrinsic) -- and \texttt{-{}-from DIR} rewrites each line's directory
     argument relative to \env{DIR}, the importing document's folder, so the
     pasted line needs no \texttt{../} hand-fixing.
-  \item \texttt{-{}-tsv} prints one tab-separated row per match (path, then the
-    metadata) -- the machine-readable feed behind the picker below. An operand
+  \item \texttt{-{}-tsv} prints one tab-separated row per match (path, the
+    folder the file sits in, then the metadata) -- the machine-readable feed
+    behind the picker below. The folder column is derived from the path rather
+    than read from the block. A bank need not be flat: the walk is recursive,
+    an emitted import line names the file's own directory, and this column is
+    what keeps a subfolder such as \file{problems/apex1.2-examples} visible
+    and searchable in a picker that otherwise hides the path. An operand
     may now be a single \file{.tex} file, not just a directory, so a picker can
     ask \texttt{-{}-import} about exactly the files it selected.
 \end{itemize}

@@ -129,8 +129,11 @@ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
 \texttt{-{}-from DIR} & (with \texttt{-{}-import}) make each line's directory
   argument relative to \env{DIR}, the importing document's folder.\\
 \texttt{-{}-tsv} & one tab-separated row per match
-  (path, name, topics, type, difficulty, source, number) -- the machine feed
-  for \file{pick-problems}. Respects the filters.\\
+  (path, folder, name, topics, type, difficulty, source, number) -- the machine
+  feed for \file{pick-problems}. Respects the filters. \env{folder} is the one
+  column not read from the block: it is the name of the directory the file sits
+  in, so a bank sorted into subfolders can be narrowed by typing a folder's
+  name in the picker.\\
 \end{tabularx}
 \end{center}
 
@@ -162,7 +165,7 @@ exactly like their problem counterparts above but read \cs{FactMeta} blocks and
 emit \cs{importfact} lines, over the fact schema: the filters are
 \texttt{-{}-topic} and \texttt{-{}-source} only (a fact has no type or
 difficulty), and \texttt{-{}-tsv} columns are
-(path, name, kind, topics, source, number). The Vim command \texttt{:ImportFact}
+(path, folder, name, kind, topics, source, number). The Vim command \texttt{:ImportFact}
 (\texttt{<Space>if}) mirrors \texttt{:ImportProblem}.
 
 \subsection*{find-passages and pick-passages (the passage-bank twins)}
