@@ -24,6 +24,20 @@ The unit is a \emph{line of handwriting} (\cs{HandwritingLine}, about
 room -- centimetres are not. Retune \cs{HandwritingLine} once and
 every line-count workspace follows.
 
+\textbf{Why the boxes take no workspace key.}
+It is tempting to give \env{solution} and \env{InstructorBox} a \texttt{workspace=8} key, in place of a \cs{workspace} written after the box.
+Nothing technical prevents it, and it was declined on purpose, for three reasons.
+\begin{itemize}
+  \item \textbf{The space is the student's page, and a gated box is only ink.}
+    Removing, hiding or commenting out a box must never move the student copy.
+    A box that carried its own space would take that space with it.
+  \item \textbf{Space belongs to the use site, not the content.}
+    A problem file is imported into a test and into a lecture with different room each time, which is why \texttt{workspaces=\{4,4,6\}} sits on the import (section~\ref{sec:ref-exercises}).
+  \item \textbf{Box and space are not one-to-one.}
+    A note and a solution often share one workspace, a solution written inside a problem has its workspace after the problem, and \env{studentonly} (below) deliberately separates the two.
+\end{itemize}
+The gain would be one short line saved, at the price of two spellings for the same thing and a search for \cs{workspace} that no longer finds all the space.
+
 One deliberate simplicity: a workspace is plain vertical space, with
 \emph{no carry-over}. If it exceeds the room left on the page, the overflow
 is dropped and the next content starts the next page -- the gap does not
@@ -86,6 +100,17 @@ follow, both intentional:
   \item \textbf{Hints are not overlays.} A hint is student-facing help that
     should push content down normally in its build -- it participates in
     layout, unlike the answer key painted over blank space.
+\end{itemize}
+
+\textbf{What is an overlay, and what is not.}
+The whole inventory, so that nothing has to be rediscovered.
+\begin{itemize}
+  \item \textbf{Zero height:} \env{solution} and \env{InstructorBox}.
+    These are the only two boxes routed through \cs{WSZeroHeight} (section~\ref{sec:ref-workspace}).
+  \item \textbf{Zero footprint:} \env{studentonly}, described next, and the frame drawn round the correct choice in a solutions build.
+    Neither is zero-height, but each takes exactly the room the student copy gives it: the first keeps its space and drops its ink, the second reports the bare option's size and lets the frame overflow into the surrounding whitespace.
+  \item \textbf{Natural height, on purpose:} \env{hint}, \env{textprose} and \cs{InstructorInline}.
+    A hint pushes content down, a \env{textprose} passage makes the instructor copy longer, and an inline note is running text that reflows its paragraph.
 \end{itemize}
 
 \subsection{Space the key reclaims: \env{studentonly}}

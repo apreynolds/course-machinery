@@ -92,6 +92,11 @@
 % A box TALLER than the workspace below it simply overprints the following content
 % -- the intended "leave more room" alarm, not a bug. (A breakable tcolorbox in a
 % \vtop renders unbroken, which is right: an overlay is a fixed stamp, not paged.)
+%
+% NO workspace KEY ON THE BOXES (\begin{solution}[workspace=8] in place of a
+% \workspace after the box): possible, and declined on purpose. The reasons, and the
+% inventory of what is and is not an overlay, are in the manual -- "The overlay/solid
+% contract" (manual/ch7-overlay-contract.tex).
 
 % --- TWEAK HERE: the gap painted above an overlay box, matching its solid-mode top
 % skip so the two builds look the same. Rigid (a kern), so its exact value is what
