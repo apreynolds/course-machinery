@@ -282,7 +282,13 @@ class Images:
             f"$graph->tex(<<END_LATEX_IMAGE);\n{tex}\nEND_LATEX_IMAGE\n\n"
             f'$graphDescription = "{description_text(image.find("description"))}";'
         )
-        alt = re.sub(r"\s+", " ", image.find("shortdescription").text).strip()
+        # A <var> in it is written [$a], as in a solution graph's: 1.6's
+        # exercise 9 ends "... asymptote at x =<var name="$a"/>."
+        short = image.find("shortdescription")
+        alt = short.text or ""
+        for child in short:
+            alt += "[" + child.get("name") + "]" + (child.tail or "")
+        alt = re.sub(r"\s+", " ", alt).strip()
         # Named options: PGML fills positional ones in order, and an empty {}
         # cannot stand in for the height that sits before long_description.
         return (">>[!" + alt + "!]"
@@ -293,7 +299,9 @@ def block(el, images, statement=False, blanks=True):
     """The block content of a <statement>, <introduction> or <solution>, as PGML paragraphs."""
     out = []
     for child in el:
-        if child.tag in ("p", "instruction"):
+        if child.tag == "p" and child.find("ol") is not None:
+            out.append(lettered_list(child, images, blanks))
+        elif child.tag in ("p", "instruction"):
             out.append(inline(child, blanks))
         elif child.tag == "tabular":
             out.append(table(child, blanks))
@@ -301,6 +309,34 @@ def block(el, images, statement=False, blanks=True):
             out.append(images.add(child, statement))
         else:
             raise ValueError(f"unexpected block <{child.tag}>")
+    return "\n\n".join(out)
+
+
+def lettered_list(p, images, blanks=True):
+    """A <p> holding only an <ol>, as paragraphs that each open with *(a)*.
+
+    1.6's exercises 15-18 answer their three <task>s with a three-item list,
+    and an item holds a table and then a sentence. PGML's own lettered list
+    ("a. ") is one line per item and cannot hold a table, so the letter is
+    written out instead: in front of the item's first paragraph, or on a line
+    of its own when the item opens with a table. The letters are the ones
+    tasks() gives the parts, so "(b)" in the solution is part b.
+    """
+    if (p.text or "").strip() or len(p) != 1 or (p[0].tail or "").strip():
+        raise ValueError("a <p> holding an <ol> and something else")
+    items = p[0].findall("li")
+    if len(items) > 8:
+        raise ValueError("more than eight <li>s: tasks() letters only a-h")
+    out = []
+    for letter, li in zip("abcdefgh", items):
+        label = f"*({letter})*"
+        if len(li) and li[0].tag == "p" and li[0].find("ol") is None:
+            out.append(label + " " + block(li, images, blanks=blanks))
+        elif len(li) and li[0].tag in ("p", "tabular", "image"):
+            out.append(label + "\n\n" + block(li, images, blanks=blanks))
+        else:
+            # An item that is only a line of text, with no <p> around it.
+            out.append(label + " " + inline(li, blanks))
     return "\n\n".join(out)
 
 
@@ -334,6 +370,10 @@ def macros_for(code, images):
         ("PopUp", "parserPopUp.pl"),
         ("DropDown", "parserPopUp.pl"),  # the same file defines both
         ("explanation_box", "PGessaymacros.pl"),
+        # 1.6's 9-14: "DNE" for an infinite limit is answered with a hint.
+        ("AnswerHints", "answerHints.pl"),
+        # 1.6's 19-24: an asymptote is answered as an equation, "x=2".
+        ("parser::Assignment", "parserAssignment.pl"),
     ]
     macros += [file for word, file in needs if word in code]
     if images.perl:
