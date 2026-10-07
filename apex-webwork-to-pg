@@ -31,7 +31,9 @@
 # multi-part: an <introduction> (the function, or its graph) and then <task>s,
 # which come out as a PGML lettered list. A graph in an introduction is the
 # question itself, so it is $graph, not $solutionGraph, and it carries the
-# book's long <description> as well as its alt text.
+# book's long <description> as well as its alt text. 1.5 added two things: a
+# graph inside a plain <statement>, treated the same way, and answers chosen
+# from a menu (<var form="popup">), which PGML draws from the PopUp object.
 #
 # The book numbers every exercise in an <exercises> division in document order,
 # including ones with no WeBWorK version (1.1's Terms and Concepts), so the
@@ -135,8 +137,13 @@ def answer_blank(var, blanks=True):
         return "[" + var.get("name") + "]**"
     if not blanks:
         return "[`[" + var.get("name") + "]`]"
+    if var.get("form") == "popup":
+        # A PopUp or DropDown object draws its own menu when PGML is handed it
+        # as the answer, so the blank is written like any other. 1.5's yes/no
+        # questions are the first of these.
+        return "[_]{" + var.get("name") + "}"
     if var.get("form"):
-        # Popups, essays and the like: none in 1.1, so not yet handled.
+        # Essays and the like: not yet met inside a live <webwork>.
         raise ValueError(f"unsupported <var form=\"{var.get('form')}\">")
     checker = var.get("evaluator") or var.get("name")
     return "[_]{" + checker + "}{" + var.get("width", "10") + "}"
@@ -210,6 +217,10 @@ def description_text(description):
         for child in el:
             if child.tag == "m":
                 out += r"\(" + math_text(child, pgml=False) + r"\)"
+            elif child.tag == "var":
+                # A value outside math (1.5's exercise 14 writes a coordinate
+                # as <m>(0, </m><var/><m>)</m>): left for Perl to interpolate.
+                out += child.get("name")
             elif child.tag == "ol":
                 for i, li in enumerate(child.findall("li"), start=1):
                     out += f"${{BR}}{i}. " + flat(li)
@@ -321,6 +332,7 @@ def macros_for(code, images):
         ("Fraction", "contextFraction.pl"),
         ("OneOf", "parserOneOf.pl"),
         ("PopUp", "parserPopUp.pl"),
+        ("DropDown", "parserPopUp.pl"),  # the same file defines both
         ("explanation_box", "PGessaymacros.pl"),
     ]
     macros += [file for word, file in needs if word in code]
@@ -336,7 +348,9 @@ def convert(exercise, number, intro, meta, args):
     code = dedent(ww.find("pg-code").text)
     images = Images()
     if ww.find("statement") is not None:
-        statement = block(ww.find("statement"), images)
+        # statement=True: a graph here is the question (1.5's 11-18), exactly
+        # as one in a multi-part exercise's <introduction> is.
+        statement = block(ww.find("statement"), images, statement=True)
     else:
         # Multi-part: what the parts share, then the parts.
         statement = block(ww.find("introduction"), images, statement=True) + "\n\n" + tasks(ww)
