@@ -82,7 +82,9 @@ prog=${as:-find-meta}
 # Everything that differs between one bank and another lives in exactly this case.
 # filter_specs are `flag:key' pairs -- each becomes a --flag PATTERN filter on that
 # metadata key (the flag is singular by habit: --topic -> topics). tsv_cols /
-# vocab_keys are metadata keys in report order. block/emit are the LaTeX macros.
+# vocab_keys are metadata keys in report order. (--tsv prints one column that is
+# NOT in tsv_cols: the file's folder, derived from its path and placed right
+# after it -- see folder_of.) block/emit are the LaTeX macros.
 # with_keys are the keys --with may inject as \import<kind> options, in the
 # canonical order they are emitted -- per-kind, because a fact's kind/name select
 # and title the environment it is wrapped in and a problem has no analogue. A kind
@@ -240,7 +242,7 @@ usage() {
     echo "    --with        not accepted: a $noun has no injectable keys."
   fi
   echo "    --from DIR    rewrite each directory argument relative to DIR."
-  cols="path"; for c in "${tsv_cols[@]}"; do cols+="<TAB>$c"; done
+  cols="path<TAB>folder"; for c in "${tsv_cols[@]}"; do cols+="<TAB>$c"; done
   echo "  --tsv       one row per match: $cols"
 }
 
@@ -511,6 +513,20 @@ import_dir() {
   fi
 }
 
+# The name of the directory the .tex file $1 sits in -- `apex1.2-examples' for
+# problems/apex1.2-examples/foo.tex. This is the --tsv `folder' column, and it is
+# DERIVED, not read from the block: a bank sorted into subfolders says something
+# by where a file is (which book section it came from, say), and a picker that
+# hides the path would otherwise hide that too. Only the LAST component, so the
+# column means the same thing however deep the bank is nested and whatever PATH
+# the walk started from. A file in a flat bank reports the bank's own name
+# (`problems'), which is true and harmless. Pure parameter expansion, no fork:
+# the awk fast path computes the same thing and the two must agree.
+folder_of() {
+  local d=${1%/*}
+  if [[ $d == "$1" ]]; then printf '.'; else printf '%s' "${d##*/}"; fi
+}
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # MATCHING
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -649,7 +665,7 @@ if [[ $mode == tsv ]]; then
         for (i = 1; i <= nfilt; i++)
           if (!csv_match(v[fk[i]], ENVIRON["flt_" fk[i]])) { ok = 0; break }
         if (ok) {
-          out = path
+          out = path "\t" folder
           for (j = 1; j <= ncol; j++) out = out "\t" v[col[j]]
           print out
         }
@@ -661,7 +677,12 @@ if [[ $mode == tsv ]]; then
       }
       # New file: emit the row for the file just finished, then reset state.
       # split("",v) empties the array portably.
-      FNR == 1 { emit(); path = FILENAME; inblock = 0; had_block = 0; split("", v) }
+      # folder is folder_of() again: the last directory component of the path,
+      # or "." for a bare file name.
+      FNR == 1 {
+        emit(); path = FILENAME; inblock = 0; had_block = 0; split("", v)
+        nseg = split(path, seg, "/"); folder = (nseg > 1) ? seg[nseg - 1] : "."
+      }
       $0 ~ open_re { inblock = 1; had_block = 1; next }
       inblock && /^[[:space:]]*\}/ { inblock = 0; next }
       # Key line inside the block -- read_meta parsing rules, verbatim. First
@@ -766,9 +787,10 @@ case $mode in
     # circuits before here and is what actually runs; this mirrors it exactly so
     # the two stay legible side by side). One tab-separated row per match: column
     # 1 is the path -- hidden from the picker's display, but kept because it is
-    # what opens/previews the file and feeds back into --import.
+    # what opens/previews the file and feeds back into --import. Column 2 is the
+    # derived folder (see folder_of); the block's own keys follow.
     for f in "${matches[@]}"; do
-      row=$f
+      row=$f$'\t'$(folder_of "$f")
       for key in "${tsv_cols[@]}"; do
         row+=$'\t'$(field "${meta_of[$f]}" "$key")
       done
