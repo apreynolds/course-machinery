@@ -11,11 +11,11 @@
 % which is searched first -- but then it gets ONLY its own, not both.
 %
 % WRITTEN FOR MATH 1003, and the comments below still speak from there: "this
-% course", the modules and the three documents named are MATH 1003's. It uses
+% course" and the three documents named are MATH 1003's. It uses
 % three books, which is more than usual:
 %
-%   apex      APEX Calculus            the main text -- modules B, C, D
-%   openstax  Calculus, Volume 1       actually used -- module A (functions)
+%   apex      APEX Calculus            the main text -- limits onward
+%   openstax  Calculus, Volume 1       actually used -- the functions review
 %   algtrig   Algebra & Trigonometry   extra help, never taught from
 %
 % HOW IT IS LOADED, AND WHY THAT IS DIFFERENT FROM apex.tex. No master \inputs
@@ -35,7 +35,7 @@
 %   - ADVICE FOR STUDENTS points at algtrig throughout and at neither calculus
 %     book -- and no document will ever say \usetext{algtrig}, because no
 %     document IS an algtrig document;
-%   - the MODULE A LECTURES are built on OpenStax and still send students to
+%   - the FUNCTIONS LECTURES are built on OpenStax and still send students to
 %     algtrig for the algebra underneath.
 %
 % Before this file existed, all three were hand-typed \href URLs with the domain
@@ -76,7 +76,7 @@
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 2. THE SECOND TEXT, FOR MODULE A
+% 2. THE SECOND TEXT, FOR THE FUNCTIONS REVIEW
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Volume 1 of the three-volume OpenStax Calculus. Note that its page slugs carry
 % their own "pages/" segment and NO .html extension, unlike APEX's -- slug form
@@ -138,12 +138,12 @@
 %
 % !! THE SLUGS ARE AS VERIFIED AS WHAT THEY REPLACED, AND NO MORE. Each was
 % !! lifted verbatim from a working \href in advice-for-students.tex or a
-% !! Module A lecture, so this file introduced no new 404 risk -- but it
+% !! functions lecture, so this file introduced no new 404 risk -- but it
 % !! inherited whatever was already wrong. LaTeX warns when a section KEY does
 % !! not resolve; a slug that is simply wrong still produces a perfectly
 % !! good-looking link to a 404. Check one by hand before leaning on it.
 %
-% TOPICS.tsv's [xN.M] column is the authoritative list of INTENDED pointers and
+% TOPICS.tex's set of [xN.M] pointers is the authoritative list of INTENDED ones and
 % is longer than this. Add a line here when a document actually cites it.
 
 % --- Chapter 1: Prerequisites ---
@@ -163,7 +163,7 @@
 
 % --- Chapter 5: Polynomial and Rational Functions ---
 \DeclareSection[algtrig]{5.1}{pages/5-1-quadratic-functions}                     % Quadratic Functions
-% 5.2 and 5.3 are the two entries in TOPICS.tsv row A.2 that had no line here,
+% 5.2 and 5.3 are the two entries in TOPICS.tex's OS 1.2 block that had no line here,
 % so OS1.2's prepwork could not cite them. Unlike every slug above, these two
 % were NOT lifted from a working \href -- they were fetched and checked against
 % the live site (both 200, both titles matching) before being added.
