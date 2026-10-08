@@ -11,14 +11,14 @@
 % books.tex are unchanged. Only the argument of \usetext follows the file name.
 %
 % WRITTEN FOR MATH 1003, and the comments below still speak from there: "this
-% course" and its modules are MATH 1003's. There, this is the text for MODULE A
-% ONLY -- the five review lectures on functions (TOPICS.tsv rows A.1-A.5, src
-% O1.1-O1.5). Modules B, C and D are APEX and use apex.tex beside this one.
+% course" means MATH 1003. There, this is the text for THE FUNCTIONS REVIEW
+% ONLY -- the five review lectures on functions (TOPICS.tex, src
+% OS 1.1-OS 1.5). The rest is APEX and uses apex.tex beside this one.
 %
 % WHY THERE ARE TWO FILES HERE. The noun for a worked item and the result
 % vocabulary below are DOCUMENT-WIDE settings, so a document has to pick one
 % book; the two files cannot be merged. \usetext is that pick, and it is why
-% every Module A master carries
+% every functions master carries
 %
 %   \usetext{openstax-calculus1}
 %
@@ -29,7 +29,7 @@
 % Because only one of these files is ever loaded into a document, the two may
 % freely disagree -- different nouns, and result environments of the same or
 % different names -- with no risk of collision. The corollary bites in one place
-% and is easy to forget: a Module A lecture never loads apex.tex, so APEX's
+% and is easy to forget: a functions lecture never loads apex.tex, so APEX's
 % cross-reference list is not available to it, and vice versa. See §4.
 
 
@@ -37,7 +37,7 @@
 % 1. WHAT THE TEXT NAMES ITS RESULTS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TWO ARE DECLARED, at the foot of this section: Rule and Strategy, each added
-% when a Module A lecture first needed it. The Checkpoint is still NOT declared,
+% when a functions lecture first needed it. The Checkpoint is still NOT declared,
 % and that is a decision rather than an omission.
 %
 % Deliberately NOT "Key Idea": that is APEX's word, declared in apex.tex, and a
@@ -50,7 +50,7 @@
 % (cbdefn, upright body, rather than cbthm's italic: a checkpoint is a prompt to
 % stop and try something, not a stated result.)
 %
-% It stays commented because no Module A lecture uses one. The old ch0 sources
+% It stays commented because no functions lecture uses one. The old ch0 sources
 % reach for \begin{definition} and for undifferentiated coloured boxes, and the
 % coloured ones are being read case by case during conversion -- most land on
 % CourseBoxes' own vocabulary (definition, definition*, remark*) or on an aside
@@ -102,8 +102,8 @@
 % \textbookref, pointing at some OTHER section.
 %
 % THESE BELONG TO THE TEXT, NOT TO THE COURSE, which is the easy thing to get
-% wrong. A Module A lecture never loads apex.tex, so every OpenStax section a
-% Module A lecture cites has to be declared HERE, even if apex.tex's commented
+% wrong. A functions lecture never loads apex.tex, so every OpenStax section a
+% functions lecture cites has to be declared HERE, even if apex.tex's commented
 % table happens to list something with the same number.
 %
 % To add one, copy a line up from the reference block at the foot of this file,
@@ -115,16 +115,16 @@
 % something you SEE. Declare the whole book and that same typo silently emits a
 % perfect-looking link to the wrong section.
 %
-% THE GAP THIS FILE USED TO RECORD IS CLOSED. It said that TOPICS.tsv has APEX
-% lectures citing OpenStax sections (B.3 cites O1.2, B.4 cites O1.1) and every
-% Module A row citing the OpenStax Algebra & Trigonometry text (the [xN.M]
+% THE GAP THIS FILE USED TO RECORD IS CLOSED. It said that TOPICS.tex has APEX
+% lectures citing OpenStax sections (1.4 cites O1.2, 1.5 cites O1.1) and every
+% functions block citing the OpenStax Algebra & Trigonometry text (the [xN.M]
 % refs), and that \textbookref could express neither, so a cross-book pointer
 % had to be a hand-typed \href in the lecture's prepwork box.
 %
 % \textbookref now takes the book: \textbookref[algtrig]{3.2}{\S3.2}. Sections
 % of a book NO document is built on are declared in books.tex, beside the
 % \DeclareBook they qualify; sections of THIS book stay here, unnamed. The
-% Module A prepwork boxes were converted when that landed.
+% functions prepwork boxes were converted when that landed.
 %
 % Going the other way -- an APEX lecture citing an OpenStax section -- add a
 % \DeclareSection[openstax] line to books.tex when a lecture actually cites one.
@@ -133,10 +133,10 @@
 
 
 % ---------------------------------------------------------------------------
-% REFERENCE -- MODULE A'S SECTIONS, DELIBERATELY COMMENTED OUT
+% REFERENCE -- THIS BOOK'S SECTIONS, DELIBERATELY COMMENTED OUT
 % ---------------------------------------------------------------------------
 % NOTHING BELOW IS LIVE. It is data: the copy-paste source for §4 above, and
-% what each Module A lecture's \booksection link= value was taken from.
+% what each functions lecture's \booksection link= value was taken from.
 %
 % Only chapter 1 is listed. This course teaches nothing else from OpenStax, so
 % unlike apex.tex's whole-book table there is no reason to carry the rest.

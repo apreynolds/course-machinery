@@ -9,8 +9,8 @@
 % Volume 1 is openstax-calculus1.tex and not openstax.tex.
 %
 % WRITTEN FOR MATH 1003, and the comments below still speak from there: "this
-% course" and its modules are MATH 1003's, and the history is that course's.
-% There, this is the text for modules B, C and D. Module A is taught from
+% course" means MATH 1003, and the history is that course's.
+% There, this is the text for limits onward. The functions review is taught from
 % OpenStax and has its own file, openstax-calculus1.tex, beside this one.
 %
 % THE MEMBERSHIP TEST, in two steps now that books.tex sits beside this file.
@@ -52,7 +52,7 @@
 % that wants a default keeps its own textbook.tex in its course-info/.
 %
 % ch0 HAS ARRIVED, AND THIS FILE IS THE SPLIT. It used to be textbook.tex, the
-% course default that a master got by saying nothing. Module A is OpenStax, so
+% course default that a master got by saying nothing. The functions review is OpenStax, so
 % the file was split in two -- apex.tex and what is now openstax-calculus1.tex,
 % side by side -- and textbook.tex was DELETED rather than kept as a default. That deletion is the
 % load-bearing part: with no textbook.tex on the path, TextRef falls through to
@@ -60,8 +60,8 @@
 % \booksection reports it. Naming the book is now mandatory rather than merely
 % possible. Every master therefore carries exactly one \usetext line:
 %
-%   \usetext{apex}       modules B, C, D  (limits, derivatives, applications)
-%   \usetext{openstax-calculus1}   module A   (functions)
+%   \usetext{apex}                 limits, derivatives, applications
+%   \usetext{openstax-calculus1}   functions
 %
 % The commented reference table at the foot travelled with this half: it
 % describes APEX and no other book.
