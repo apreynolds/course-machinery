@@ -94,6 +94,8 @@ def book_macros(tex):
     tex = re.sub(r"\\abs\{([^{}]*)\}", r"\\left\\lvert \1\\right\\rvert", tex)
     if r"\abs" in tex:
         raise ValueError(r"\abs with a nested argument: " + tex)
+    # \fp, \gp and \yp are the book's f', g' and y', first met in 2.1.
+    tex = re.sub(r"\\([fgy])p(?![A-Za-z])", r"\1'", tex)
     return tex.replace("<", r"\lt ").replace(">", r"\gt ")
 
 
@@ -121,7 +123,8 @@ def display_math(md, punctuation=""):
 
 
 # Cross-references the conversion can put into words: the xml:id of the section
-# being converted, filled in by main(). Anything else is an error, not a guess.
+# being converted, and of each of its exercises (as its book number), filled in
+# by main(). Anything else is an error, not a guess.
 XREFS = {}
 
 
@@ -169,6 +172,13 @@ def inline(el, blanks=True):
             out += "\n\n[``" + display_math(child, punctuation) + "``]\n\n"
             if punctuation:
                 continue
+        elif child.tag == "xref" and child.get("first"):
+            # A range of exercises, <xref first="..." last="...">Exercises</xref>:
+            # 2.1's tangent-line group says its functions are those of 7-14.
+            first, last = child.get("first"), child.get("last")
+            if first not in XREFS or last not in XREFS:
+                raise ValueError(f"<xref first=\"{first}\" last=\"{last}\"> has no wording")
+            out += f"{child.text or 'Exercises'} {XREFS[first]}--{XREFS[last]}"
         elif child.tag == "xref":
             if child.get("ref") not in XREFS:
                 raise ValueError(f"<xref ref=\"{child.get('ref')}\"> has no wording")
@@ -312,6 +322,29 @@ def block(el, images, statement=False, blanks=True):
     return "\n\n".join(out)
 
 
+def direction_line(p, exercise):
+    """A group's direction line, from the <p> of its <introduction>, as PGML.
+
+    Usually the whole paragraph. 2.1's last group ends its direction line with
+    an <ol> of the six questions asked about each graph, and every exercise in
+    the group then asks the same six again, one <instruction> per blank. So the
+    list is left out of the direction line -- but only when it has exactly one
+    item per answer blank, which is what says the exercise repeats it.
+    """
+    ol = p.find("ol")
+    if ol is None:
+        return inline(p)
+    if p[-1] is not ol or (ol.tail or "").strip():
+        raise ValueError("a direction line with something after its <ol>")
+    blanks = [v for v in exercise.iter("var") if v.get("width")]
+    if len(ol.findall("li")) != len(blanks):
+        raise ValueError("a direction line's <ol> that the exercise does not repeat blank for blank")
+    lead = ET.Element("p")
+    lead.text = p.text
+    lead.extend(child for child in p if child is not ol)
+    return inline(lead).strip()
+
+
 def lettered_list(p, images, blanks=True):
     """A <p> holding only an <ol>, as paragraphs that each open with *(a)*.
 
@@ -351,8 +384,10 @@ def tasks(ww):
     lines = []
     for letter, task in zip("abcdefgh", ww.findall("task")):
         paragraphs = list(task.find("statement"))
-        if any(p.tag != "p" for p in paragraphs):
-            raise ValueError("a <task> holding more than paragraphs")
+        # 2.1's 27 and 28 put an <instruction> ("Enter your answers as a
+        # comma-separated list") between a task's question and its blank.
+        if any(p.tag not in ("p", "instruction") for p in paragraphs):
+            raise ValueError("a <task> holding more than paragraphs and instructions")
         lines.append(f"{letter}. " + " ".join(inline(p) for p in paragraphs))
     if len(lines) != len(ww.findall("task")):
         raise ValueError("more than eight <task>s: 'i. ' would start a roman list")
@@ -479,6 +514,11 @@ def main():
     exercises = root.find("exercises")
     # ElementTree has no parent pointers, so build the map once.
     parent = {child: el for el in exercises.iter() for child in el}
+    # Every exercise's book number under its xml:id, so that a direction line
+    # pointing at a range of exercises can name it.
+    for number, exercise in enumerate(exercises.iter("exercise"), start=1):
+        if exercise.get(XMLID):
+            XREFS[exercise.get(XMLID)] = str(number)
     # Number in DOCUMENT order, which is the book's. Walking group by group is
     # not the same thing: 1.3's last exercise sits directly in its <subexercises>
     # after the <exercisegroup>s, and a group-first walk numbered it 7, not 43.
@@ -495,7 +535,7 @@ def main():
         # A group's <introduction> is its direction line ("Approximate the
         # limit ..."), which the book prints once and a .pg must repeat.
         intro = group.find("introduction")
-        intro = inline(intro.find("p")) if intro is not None else ""
+        intro = direction_line(intro.find("p"), exercise) if intro is not None else ""
         label, src = convert(exercise, number, intro, meta, args)
         args.out.mkdir(parents=True, exist_ok=True)
         (args.out / f"{label}.pg").write_text(src)
