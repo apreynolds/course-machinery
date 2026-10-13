@@ -409,6 +409,8 @@ def macros_for(code, images):
         ("AnswerHints", "answerHints.pl"),
         # 1.6's 19-24: an asymptote is answered as an equation, "x=2".
         ("parser::Assignment", "parserAssignment.pl"),
+        # 2.1's 15-26: a tangent line is answered as an equation, "y=4(x-2)+4".
+        ("ImplicitPlane", "parserImplicitPlane.pl"),
     ]
     macros += [file for word, file in needs if word in code]
     if images.perl:
