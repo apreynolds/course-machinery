@@ -140,10 +140,12 @@ def answer_blank(var, blanks=True):
         return "[" + var.get("name") + "]**"
     if not blanks:
         return "[`[" + var.get("name") + "]`]"
-    if var.get("form") == "popup":
-        # A PopUp or DropDown object draws its own menu when PGML is handed it
-        # as the answer, so the blank is written like any other. 1.5's yes/no
-        # questions are the first of these.
+    if var.get("form") in ("popup", "buttons"):
+        # A PopUp, DropDown or RadioButtons object draws its own menu when PGML
+        # is handed it as the answer, so the blank is written like any other.
+        # 1.5's yes/no questions are the first popups; 2.2's 15-18 the first
+        # "buttons", whose object is in fact a DropDown, so the form only says
+        # what PreTeXt would have drawn and the object decides.
         return "[_]{" + var.get("name") + "}"
     if var.get("form"):
         # Essays and the like: not yet met inside a live <webwork>.
@@ -404,6 +406,7 @@ def macros_for(code, images):
         ("OneOf", "parserOneOf.pl"),
         ("PopUp", "parserPopUp.pl"),
         ("DropDown", "parserPopUp.pl"),  # the same file defines both
+        ("RadioButtons", "parserRadioButtons.pl"),
         ("explanation_box", "PGessaymacros.pl"),
         # 1.6's 9-14: "DNE" for an infinite limit is answered with a hint.
         ("AnswerHints", "answerHints.pl"),
