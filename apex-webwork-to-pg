@@ -94,8 +94,10 @@ def book_macros(tex):
     tex = re.sub(r"\\abs\{([^{}]*)\}", r"\\left\\lvert \1\\right\\rvert", tex)
     if r"\abs" in tex:
         raise ValueError(r"\abs with a nested argument: " + tex)
-    # \fp, \gp and \yp are the book's f', g' and y', first met in 2.1.
-    tex = re.sub(r"\\([fgy])p(?![A-Za-z])", r"\1'", tex)
+    # \fp, \gp and \yp are the book's f', g' and y', first met in 2.1;
+    # \fpp is f'', first met in 2.3. One prime per p.
+    tex = re.sub(r"\\([fgy])(pp?)(?![A-Za-z])",
+                 lambda m: m.group(1) + "'" * len(m.group(2)), tex)
     return tex.replace("<", r"\lt ").replace(">", r"\gt ")
 
 
