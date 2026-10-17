@@ -53,7 +53,12 @@
 #                and the page-edge frame. A view is a bundle of layers. (The
 #                instructor copy IS the staff copy -- TAs get it too; there is no
 #                separate marker tier.)
-# Any other view name warns and is skipped.
+# Any other view name warns and is skipped. A view can be switched off
+# temporarily with a flag, leaving the list intact:
+#
+#     %! views: solutions=false, hints=false, instructor
+#
+# builds only the instructor view; `=true' (or no flag) leaves a view on.
 # View PDFs follow the same mirror / BOTH handling as the default build. A view
 # says which PDFs a document HAS; where any of them additionally goes is a
 # separate question, answered by `%! copies:' below.
@@ -511,8 +516,22 @@ read_magic_list() {
   done < <(read_magic "$key" "$file")
 }
 
-# The `%! views: a, b, c' request -- which extra PDFs this document has.
-read_views() { read_magic_list views "$1"; }
+# The `%! views: a, b, c' request -- which extra PDFs this document has. An
+# entry may carry a flag, `solutions=false' / `solutions=true', so a view can be
+# switched off for a while without deleting it from the list: `=false' drops it
+# here, `=true' is the same as the bare name. Filtered in this one place so the
+# build loop and copies_for_file agree -- a copy naming a switched-off view
+# warns and is skipped, exactly as if the view were not listed.
+read_views() {
+  local tok
+  while IFS= read -r tok; do
+    case $tok in
+      *=false) continue ;;
+      *=true) tok=${tok%=true} ;;
+    esac
+    printf '%s\n' "$tok"
+  done < <(read_magic_list views "$1")
+}
 
 # The `%! copies: a-->X, b-->Y(from DATE)' request -- where built PDFs also go.
 read_copies() { read_magic_list copies "$1"; }

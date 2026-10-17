@@ -69,6 +69,19 @@ so the call site needs no class option:
     tier).
 \end{itemize}
 
+\textbf{A view can be switched off without deleting it.} Add \texttt{=false}
+to an entry and the build passes it over; \texttt{=true}, or no flag, leaves
+it on. So while you work on the instructor copy,
+
+\begin{manexsource}
+%! views: solutions=false, hints=false, instructor
+\end{manexsource}
+
+\noindent builds just the student PDF and \file{FILE-INSTRUCTOR.pdf}, and
+deleting the two flags brings the others back. A \texttt{\%! copies:} entry
+that names a switched-off view warns and is skipped, as if the view were not
+listed.
+
 \textbf{The base PDF and its views build side by side.} They are separate
 \file{latexmk} runs that share nothing -- each has its own aux directory and
 job name -- so a lecture with two views takes about as long as its slowest
