@@ -188,17 +188,25 @@
 %%
 %% The count is only printed when there IS one -- \ifnum guards it -- so the
 %% ordinary sheet reads "26 booklets" and stops.
-\newcommand{\att@heading}[6]{%
+%%
+%% THE DAY AND THE RANGE ARE FOR FILLING THE ENVELOPES. The day's two stacks
+%% look identical, and the range says which booklets to count off the top of
+%% that day's stack -- so the sheet going into the envelope is all that is
+%% needed, without the workbook open beside it. Both sit on lines the heading
+%% already had, in the bold of the line they join, so the heading is no taller
+%% than before (see TUNING). The range is the workbook's First and Last.
+\newcommand{\att@heading}[9]{%
   \begingroup
   \centering
   \sffamily
   {\large\bfseries\coursenum---\coursetitle\par}
   \vspace{0.35em}
-  {\Large\bfseries Test #1 Attendance\par}
+  {\Large\bfseries #7\quad\textbullet\quad Test #1 Attendance\par}
   \vspace{0.35em}
   {Section #2\quad\textbullet\quad TA: #3\quad\textbullet\quad #4 students\par}
   \vspace{0.15em}
-  {\small #5 booklets
+  {\small \ifnum#5>0 \textbf{Booklets #8--#9}\quad\textbullet\quad\fi
+    #5 booklets
     \ifnum#6>0 \quad\textbullet\quad #6 writing elsewhere\fi\par}
   \endgroup
   \vspace{1.0em}
@@ -208,6 +216,7 @@
 %% THE SHEET
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% \begin{attendancesheet}{<test>}{<section>}{<TA>}{<count>}{<booklets>}{<elsewhere>}
+%%                        {<day>}{<first booklet>}{<last booklet>}
 %%   \Student{Last, First}
 %%   ...
 %% \end{attendancesheet}
@@ -245,8 +254,11 @@
 %% there is restored at \end and every sheet would believe it was the first.
 %% Breaking on the way out sidesteps the question -- \clearpage is an action,
 %% and actions do not care what group they are in.
-\newenvironment{attendancesheet}[6]{%
-  \att@heading{#1}{#2}{#3}{#4}{#5}{#6}%
+%%
+%% NINE ARGUMENTS IS TeX's CEILING. A tenth fact for the heading means passing
+%% one argument that carries two (the range as one "1--28", say), not a tenth #.
+\newenvironment{attendancesheet}[9]{%
+  \att@heading{#1}{#2}{#3}{#4}{#5}{#6}{#7}{#8}{#9}%
   % The tick column is measured from the heading it will carry, so "Test 2" and
   % "Test 10" each get a column that fits and no more.
   \settowidth{\att@tickwidth}{\textbf{Test #1}}%
