@@ -7,7 +7,7 @@
 %% course-sections.csv lists them.
 %%
 %% NOTHING HERE IS COURSE-SPECIFIC. The course's name reaches the heading through
-%% courseinfo's \coursenum and \coursetitle, so porting this file to another
+%% courseinfo's \coursenum, so porting this file to another
 %% course is a copy and no edit. Everything that varies -- the sections, their
 %% order, the TAs, the counts -- arrives as arguments from the generator.
 %%
@@ -52,7 +52,7 @@
 %% only move once the data moved with it. A package that only takes arguments can
 %% go anywhere; a package that opens files travels with what it opens.
 %%
-%% DEPENDS ON courseinfo for \coursenum and \coursetitle in the heading, and is
+%% DEPENDS ON courseinfo for \coursenum in the heading, and is
 %% \RequirePackage'd below rather than left to the document: a package that
 %% prints the course's name should carry that dependency itself, so the generated
 %% file stays a list of sheets and nothing else. courseinfo's \DTMsavedate needs
@@ -115,6 +115,11 @@
 %% again and RE-MEASURE: build a 35-row sheet and count its pages, because the
 %% arithmetic in this paragraph is a sanity check and not the test.
 %%
+%% RE-MEASURED 2026-10-19, when the heading went from four lines to three. A
+%% 35-row sheet now carries TWO names that wrap once and fails at three; the
+%% four-line heading carried only one by the same test, so the "five" above no
+%% longer holds -- the body or the class has grown since it was measured.
+%%
 %% HOW OVERFLOW ACTUALLY SHOWS UP, which is not what you would expect. A tabular
 %% is one unbreakable box, so a sheet too tall for its page does NOT produce an
 %% Overfull \vbox and does NOT run past the bottom rule. TeX simply cannot place
@@ -174,7 +179,11 @@
 %% Libertinus serif body -- the same sans the class's own \maketitle uses for its
 %% title and subtitle, so the sheet reads as a sibling of the other course
 %% documents without borrowing their sizes or their "Updated" line.
-%% THE SECOND LINE IS THE ENVELOPE'S STORY. A section's envelope no longer holds
+%% THREE LINES, biggest first: what the sheet is, whose it is, what is in its
+%% envelope. The course's title is left off -- the number says which course,
+%% and every line saved is height the table can have (see TUNING).
+%%
+%% THE LAST LINE IS THE ENVELOPE'S STORY. A section's envelope no longer holds
 %% one booklet per name on this sheet: students writing at the Student
 %% Accessibility Centre have theirs waiting there instead, so the count is short
 %% by however many of them there are. Saying so here is what stops a TA counting
@@ -192,22 +201,21 @@
 %% THE DAY AND THE RANGE ARE FOR FILLING THE ENVELOPES. The day's two stacks
 %% look identical, and the range says which booklets to count off the top of
 %% that day's stack -- so the sheet going into the envelope is all that is
-%% needed, without the workbook open beside it. Both sit on lines the heading
-%% already had, in the bold of the line they join, so the heading is no taller
-%% than before (see TUNING). The range is the workbook's First and Last.
+%% needed, without the workbook open beside it. The range is the workbook's
+%% First and Last, in bold and capitals because it is what the eye goes
+%% looking for; a section with no booklets has no range, so \ifnum drops it.
 \newcommand{\att@heading}[9]{%
   \begingroup
   \centering
   \sffamily
-  {\large\bfseries\coursenum---\coursetitle\par}
+  {\Large\bfseries\coursenum\ Test #1 Attendance\par}
   \vspace{0.35em}
-  {\Large\bfseries #7\quad\textbullet\quad Test #1 Attendance\par}
+  {\large Section #2 (#7)\quad\textbullet\quad TA: #3\par}
   \vspace{0.35em}
-  {Section #2\quad\textbullet\quad TA: #3\quad\textbullet\quad #4 students\par}
-  \vspace{0.15em}
-  {\small \ifnum#5>0 \textbf{Booklets #8--#9}\quad\textbullet\quad\fi
-    #5 booklets
-    \ifnum#6>0 \quad\textbullet\quad #6 writing elsewhere\fi\par}
+  % The %s keep the line ends from adding spaces to a line built in pieces.
+  {#4 students\quad\textbullet\quad #5 booklets%
+    \ifnum#6>0\ (#6 writing elsewhere)\fi%
+    \ifnum#5>0\quad\textbullet\quad\textbf{BOOKLETS #8--#9}\fi\par}
   \endgroup
   \vspace{1.0em}
 }
