@@ -222,6 +222,20 @@ A draft directory with no links left gets no review set.
 \emph{The round is part of the set ID}, because an import skips a set name that already exists: after culling links, build \texttt{-r 2}, and the culled round arrives as a new set.
 Rebuilding a round replaces the draft's earlier \file{.def} files; old rounds stay on the server until deleted there, which is harmless, since review sets carry no student data.
 
+\paragraph{A local review page instead (trial, from 2026-10-23).}
+\begin{manexsource}
+webwork-review-page [-s SEED] [--open] DIR ...
+\end{manexsource}
+
+Renders every \file{NN-name.pg} link in a group directory, in \file{NN} order, onto one self-contained page, \file{DIR/REVIEW.html}: the link number, where it points, the rendered statement with its solution open, the answer key, and any render error.
+Generated images are embedded in the page, so it never points at a stale one.
+It replaces the server review above for MATH1003's remaining sections, as a trial; the server is still checked once after the build, since the page has no MathQuill.
+
+Two numeral-first text files sit beside the links.
+\file{NOTES.md} is written once, one numeral per line, and is the reviewer's from then on: deleting a line culls that problem, text after a numeral is an edit to it, and notes about several problems go at the bottom.
+\file{REASONS.md}, written by the drafter, gives the line shown under each heading: why the candidate is there, and its Tier~2 findings.
+Re-running the script after a review greys out each culled problem and shows each note above its problem, so a second round reads against the first.
+
 \paragraph{The manifest.}
 \file{MANIFEST.tsv} records each copy's source path and git blob hash, and it travels to the server inside the set directory.
 Mid-term fixes happen on the server, so at the end of term the set directory is downloaded and the manifest says which file each copy came from and whether it was edited there.

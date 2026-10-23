@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+#
+# webwork-review-page — every problem in a draft group, rendered on one local page
+# Usage: webwork-review-page [-s SEED] [--open] DIR ...
+#
+#   DIR          a group directory of NN-name.pg links, usually a draft
+#                (<SECTION>_<Title>-<nn>-<Group>--CANDIDATES-CLAUDE/); a shell
+#                glob does a whole section:
+#                    webwork-review-page 2-derivatives/webwork-sets/2.4_*--CANDIDATES-CLAUDE
+#   -s SEED      render every problem at this seed (default 1234, as pr-pg-render)
+#   --open       open each page in the browser once written
+#   -h, --help   this text
+#
+# Writes, inside each DIR:
+#
+#     REVIEW.html   the page: one block per link, in NN order, each showing the
+#                   link number, where the link points, the reason the problem
+#                   is a candidate, the rendered statement with its solution
+#                   open, the answer key, and any render error or warning
+#     NOTES.md      ONLY IF ABSENT: one numeral per line, one line per link
+#
+# WHY. Added 2026-10-23, as a trial, replacing the server review (`webwork-build
+# --review`) for MATH1003's remaining sections. Reviewing on the server meant a
+# tarball, an import, and one browser tab per problem; a group read top to
+# bottom on one page is the review Patrick actually wants.
+#
+# THE REVIEW CONVENTION, which this script only sets up. NOTES.md is the record
+# of which candidates survive: deleting a line culls that problem, and text
+# after a numeral is an edit to it. Notes about several problems at once ("could
+# 3 and 4 be combined?") go at the bottom, after the numerals. The links are left
+# alone. Re-running the script after NOTES.md has been edited shows each culled
+# problem greyed out and each problem's note above it, so a second round reads
+# against the first; it never rewrites NOTES.md.
+#
+# REASONS.md (optional, written by whoever drafted the group) supplies the line
+# under each heading: "NN why this candidate is here", one line per link, in the
+# same numeral-first form as NOTES.md. Tier 2 findings belong on that line too.
+#
+# HOW. Each link is rendered by `pr-pg-render --html --solution`, one at a time,
+# because that script writes its preview to one fixed path. The body is lifted
+# out of that preview; every generated image (TikZ graphs and the like) is read
+# from ~/.cache/pg-render and embedded in the page as a data: URI, so REVIEW.html
+# is one self-contained file that cannot later point at a stale image. MathJax
+# comes from the CDN, as in pr-pg-render's own preview.
+#
+# WHAT IT IS NOT. The layout is pr-pg-render's approximation, not the server's,
+# and there is no MathQuill: answer entry still needs a server check after the
+# build. It renders one seed, so it shows a problem, not whether the problem
+# varies -- that is pg-profile's job, and the drafter's.
+
+import argparse
+import base64
+import html
+import pathlib
+import re
+import subprocess
+import sys
+
+CACHE = pathlib.Path.home() / ".cache" / "pg-render"
+
+# pr-pg-render's previews refer to generated images under this URL prefix,
+# which is how PG names its temp directory; the files themselves are in CACHE.
+TMP_URL = "/pg_files/tmp/"
+
+# The image types PG generates or a problem may load, and how a data: URI names them.
+MIME = {
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+}
+
+# Warnings that are noise here rather than findings about the problem:
+#  - the first group only webwork2 can satisfy (the same list as pg-profile's);
+#  - "Wide character" is pr-pg-render writing its own preview without declaring
+#    UTF-8, which it does for every problem containing a curly quote.
+NOISE = [
+    "numOfAttempts",
+    "formattedDueDate",
+    "PeriodicRerandomization",
+    "$WW",
+    "studentName",
+    "setNumber",
+    "Wide character in print",
+]
+
+
+# ---------------------------------------------------------------------------
+# Reading the group directory and its two text files
+# ---------------------------------------------------------------------------
+
+def links_in(directory):
+    """The NN-name.pg entries at the directory's top level, in NN order.
+
+    Subdirectories (discard/, say) are not looked into. A name without an NN-
+    prefix is returned with number None so the caller can complain about it."""
+    found = []
+    for path in sorted(directory.glob("*.pg")):
+        match = re.match(r"(\d+)-", path.name)
+        number = match.group(1) if match else None
+        found.append((number, path))
+    # Sort numerically, so 100- would follow 99- even if someone forgets to pad.
+    found.sort(key=lambda item: (item[0] is None, int(item[0] or 0), item[1].name))
+    return found
+
+
+def numbered_lines(path):
+    """Read a numeral-first file (NOTES.md or REASONS.md).
+
+    Returns (by_number, rest): by_number maps "07" to the text after the numeral
+    ("" when the line is a bare numeral), and rest is every other non-blank line,
+    which in NOTES.md is the notes about several problems at once. Numerals are
+    compared zero-padded to the links' width, so "7" and "07" are the same line."""
+    by_number, rest = {}, []
+    if not path.exists():
+        return None, []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = re.match(r"\s*(\d+)\b\s*(.*)$", line)
+        if match:
+            by_number[match.group(1).zfill(2)] = match.group(2).strip()
+        elif line.strip():
+            rest.append(line.rstrip())
+    return by_number, rest
+
+
+# ---------------------------------------------------------------------------
+# Rendering one problem
+# ---------------------------------------------------------------------------
+
+def render(pg_file, seed):
+    """Render one problem and return (body_html, answers, diagnostics).
+
+    answers is a list of (label, type, correct answer) read off pr-pg-render's
+    report; diagnostics is a list of ("ERROR"|"WARNING", text)."""
+    result = subprocess.run(
+        ["pr-pg-render", "--html", "--solution", "--seed", str(seed), str(pg_file)],
+        capture_output=True,
+        text=True,
+    )
+
+    answers, diagnostics, preview = [], [], None
+    current = None  # the diagnostic a continuation line belongs to
+
+    # The report is fixed-format: two spaces, then a field. An ERROR or WARNING
+    # can run over several lines, each continuation indented eleven spaces.
+    for line in result.stdout.splitlines() + result.stderr.splitlines():
+        if line.startswith("           ") and current is not None:
+            current[1] += "\n" + line.strip()
+            continue
+        current = None
+        match = re.match(r"  (ERROR|WARNING)\s+(.*)$", line)
+        if match:
+            current = [match.group(1), match.group(2)]
+            diagnostics.append(current)
+            continue
+        match = re.match(r"  preview\s+(\S.*)$", line)
+        if match:
+            preview = pathlib.Path(match.group(1))
+            continue
+        # An answer line: a label, a type that is one word or a word with a
+        # bracketed qualifier ("Value (PopUp)"), then the correct answer.
+        match = re.match(r"  (\S+)\s+(\S+(?: \([^)]*\))?)\s+(.*)$", line)
+        if match and match.group(1) not in ("ok",):
+            answers.append(match.groups())
+
+    diagnostics = [d for d in diagnostics if not any(n in d[1] for n in NOISE)]
+
+    if preview is None or not preview.exists():
+        diagnostics.append(["ERROR", "pr-pg-render wrote no preview"])
+        return "", answers, diagnostics
+
+    # The preview is UTF-8 in its body; errors="replace" keeps one bad byte in
+    # pr-pg-render's own header line from losing the whole page.
+    text = preview.read_text(encoding="utf-8", errors="replace")
+    match = re.search(r"</header>(.*)</body>", text, re.S)
+    body = match.group(1) if match else ""
+
+    return body, answers, diagnostics
+
+
+def embed_images(body, diagnostics):
+    """Replace each generated image's URL with the image itself, as a data: URI."""
+
+    def replace(match):
+        url = match.group(1)
+        if not url.startswith(TMP_URL):
+            if not url.startswith(("data:", "http:", "https:")):
+                diagnostics.append(["WARNING", f"image not embedded: {url}"])
+            return match.group(0)
+        file = CACHE / url[len(TMP_URL):]
+        mime = MIME.get(file.suffix.lower())
+        if mime is None or not file.exists():
+            diagnostics.append(["WARNING", f"image not found in the render cache: {url}"])
+            return match.group(0)
+        data = base64.b64encode(file.read_bytes()).decode("ascii")
+        return f'src="data:{mime};base64,{data}"'
+
+    return re.sub(r'src="([^"]*)"', replace, body)
+
+
+def open_solutions(body):
+    """Show solutions and hints open, rather than as collapsed accordions.
+
+    PG wraps each in <div class="solution accordion ..."><details ...>; the
+    details element is a native disclosure, so adding `open' is all it takes."""
+    return re.sub(
+        r'(<div class="(?:solution|hint) accordion[^"]*">\s*<details)',
+        r"\1 open",
+        body,
+    )
+
+
+# ---------------------------------------------------------------------------
+# The page
+# ---------------------------------------------------------------------------
+
+STYLE = """
+body { font: 16px/1.5 -apple-system, sans-serif; margin: 2rem auto; max-width: 48rem; padding: 0 1rem; }
+h1 { font-size: 1.3rem; }
+.meta { color: #666; font-size: .85rem; }
+.problem { border-top: 3px solid #333; margin-top: 2.5rem; padding-top: .5rem; }
+.problem h2 { font-size: 1.6rem; margin: 0; }
+.problem h2 .name { font-size: .9rem; font-weight: normal; color: #666; }
+.reason { background: #eef4ff; padding: .4rem .6rem; margin: .5rem 0; }
+.note { background: #fff4d6; padding: .4rem .6rem; margin: .5rem 0; }
+.diag { background: #fde8e8; color: #900; padding: .4rem .6rem; white-space: pre-wrap; font-size: .85rem; }
+.culled { opacity: .35; }
+.culled h2::after { content: " — culled"; font-size: 1rem; color: #900; }
+.solution { border-left: 4px solid #8a8; padding-left: .8rem; margin-top: 1rem; }
+.solution summary { font-weight: bold; }
+table.key { border-collapse: collapse; font-size: .9rem; margin-top: 1rem; }
+table.key td, table.key th { border: 1px solid #ccc; padding: .15rem .5rem; text-align: left; }
+input[type=text] { font: inherit; border: 1px solid #888; padding: .1rem .3rem; }
+pre.general { background: #fff4d6; padding: .6rem; white-space: pre-wrap; }
+"""
+
+
+def home_relative(path):
+    """Show a path under the home directory as ~/..., as Patrick would type it."""
+    text = str(path)
+    home = str(pathlib.Path.home())
+    return "~" + text[len(home):] if text.startswith(home) else text
+
+
+def build_page(directory, seed):
+    """Render every link in one group directory and write its REVIEW.html."""
+    links = links_in(directory)
+    if not links:
+        print(f"webwork-review-page: no .pg links in {directory}", file=sys.stderr)
+        return None
+
+    bad = [path.name for number, path in links if number is None]
+    if bad:
+        print(f"webwork-review-page: no NN- prefix, so no place in the order: {', '.join(bad)}",
+              file=sys.stderr)
+        return None
+
+    notes, general = numbered_lines(directory / "NOTES.md")
+    reasons, _ = numbered_lines(directory / "REASONS.md")
+
+    blocks = []
+    for number, link in links:
+        print(f"  {link.name}", file=sys.stderr)
+        body, answers, diagnostics = render(link, seed)
+        body = open_solutions(embed_images(body, diagnostics))
+
+        # A problem is culled when NOTES.md exists and has no line for it.
+        culled = notes is not None and number not in notes
+        parts = [f'<section class="problem{" culled" if culled else ""}" id="p{number}">']
+        parts.append(f'<h2>{number} <span class="name">{html.escape(link.name)}</span></h2>')
+        parts.append(f'<div class="meta">{html.escape(home_relative(link.resolve()))}</div>')
+        if reasons and reasons.get(number):
+            parts.append(f'<div class="reason">{html.escape(reasons[number])}</div>')
+        if notes and notes.get(number):
+            parts.append(f'<div class="note">Note: {html.escape(notes[number])}</div>')
+        for kind, text in diagnostics:
+            parts.append(f'<div class="diag">{kind}: {html.escape(text)}</div>')
+        parts.append(body)
+        if answers:
+            rows = "".join(
+                f"<tr><td>{html.escape(label)}</td><td>{html.escape(kind)}</td>"
+                f"<td>{html.escape(value)}</td></tr>"
+                for label, kind, value in answers
+            )
+            parts.append(f'<table class="key"><tr><th>blank</th><th>type</th>'
+                         f'<th>correct answer</th></tr>{rows}</table>')
+        parts.append("</section>")
+        blocks.append("\n".join(parts))
+
+    title = directory.name.removesuffix("--CANDIDATES-CLAUDE")
+    general_html = ""
+    if general:
+        general_html = '<pre class="general">' + html.escape("\n".join(general)) + "</pre>"
+
+    page = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{html.escape(title)}</title>
+<script>
+  window.MathJax = {{ tex: {{ inlineMath: [['\\\\(', '\\\\)']], displayMath: [['\\\\[', '\\\\]']] }} }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+<style>{STYLE}</style>
+</head>
+<body>
+<h1>{html.escape(title)}</h1>
+<div class="meta">{len(links)} problems, seed {seed}, rendered locally by pr-pg-render (not the server's layout, no MathQuill)</div>
+{general_html}
+{chr(10).join(blocks)}
+</body>
+</html>
+"""
+    out = directory / "REVIEW.html"
+    out.write_text(page, encoding="utf-8")
+
+    # NOTES.md is created once and is Patrick's from then on.
+    notes_file = directory / "NOTES.md"
+    if not notes_file.exists():
+        notes_file.write_text("".join(f"{number}\n" for number, _ in links), encoding="utf-8")
+        print(f"wrote {notes_file}")
+
+    return out
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Render every problem in a draft group onto one local review page.")
+    parser.add_argument("dirs", nargs="+", type=pathlib.Path, metavar="DIR",
+                        help="group directory of NN-name.pg links")
+    parser.add_argument("-s", "--seed", type=int, default=1234,
+                        help="render every problem at this seed (default 1234)")
+    parser.add_argument("--open", action="store_true",
+                        help="open each page in the browser once written")
+    args = parser.parse_args()
+
+    failed = False
+    for directory in args.dirs:
+        if not directory.is_dir():
+            print(f"webwork-review-page: not a directory: {directory}", file=sys.stderr)
+            failed = True
+            continue
+        print(f"{directory.name}:", file=sys.stderr)
+        out = build_page(directory, args.seed)
+        if out is None:
+            failed = True
+            continue
+        print(f"wrote {out}")
+        if args.open:
+            subprocess.run(["open", str(out)])
+
+    sys.exit(1 if failed else 0)
+
+
+if __name__ == "__main__":
+    main()
