@@ -71,10 +71,8 @@ MIME = {
     ".jpeg": "image/jpeg",
 }
 
-# Warnings that are noise here rather than findings about the problem:
-#  - the first group only webwork2 can satisfy (the same list as pg-profile's);
-#  - "Wide character" is pr-pg-render writing its own preview without declaring
-#    UTF-8, which it does for every problem containing a curly quote.
+# Warnings only webwork2 can satisfy, which are noise here rather than findings
+# about the problem (the same list as pg-profile's).
 NOISE = [
     "numOfAttempts",
     "formattedDueDate",
@@ -82,7 +80,6 @@ NOISE = [
     "$WW",
     "studentName",
     "setNumber",
-    "Wide character in print",
 ]
 
 
