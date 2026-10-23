@@ -149,8 +149,12 @@ def answer_blank(var, blanks=True):
         # "buttons", whose object is in fact a DropDown, so the form only says
         # what PreTeXt would have drawn and the object decides.
         return "[_]{" + var.get("name") + "}"
+    if var.get("form") == "essay":
+        # 2.4's 7-14 are the first live <webwork>s whose only answer is an
+        # essay. Written as the explanation_box the earlier sections' code
+        # used, so the fork pass removes it the same way.
+        return '[@ explanation_box(message => "Show your work.") @]*'
     if var.get("form"):
-        # Essays and the like: not yet met inside a live <webwork>.
         raise ValueError(f"unsupported <var form=\"{var.get('form')}\">")
     checker = var.get("evaluator") or var.get("name")
     return "[_]{" + checker + "}{" + var.get("width", "10") + "}"
@@ -334,6 +338,11 @@ def direction_line(p, exercise):
     the group then asks the same six again, one <instruction> per blank. So the
     list is left out of the direction line -- but only when it has exactly one
     item per answer blank, which is what says the exercise repeats it.
+
+    2.4's 7-14 are the other case: an <ol> of three things to do, (a) use the
+    rule, (b) differentiate another way, (c) show they agree, over an exercise
+    whose only answer is an essay. Nothing repeats the list, so it stays, as
+    the book prints it.
     """
     ol = p.find("ol")
     if ol is None:
@@ -341,6 +350,8 @@ def direction_line(p, exercise):
     if p[-1] is not ol or (ol.tail or "").strip():
         raise ValueError("a direction line with something after its <ol>")
     blanks = [v for v in exercise.iter("var") if v.get("width")]
+    if not blanks and not (p.text or "").strip():
+        return lettered_list(p, Images())
     if len(ol.findall("li")) != len(blanks):
         raise ValueError("a direction line's <ol> that the exercise does not repeat blank for blank")
     lead = ET.Element("p")
@@ -439,7 +450,8 @@ def convert(exercise, number, intro, meta, args):
     solution = ww.find("solution")
     solution = block(solution, images, blanks=False) if solution is not None else None
 
-    loads = ",\n".join(f"    '{m}'" for m in macros_for(code, images))
+    # The statement too: 2.4's essay boxes are written there, not in the code.
+    loads = ",\n".join(f"    '{m}'" for m in macros_for(code + statement, images))
     tags = "## DBsubject(Calculus - single variable)\n"
     if args.dbchapter:
         tags += f"## DBchapter({args.dbchapter})\n"
