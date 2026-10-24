@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # build-pdfs — compile course .tex files into PDFs with latexmk
 # Usage: build-pdfs [--release [--dry-run]] [--no-release] [--serial] [FILE.tex ...]
+#        build-pdfs --where FILE.tex [...]
 #
 # With no arguments, compiles every *.tex file in the current directory.
 # Each source FILE.tex produces FILE.pdf.
@@ -10,6 +11,10 @@
 #   --dry-run     with --release, report what would be sent and send nothing.
 #   --no-release  skip the due-check that otherwise ends every run.
 #   --serial      build a document's PDFs one after another, not side by side.
+#   --where       build and release nothing; print the absolute path of each
+#                 source's base PDF, one per line, as the .MIRRORDIR rules below
+#                 place it (in BOTH mode, the mirror copy). The PDF need not
+#                 exist yet, and no mirror directory is created.
 #
 # A document's base PDF and its views are built AT THE SAME TIME (see build_file),
 # so a three-view lecture takes about as long as its slowest view. Each build's
@@ -291,6 +296,10 @@ find_mirrordir_file() {
 # base-must-exist rule above is there to prevent. In `check' mode a missing
 # mirror sub-directory simply means "nothing was built there", and the caller
 # falls back to the local build directory.
+#
+# `where' (for --where) neither creates nor requires the mirror sub-directory:
+# it echoes where the PDF WOULD go, so a caller can tell "never built" from
+# "builds locally".
 read_mirrordir() {
   local create=${1:-create}
   local finfo f root info base mode rel dest
@@ -314,7 +323,7 @@ read_mirrordir() {
       echo "build-pdfs: could not create .MIRRORDIR path '$dest', building locally" >&2
       return 0
     fi
-  elif [[ ! -d $dest ]]; then
+  elif [[ $create == check && ! -d $dest ]]; then
     return 0
   fi
   printf '%s\n%s\n' "$mode" "$dest"
@@ -1023,10 +1032,29 @@ release_sweep() {
   done < <(grep -rl --include='*.tex' -e '^%![[:space:]]*copies[[:space:]]*:' "$root" 2>/dev/null)
 }
 
+# Echo the absolute path of a source's base PDF, for --where: the .MIRRORDIR
+# mirror directory when one is in force, else beside the source -- the same
+# decision build_file makes. BOTH mode reports the mirror, since the local copy
+# is the one already in view beside the source. Parameter expansion rather than
+# dirname/basename, to keep the forks down for an interactive caller (a yazi key).
+#   $1 source .tex
+where_file() {
+  local src=$1 dir base outinfo outdir
+  if [[ $src == */* ]]; then dir=${src%/*}; else dir=.; fi
+  base=${src##*/}
+  (
+    cd "$dir" || exit
+    outdir=$PWD
+    outinfo=$(read_mirrordir where)
+    [[ -n $outinfo ]] && { read -r _; read -r outdir; } <<<"$outinfo"
+    printf '%s\n' "$outdir/${base%.tex}.pdf"
+  )
+}
+
 # Flags, then files. A plain loop rather than getopts: the options are few and
 # long-only, and anything unrecognised must stay a filename so the existing
 # "every argument is a source" rule is undisturbed.
-release_only=""; dry=""; auto_release=1; serial=""
+release_only=""; dry=""; auto_release=1; serial=""; where=""
 args=()
 for arg in "$@"; do
   case $arg in
@@ -1034,10 +1062,30 @@ for arg in "$@"; do
     --dry-run)    dry=1 ;;
     --no-release) auto_release=0 ;;
     --serial)     serial=1 ;;
+    --where)      where=1 ;;
     *)            args+=("$arg") ;;
   esac
 done
 set -- ${args[@]+"${args[@]}"}
+
+# --where: report, build nothing (see the header). Ahead of --release and of the
+# auto-release sweep, so a query can never send a copy anywhere.
+if [[ -n $where ]]; then
+  if [[ $# -eq 0 ]]; then
+    echo "build-pdfs: --where needs at least one .tex file" >&2
+    exit 1
+  fi
+  status=0
+  for src in "$@"; do
+    if [[ $src != *.tex || ! -f $src ]]; then
+      echo "build-pdfs: --where: '$src' is not a .tex file" >&2
+      status=1
+      continue
+    fi
+    where_file "$src" || status=1
+  done
+  exit "$status"
+fi
 
 # --release is the sweep on its own, for a caller with a clock (ppush) rather
 # than a document to build.
