@@ -427,6 +427,10 @@ def macros_for(code, images):
         ("parser::Assignment", "parserAssignment.pl"),
         # 2.1's 15-26: a tangent line is answered as an equation, "y=4(x-2)+4".
         ("ImplicitPlane", "parserImplicitPlane.pl"),
+        # 5.1's 9-27: an antiderivative is answered up to its constant, "x^2+C".
+        ("FormulaUpToConstant", "parserFormulaUpToConstant.pl"),
+        # 5.1's 8: F and G are named functions a student can type.
+        ("parserFunction", "parserFunction.pl"),
     ]
     macros += [file for word, file in needs if word in code]
     if images.perl:
