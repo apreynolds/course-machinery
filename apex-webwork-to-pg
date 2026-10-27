@@ -98,7 +98,35 @@ def book_macros(tex):
     # \fpp is f'', first met in 2.3. One prime per p.
     tex = re.sub(r"\\([fgy])(pp?)(?![A-Za-z])",
                  lambda m: m.group(1) + "'" * len(m.group(2)), tex)
+    tex = lzoo(tex)
     return tex.replace("<", r"\lt ").replace(">", r"\gt ")
+
+
+def lzoo(tex):
+    """\\lzoo{x}{f}, the book's d/dx (f), first met in 2.5's 41-42.
+
+    Its second argument can hold braces of its own (\\mathopen{}), so the
+    groups are matched by counting rather than by a regex.
+    """
+    def group(start):
+        # The index just past the {...} that opens at tex[start].
+        depth = 0
+        for i in range(start, len(tex)):
+            depth += {"{": 1, "}": -1}.get(tex[i], 0)
+            if depth == 0:
+                return i + 1
+        raise ValueError(r"\lzoo with unbalanced braces: " + tex)
+
+    while (start := tex.find(r"\lzoo{")) >= 0:
+        var_end = group(start + 5)
+        if tex[var_end:var_end + 1] != "{":
+            raise ValueError(r"\lzoo with one argument: " + tex)
+        arg_end = group(var_end)
+        var = tex[start + 6:var_end - 1]
+        arg = tex[var_end + 1:arg_end - 1]
+        tex = (tex[:start] + r"\frac{d}{d" + var + r"}\left(" + arg + r"\right)"
+               + tex[arg_end:])
+    return tex
 
 
 def display_math(md, punctuation=""):
