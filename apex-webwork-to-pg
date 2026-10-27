@@ -199,6 +199,9 @@ def inline(el, blanks=True):
             out += '"' + inline(child, blanks) + '"'
         elif child.tag == "em":
             out += "_" + inline(child, blanks) + "_"
+        elif child.tag == "enlarge-page":
+            # A print-layout hint (2.5's 41-42 direction line); nothing to say.
+            pass
         else:
             raise ValueError(f"unexpected inline <{child.tag}>")
         out += pgml_escape(child.tail or "")
