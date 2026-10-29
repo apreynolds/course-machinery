@@ -99,6 +99,17 @@ def book_macros(tex):
     tex = re.sub(r"\\([fgy])(pp?)(?![A-Za-z])",
                  lambda m: m.group(1) + "'" * len(m.group(2)), tex)
     tex = lzoo(tex)
+    # The rest of the book's Leibniz family, first met in 2.6, each with plain
+    # arguments: \lz{y}{x} is dy/dx, \lzn{2}{y}{x} is d^2y/dx^2, \lzo{x} is
+    # d/dx and \lzon{2}{x} is d^2/dx^2 (docinfo.ptx). The (?![a-z]) keeps \lz
+    # from matching the front of \lzn.
+    tex = re.sub(r"\\lz\{([^{}]*)\}\{([^{}]*)\}", r"\\frac{d\1}{d\2}", tex)
+    tex = re.sub(r"\\lzn\{([^{}]*)\}\{([^{}]*)\}\{([^{}]*)\}",
+                 r"\\frac{d^{\1}\2}{d\3^{\1}}", tex)
+    tex = re.sub(r"\\lzo\{([^{}]*)\}", r"\\frac{d}{d\1}", tex)
+    tex = re.sub(r"\\lzon\{([^{}]*)\}\{([^{}]*)\}", r"\\frac{d^{\1}}{d\2^{\1}}", tex)
+    if re.search(r"\\lz[a-z]*(?![A-Za-z])", tex):
+        raise ValueError(r"a \lz macro with nested arguments: " + tex)
     return tex.replace("<", r"\lt ").replace(">", r"\gt ")
 
 
