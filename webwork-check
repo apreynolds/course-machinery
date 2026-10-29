@@ -17,7 +17,7 @@
 #               own webwork/ -- a link still pointing at an upstream clone
 #               means the problem was never forked -- and a .pg there that is
 #               not a link is an error too. A draft directory, named
-#               *--CANDIDATES-CLAUDE, may link anywhere.
+#               *--CANDIDATES-CLAUDE, may link anywhere, but relatively.
 #
 #             This is the check that would have caught the Module 6
 #             renumbering hazards, where a set referenced a problem upstream had
@@ -260,10 +260,11 @@ check_def() {
 #                                       upstream clone means the problem was
 #                                       never forked, and a link into another
 #                                       topic crosses a repo boundary.
-#   ...-<nn>-<Group>--CANDIDATES-CLAUDE A DRAFT for review. Gitignored. Links
-#                                       point into the upstream clones, because
-#                                       nothing has been forked yet, so only
-#                                       "does it resolve" applies.
+#   ...-<nn>-<Group>--CANDIDATES-CLAUDE A DRAFT for review. Committed since
+#                                       2026-10-29. Links point into the
+#                                       upstream clones, because nothing has
+#                                       been forked yet, so only "does it
+#                                       resolve" and "is it relative" apply.
 #
 # Other files in a group directory -- a README.md of notes -- are ignored. A
 # real .pg file in a settled one is not: the problem would then exist twice,
@@ -294,7 +295,15 @@ check_group() {
                 gbad=$((gbad + 1))
                 continue
             fi
-            [ "$settled" -eq 1 ] || continue
+            # A draft may link into a clone, but relatively, since it is
+            # committed and finished on whichever machine is to hand.
+            if [ "$settled" -eq 0 ]; then
+                if [ "${target#/}" != "$target" ]; then
+                    echo "  ✗ ABSOLUTE   $shown -> $target"
+                    gbad=$((gbad + 1))
+                fi
+                continue
+            fi
 
             # Unforked before absolute: a link into an upstream clone is
             # usually absolute too, and "never forked" is the finding that
