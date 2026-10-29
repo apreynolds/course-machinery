@@ -3,9 +3,9 @@
 # webwork-review-page — every problem in a draft group, rendered on one local page
 # Usage: webwork-review-page [-s SEED] [--open] DIR ...
 #
-#   DIR          a group directory of NN-name.pg links, usually a draft
-#                (<SECTION>_<Title>-<nn>-<Group>--CANDIDATES-CLAUDE/); a shell
-#                glob does a whole section:
+#   DIR          a group directory of NN-name.pg links: a draft
+#                (<SECTION>_<Title>-<nn>-<Group>--CANDIDATES-CLAUDE/) or a
+#                settled group; a shell glob does a whole section:
 #                    webwork-review-page 2-derivatives/webwork-sets/2.4_*--CANDIDATES-CLAUDE
 #   -s SEED      render every problem at this seed (default 1234, as pr-pg-render)
 #   --open       open each page in the browser once written
@@ -17,7 +17,18 @@
 #                   link number, where the link points, the reason the problem
 #                   is a candidate, the rendered statement with its solution
 #                   open, the answer key, and any render error or warning
-#     NOTES.md      ONLY IF ABSENT: one numeral per line, one line per link
+#     NOTES.md      ONLY IF ABSENT, AND ONLY IN A DRAFT: one numeral per line,
+#                   one line per link
+#
+# REVIEW.html is gitignored and rebuilt whenever it is wanted; NOTES.md and
+# REASONS.md are committed, so a review started on one machine can be finished
+# on another.
+#
+# A SETTLED GROUP gets a page too (from 2026-10-29): the forked problems as the
+# set will serve them, each under its REASONS.md line, which the fork pass
+# carries over from the draft, renumbered. It is the set's reading copy, and is
+# rebuilt after the solutions pass so it shows the real solutions. No NOTES.md
+# is written there: the review is over, and the survivors are the links.
 #
 # WHY. Added 2026-10-23, as a trial, replacing the server review (`webwork-build
 # --review`) for MATH1003's remaining sections. Reviewing on the server meant a
@@ -312,9 +323,9 @@ def build_page(directory, seed):
     out = directory / "REVIEW.html"
     out.write_text(page, encoding="utf-8")
 
-    # NOTES.md is created once and is Patrick's from then on.
+    # NOTES.md is created once, in a draft only, and is Patrick's from then on.
     notes_file = directory / "NOTES.md"
-    if not notes_file.exists():
+    if directory.name.endswith("--CANDIDATES-CLAUDE") and not notes_file.exists():
         notes_file.write_text("".join(f"{number}\n" for number, _ in links), encoding="utf-8")
         print(f"wrote {notes_file}")
 
@@ -323,7 +334,7 @@ def build_page(directory, seed):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Render every problem in a draft group onto one local review page.")
+        description="Render every problem in a group directory onto one local review page.")
     parser.add_argument("dirs", nargs="+", type=pathlib.Path, metavar="DIR",
                         help="group directory of NN-name.pg links")
     parser.add_argument("-s", "--seed", type=int, default=1234,
