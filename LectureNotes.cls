@@ -3,7 +3,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OPTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% [projector] -- the copy shown in the room: bigger type, tighter top margin.
+% [projector] -- the copy shown in the room: bigger type, tighter top margin, and
+% a taller page so it breaks where the handout does (see GEOMETRY).
 % Default is the handout (students, pre-class). The option is named for the
 % -PROJECTOR view so the class option and the built file agree.
 \newif\ifProjector
@@ -230,6 +231,15 @@
 % head and the body begins below it.
 \RequirePackage{geometry}
 \geometry{letterpaper}
+
+% The handout's vertical numbers, named once because the projector's page height
+% is computed from them (below). Change a handout margin here and the projector
+% follows.
+\def\LN@HandoutTop{0.5in}
+\def\LN@HandoutBottom{0.75in}
+\def\LN@HandoutHeadheight{17pt}
+\def\LN@HandoutHeadsep{10pt}
+
 \ifProjector
   % Room copy: no marginpar, top margin tightened to buy vertical space, and the
   % body pushed LEFT of centre.
@@ -243,15 +253,38 @@
   %
   % The reason is the room, not the page: presenting from an iPad puts the app's
   % tool bar down the RIGHT edge of the screen, over the projected text.
-  \geometry{top=0.25in, bottom=0.75in, textwidth=2.6\alphabet,
+  %
+  % PAGE HEIGHT: TALLER THAN LETTER, so the projector breaks where the handout
+  % does. The measure already makes every LINE wrap at the same word in both
+  % views; this makes every PAGE hold the same lines. On letter paper it could
+  % not: 17pt type sits on a 22pt baseline (size17.clo) against the handout's
+  % 17pt (size14.clo), so a full handout page ran ~29% over in the room copy.
+  %
+  % So the projector's text block is the handout's, scaled by 22/17, and the
+  % paper is whatever height that block plus the projector's own margins and
+  % head comes to (~13.5in). 22/17 is the LARGEST scaling in play: paragraph
+  % gaps and display skips grow only with the type (17/14), and figures not at
+  % all, so a projector page can come out slightly underfull but never over.
+  %
+  % Nobody prints this copy. The tablet fits the page to its width and the copy
+  % is scrolled, so the taller page changes where breaks fall and nothing else.
+  % Width stays 8.5in, so the measure and hmarginratio above are unaffected.
+  \newlength\LN@ProjectorBody
+  \setlength\LN@ProjectorBody{\dimexpr
+    (11in - \LN@HandoutTop - \LN@HandoutBottom
+          - \LN@HandoutHeadheight - \LN@HandoutHeadsep) * 22 / 17\relax}
+  \geometry{paperwidth=8.5in,
+            paperheight=\dimexpr\LN@ProjectorBody + 0.25in + 0.75in + 22pt + 8pt\relax,
+            top=0.25in, bottom=0.75in, textwidth=2.6\alphabet,
             hmarginratio={3:7},
             includehead, headheight=22pt, headsep=8pt}
 \else
   % Handout: left margin fixed, remainder falls to the right and carries the
   % marginpar column.
-  \geometry{top=0.5in, bottom=0.75in, left=0.5in,
+  \geometry{top=\LN@HandoutTop, bottom=\LN@HandoutBottom, left=0.5in,
             textwidth=2.6\alphabet, marginparwidth=1.3in,
-            includehead, headheight=17pt, headsep=10pt}
+            includehead, headheight=\LN@HandoutHeadheight,
+            headsep=\LN@HandoutHeadsep}
 \fi
 
 % No \TitleMarker override: the instructor-copy signal is now the page-edge frame
