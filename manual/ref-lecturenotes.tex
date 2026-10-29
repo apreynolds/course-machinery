@@ -13,8 +13,9 @@ assessment. Workflow: section~\ref{sec:lectures}.
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
 \texttt{projector} & the in-room copy: 17\,pt, tighter top margin, no
-  marginpar column, no page number, and the text block sitting left of
-  centre (same width, shifted -- see below).
+  marginpar column, no page number, the text block sitting left of
+  centre (same width, shifted -- see below), and a page taller than
+  letter, so it breaks where the handout does (see below).
   Normally you never write it -- the build's \env{projector} view injects
   \cs{ProjectorView} and the class switches by itself.\\
 \emph{(other)} & forwarded to \file{extarticle}.\\
@@ -82,6 +83,11 @@ Other deliberate class behaviour:
     as everywhere else -- this moves the block, it does not reflow it. The
     reason is the room: presenting from a tablet puts the app's tool bar down
     the right edge of the screen, over the projected text.
+  \item The projector page is taller than letter (8.5\,in wide, about 13.5\,in tall), so it holds the same \emph{lines} as a handout page and breaks where the handout does.
+    The shared measure already makes every line wrap at the same word; on letter paper the pages still drifted apart, because 17\,pt type sits on a 22\,pt baseline against the handout's 17\,pt, and a full handout page ran about 29\% over -- one long contents list pushed every later page down by one.
+    The text block is the handout's scaled by 22/17, the largest growth in play (paragraph gaps grow only with the type, figures not at all), so a projector page can be slightly underfull but never overflows.
+    The height is computed from the handout's margins, so changing those moves both views together.
+    Nobody prints this copy; the tablet fits the page to its width and the copy is scrolled.
   \item Headings and links stay black: lectures sit with assessments on
     the ``clear, not fancy'' side; colour belongs to CourseDocument.
 \end{itemize}
