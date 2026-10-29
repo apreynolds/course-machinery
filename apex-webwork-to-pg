@@ -218,6 +218,10 @@ def inline(el, blanks=True):
         elif child.tag == "xref":
             if child.get("ref") not in XREFS:
                 raise ValueError(f"<xref ref=\"{child.get('ref')}\"> has no wording")
+            # text="custom" means the element's own words go before the number
+            # ("Exercises 13--25"); otherwise the words are in the paragraph.
+            if child.get("text") == "custom" and child.text:
+                out += child.text + " "
             out += XREFS[child.get("ref")]
         elif child.tag == "var":
             out += answer_blank(child, blanks)
@@ -570,9 +574,17 @@ def main():
     parent = {child: el for el in exercises.iter() for child in el}
     # Every exercise's book number under its xml:id, so that a direction line
     # pointing at a range of exercises can name it.
+    numbers = {}
     for number, exercise in enumerate(exercises.iter("exercise"), start=1):
+        numbers[exercise] = number
         if exercise.get(XMLID):
             XREFS[exercise.get(XMLID)] = str(number)
+    # A whole exercise group, as its range: 2.6's 36-39 say their functions
+    # are "the same functions used in Exercises 13--25", an <xref> to a group.
+    for group in exercises.iter("exercisegroup"):
+        inside = [numbers[e] for e in group.iter("exercise")]
+        if group.get(XMLID) and inside:
+            XREFS[group.get(XMLID)] = f"{min(inside)}--{max(inside)}"
     # Number in DOCUMENT order, which is the book's. Walking group by group is
     # not the same thing: 1.3's last exercise sits directly in its <subexercises>
     # after the <exercisegroup>s, and a group-first walk numbered it 7, not 43.
