@@ -51,7 +51,8 @@
 #                is student-facing help, so list both views for both PDFs.
 #   projector -> also build FILE-PROJECTOR.pdf, with \def\ProjectorView{}
 #                injected so the `LectureNotes' class switches to the room copy
-#                (17pt, wider text, tighter top margin) instead of the handout.
+#                (17pt, tighter top margin, a taller page that breaks where the
+#                handout does) instead of the handout.
 #   instructor-> also build FILE-INSTRUCTOR.pdf, the instructor bundle: injects
 #                \ShowSolutions + \ShowHints + \ShowInstructorNotes, so the
 #                instructor copy shows solutions, hints, the slate staff notes,
