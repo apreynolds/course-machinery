@@ -595,12 +595,16 @@ def fold_name(text):
 
 
 def read_sac_students(sections):
-    """sac-students.xlsx -> (counts, marked, available).
+    """sac-students.xlsx -> (counts, marked, available, rows).
 
         counts[section]  {"yes": n, "unknown": n}    what the arithmetic needs
         marked[section]  [(last, first), ...]        the `yes' rows, to mark on
                                                      the attendance sheet
         available        False when the file could not be read at all
+        rows             every counted row as a dict: number, last, first,
+                         section, where -- for test-admin to check against the
+                         class lists. This file stays hand-maintained: nothing
+                         here or there ever writes to it.
 
     NOT FATAL WHEN ABSENT -- OneDrive may simply not be there. The caller falls
     back to print-job.csv's sac_fallback, which is the old flat ballpark: it
@@ -634,7 +638,7 @@ def read_sac_students(sections):
             f"SAC order falls back to the flat ballpark and no section is "
             f"reduced. (Is OneDrive signed in?)"
         )
-        return {}, {}, False
+        return {}, {}, False, []
 
     # Only reachable when the script was started some way that skipped uv, since
     # the inline dependency block at the top of each one asks for openpyxl. Fatal
@@ -662,9 +666,9 @@ def read_sac_students(sections):
             f"be part-way through syncing, or open for editing. Falling back "
             f"to the ballpark, which over-prints."
         )
-        return {}, {}, False
+        return {}, {}, False, []
 
-    counts, marked, seen = {}, {}, set()
+    counts, marked, seen, kept = {}, {}, {}, []
     try:
         rows = workbook.active.iter_rows(min_row=1, values_only=True)
 
@@ -685,7 +689,7 @@ def read_sac_students(sections):
                 f"{', '.join(sorted(missing))}; it needs "
                 f"{', '.join(SAC_COLUMNS)}. Falling back to the ballpark."
             )
-            return {}, {}, False
+            return {}, {}, False, []
 
         def field(row, name):
             """One cell as clean text: blank for empty, str() for a number."""
@@ -715,11 +719,12 @@ def read_sac_students(sections):
             key = (fold_name(last), fold_name(first), section)
             if key in seen:
                 warn(
-                    f"{SAC_STUDENTS_XLSX.name} row {number}: a second row for "
-                    f"the same student in {section}; counted once."
+                    f"{SAC_STUDENTS_XLSX.name} row {number} repeats row "
+                    f"{seen[key]}, the same student in {section}; counted once. "
+                    f"Delete one of them."
                 )
                 continue
-            seen.add(key)
+            seen[key] = number
 
             state = field(row, "writes-at-sac").casefold()
             if state in SAC_YES:
@@ -736,6 +741,13 @@ def read_sac_students(sections):
                 )
                 where = "unknown"
 
+            kept.append({
+                "number": number,
+                "last": last,
+                "first": first,
+                "section": section,
+                "where": where,
+            })
             tally = counts.setdefault(section, {"yes": 0, "unknown": 0})
             if where == "yes":
                 tally["yes"] += 1
@@ -746,4 +758,4 @@ def read_sac_students(sections):
         # A read_only workbook holds the file open until told otherwise.
         workbook.close()
 
-    return counts, marked, True
+    return counts, marked, True, kept
