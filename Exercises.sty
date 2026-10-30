@@ -1321,14 +1321,19 @@
 
 % Per-box options for \begin{solution}, keyval family `exbox' -- the same idiom as
 % \importproblem's `eximport'. (The hint is a plain run-in now, not a box, so it
-% takes no options.) One key for now; future per-box axes slot in as one more.
+% takes no options.)
 %
-%   notitle   drop the corner tab, leaving just the coloured box
+%   notitle      drop the corner tab, leaving just the coloured box
+%   scale=0.85   shrink the box to fit its workspace (overlay mode only; see
+%                \WSOverlayScale in Workspace.sty). For the solution that is a
+%                little too long; one far too long wants trimming instead.
 %
 % \ifex@notitle is reset false before each box, so the option never leaks to the
-% next; \setkeys errors loudly on an unknown key (a typo), as eximport does.
+% next; scale needs no reset, because the environment's group ends with the box.
+% \setkeys errors loudly on an unknown key (a typo), as eximport does.
 \newif\ifex@notitle
 \define@key{exbox}{notitle}[true]{\ex@notitletrue}
+\define@key{exbox}{scale}{\def\WSOverlayScale{#1}}
 
 % \NewEnviron captures the whole body as \BODY. When solutions are OFF we simply
 % never emit \BODY -- the clean way to drop an environment's contents, and the

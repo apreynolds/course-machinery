@@ -91,7 +91,9 @@
 %      \nointerlineskip of step 3 leaves the box top flush under the previous line.
 % A box TALLER than the workspace below it simply overprints the following content
 % -- the intended "leave more room" alarm, not a bug. (A breakable tcolorbox in a
-% \vtop renders unbroken, which is right: an overlay is a fixed stamp, not paged.)
+% \vtop is NOT paged, which is right: an overlay is a fixed stamp. It does still
+% split where the page would have ended and stack the parts with a gap, but that
+% seam is past the bottom edge unless the box is scaled -- see SCALE below.)
 %
 % NO workspace KEY ON THE BOXES (\begin{solution}[workspace=8] in place of a
 % \workspace after the box): possible, and declined on purpose. The reasons, and the
@@ -104,12 +106,42 @@
 \newlength{\WSOverlayGap}
 \setlength{\WSOverlayGap}{\medskipamount}
 
+% SCALE: \WSOverlayScale shrinks the overlay, for the box that is just a little
+% too big for its workspace -- typically a solution taller than a whole page,
+% which no amount of \workspace can hold. A box package sets it locally from a
+% `scale' key (\begin{solution}[scale=0.85]); 1, the default, changes nothing.
+%
+% The box is typeset at \linewidth/scale and then shrunk by scale, so it still
+% spans the full text width -- it is the TYPE that gets smaller, and because each
+% line also holds more words, the box loses height faster than the factor alone
+% (roughly scale^2 for running text). OVERLAY MODE ONLY: under \collapseworkspace
+% the box flows at full size and breaks across pages, so there is nothing to
+% rescue, and scaling would stop it breaking.
+%
+% A shrunk overlay is still an overlay: if it remains too tall, it overprints, the
+% same alarm as before.
+\newcommand{\WSOverlayScale}{1}
+
 \newsavebox{\WS@ovbox}
 \newdimen\WS@prevdp
 \newcommand{\WSZeroHeight}[1]{%
   \ifWorkspaceOverlay
     \par
-    \setbox\WS@ovbox=\vtop{#1}%          % build (its own inner list; outer list untouched)
+    \ifdim\WSOverlayScale\p@=\p@
+      \setbox\WS@ovbox=\vtop{#1}%        % build (its own inner list; outer list untouched)
+    \else
+      % widen the measure by 1/scale, build, then shrink the whole box by scale.
+      % break at: a breakable tcolorbox still splits where it thinks the PAGE
+      % ends, even inside this \vtop, and stacks the parts with a gap. Unscaled,
+      % that seam falls off the bottom edge unseen; shrunk, it lands mid-page.
+      % A first part 100in tall keeps the box in one piece.
+      \setbox\WS@ovbox=\vtop{%
+        \hsize=\fpeval{\linewidth/\WSOverlayScale}\p@
+        \linewidth=\hsize
+        \tcbset{break at=100in}%
+        #1}%
+      \setbox\WS@ovbox=\hbox{\scalebox{\WSOverlayScale}{\box\WS@ovbox}}%
+    \fi
     \ht\WS@ovbox=\z@ \dp\WS@ovbox=\z@     % report zero height + depth
     \WS@prevdp=\prevdepth                 % remember the exact vertical position
     \kern\WSOverlayGap                    % paint the box this far below the previous line...
