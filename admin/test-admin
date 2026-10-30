@@ -1090,11 +1090,11 @@ def match_elsewhere(students, sac_marked):
     """Which listed names belong to students writing elsewhere -> {section: {name}}.
 
     TWO FILES, TWO SPELLINGS OF THE SAME PERSON. The registrar gives one display
-    string, "Barrios Martinez, Danna X."; sac-students.xlsx is typed by hand into
+    string, "Sample Lastname, Jordan X."; sac-students.xlsx is typed by hand into
     separate last and first columns. So the comparison is folded (case and
     accents dropped, see fold_name) and the first name is allowed to be a PREFIX
-    on either side, which is what lets a recorded "Danna" find a listed
-    "Danna X." without also letting "Dan" find her.
+    on either side, which is what lets a recorded "Jordan" find a listed
+    "Jordan X." without also letting "Jor" find them.
 
     SCOPED TO THE SECTION, always. The section is recorded beside the name, two
     students in a course of 634 may well share one, and a cross-section match
