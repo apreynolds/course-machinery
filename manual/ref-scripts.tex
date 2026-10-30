@@ -226,6 +226,10 @@ A file it could not recognise stays in place, and so keeps earning its warning o
 A student who drops stays in the export, with \texttt{(Dropped YYYY-MM-DD)} added to their name.
 The script leaves them out of the enrolment counts and the attendance sheets, and reports how many it left out of each section.
 
+\file{sac-students.xlsx} stays hand-maintained, because the class lists cannot know who registers at the SAC or where they choose to write.
+The script checks every row against the class lists and suggests edits by row number: a duplicate, a student who dropped, a student now in another section, a name on no class list.
+It changes nothing in that file, and offers a chance to stop and edit it before the numbers are fixed.
+
 It holds no fact about any one course.
 It finds the course by walking up from its own location to the first directory that holds a \file{course-info/} --- not the first that holds \file{.git}, which inside a submodule would be the machinery itself --- and reads everything from there:
 

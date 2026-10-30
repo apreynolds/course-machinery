@@ -39,7 +39,8 @@
 #   2. THE CLASS LISTS  how old is each instructor's newest export?       (ask)
 #      a yes also moves the exports they supersede into zzzzz/
 #   3. ENROLMENT        correct course-sections.csv from the class lists? (ask)
-#   4. THE NUMBERS      spare booklets per section, and the SAC's block   (ask)
+#   4. THE NUMBERS      suggested edits to sac-students.xlsx, if any,     (ask)
+#                       spare booklets per section, and the SAC's block   (ask)
 #   5. the attendance sheets are built
 #   6. the workbook is written
 #   7. THE FOLLOW-THROUGH  the steps done by hand, one at a time, each     (ask)
@@ -1085,7 +1086,7 @@ def same_person(display_name, fold_last, fold_first):
     )
 
 
-def match_elsewhere(students, sac_marked, dropped):
+def match_elsewhere(students, sac_marked):
     """Which listed names belong to students writing elsewhere -> {section: {name}}.
 
     TWO FILES, TWO SPELLINGS OF THE SAME PERSON. The registrar gives one display
@@ -1099,14 +1100,9 @@ def match_elsewhere(students, sac_marked, dropped):
     students in a course of 634 may well share one, and a cross-section match
     would silently mark the wrong person's row.
 
-    THE WARNINGS ARE THE POINT of doing this at all. A row that matches nobody
-    means a typo, a withdrawal, or a section change -- and in the last case the
-    order takes a booklet off the wrong section's stack. A row
-    that matches two people cannot be resolved from what is written down, so it
-    marks neither and says so.
-
-    A ROW FOR A STUDENT WHO DROPPED gets a warning of its own, because the class
-    list can say what happened rather than offering three guesses.
+    A row that matches two people cannot be resolved from what is written down,
+    so it marks neither and says so. A row that matches nobody marks nobody, and
+    is review_sac_rows's to report.
     """
     marked = {}
     for section, wanted in sac_marked.items():
@@ -1118,39 +1114,137 @@ def match_elsewhere(students, sac_marked, dropped):
                 if same_person(display_name, fold_last, fold_first)
             ]
 
-            if not hits:
-                drop_dates = [
-                    drop_date for display_name, drop_date in dropped.get(section, [])
-                    if same_person(display_name, fold_last, fold_first)
-                ]
-                if drop_dates:
-                    warn(
-                        f"{SAC_STUDENTS_XLSX.name}: {last}, {first} is recorded "
-                        f"in {section} but dropped it on {max(drop_dates)}. The "
-                        f"order still takes a booklet off {section} for them "
-                        f"until the row is removed."
-                    )
-                    continue
-                if not listed:
-                    # The class list for this section is missing entirely, which
-                    # is already reported once. Saying it again per student would
-                    # bury the freshness table under a name for every SAC row.
-                    continue
-                warn(
-                    f"{SAC_STUDENTS_XLSX.name}: {last}, {first} is recorded in "
-                    f"{section} but no one of that name is on {section}'s class "
-                    f"list -- withdrawn, a typo, or in a different section now. "
-                    f"The order still takes a booklet off {section} for them."
-                )
-            elif len(hits) > 1:
+            if len(hits) > 1:
                 warn(
                     f"{SAC_STUDENTS_XLSX.name}: {last}, {first} matches "
                     f"{len(hits)} students in {section}; none marked on the "
                     f"sheet. Add a middle initial to tell them apart."
                 )
-            else:
+            elif hits:
                 marked.setdefault(section, set()).add(hits[0])
     return marked
+
+
+def review_sac_rows(sac_rows, students, dropped, sections, current):
+    """Check every SAC row against the class lists -> edits to suggest, as text.
+
+    ONLY SUGGESTS. The file is hand-maintained because the class lists cannot know
+    who registers at the SAC or where they choose to write, and a row may be right
+    for a reason the export does not show. So this names rows and leaves the
+    editing to a person. Row numbers are Excel's.
+
+    EVERY ROW, not just the `yes' ones marked on the sheets: an `unknown' row
+    orders a booklet too, and a `no' row is still a stale row.
+
+    A ROW IS ONLY JUDGED WHEN ITS SECTION'S CLASS LIST WAS FILED. A missing list
+    is already reported once, and it says nothing about who is in that section.
+
+    TWO ROWS WITH ONE NAME IN TWO SECTIONS are fine if each name is on its own
+    section's list, since those are two people. If it is not, the checks below
+    report that row, and say so when another row already has the student right.
+    """
+    def is_filed(section):
+        return sections[section]["instructor"] in current
+
+    def label(row):
+        return f"row {row['number']}: {row['last']}, {row['first']} ({row['section']})"
+
+    def is_same(row, other):
+        return same_person(
+            f"{other['last']}, {other['first']}",
+            fold_name(row["last"]), fold_name(row["first"]),
+        )
+
+    def cost(row):
+        """What leaving a row as it is does to the order."""
+        if row["where"] == "yes":
+            return f" Until then the order takes a booklet off {row['section']}."
+        if row["where"] == "unknown":
+            return " Until then the SAC block counts a booklet for them."
+        return ""
+
+    suggestions = []
+    for index, row in enumerate(sac_rows):
+        for other in sac_rows[index + 1:]:
+            if not is_same(row, other):
+                continue
+            pair = f"rows {row['number']} and {other['number']}"
+            name = f"{row['last']}, {row['first']}"
+            if row["section"] == other["section"]:
+                suggestions.append(
+                    f"{pair} look like one student in {row['section']} "
+                    f"({name}), and both are counted. Delete one."
+                )
+            elif not (is_filed(row["section"]) and is_filed(other["section"])):
+                suggestions.append(
+                    f"{pair} have one name in {row['section']} and "
+                    f"{other['section']} ({name}), with no class list to say "
+                    f"whether that is one student. Check them."
+                )
+
+    for row in sac_rows:
+        if not is_filed(row["section"]):
+            continue
+        fold_last, fold_first = fold_name(row["last"]), fold_name(row["first"])
+
+        live_in = [
+            section for section, entries in students.items()
+            if any(same_person(name, fold_last, fold_first) for name, _id in entries)
+        ]
+        if row["section"] in live_in:
+            continue
+
+        if len(live_in) == 1:
+            target = live_in[0]
+            twin = next(
+                (other for other in sac_rows
+                 if other["section"] == target and is_same(row, other)),
+                None,
+            )
+            if twin:
+                suggestions.append(
+                    f"{label(row)} is in {target} now, and row {twin['number']} "
+                    f"already says so. Delete this row." + cost(row)
+                )
+            else:
+                suggestions.append(
+                    f"{label(row)} is in {target} now. Change the section."
+                    + cost(row)
+                )
+        elif live_in:
+            suggestions.append(
+                f"{label(row)} is not on that class list, but the name is on "
+                f"{' and '.join(sorted(live_in))}. Check which." + cost(row)
+            )
+        else:
+            drop_dates = [
+                drop_date
+                for entries in dropped.values()
+                for name, drop_date in entries
+                if same_person(name, fold_last, fold_first)
+            ]
+            if drop_dates:
+                suggestions.append(
+                    f"{label(row)} dropped on {max(drop_dates)}. Delete this row."
+                    + cost(row)
+                )
+            else:
+                suggestions.append(
+                    f"{label(row)} is on no class list. Check the spelling."
+                    + cost(row)
+                )
+
+    return suggestions
+
+
+def report_sac_review(suggestions):
+    """List the suggested edits; a table's rows, counted as warnings."""
+    say(paint(
+        f"{SAC_STUDENTS_XLSX.name}: {len(suggestions)} suggested edit(s), "
+        f"none of them made by this script", "bold"))
+    for suggestion in suggestions:
+        say(f"  {suggestion}")
+        count_warning()
 
 
 def check_one_page_per_sheet(pdf_path, expected_pages):
@@ -2285,12 +2379,23 @@ def main():
     # file's count plus the cushion -- or print-job.csv's ballpark when that
     # file cannot be read. The ballpark over-prints on purpose: a missing shared
     # file should waste paper, not strand a student.
-    sac_counts, sac_marked, sac_available = read_sac_students(sections)
+    sac_counts, sac_marked, sac_available, sac_rows = read_sac_students(sections)
     if not sac_available:
         sac_counts = {}
     # Matched now rather than when the sheets are built, so a SAC row that fits
     # nobody on a class list is on screen while the SAC numbers are being chosen.
-    elsewhere = match_elsewhere(students, sac_marked, dropped)
+    elsewhere = match_elsewhere(students, sac_marked)
+
+    # A CHANCE TO STOP, because the numbers are fixed at the moment of the run: an
+    # edit made afterwards reaches this order only if the run starts again. Nothing
+    # has been written yet that a rerun would object to.
+    suggestions = review_sac_rows(sac_rows, students, dropped, sections, current)
+    if suggestions:
+        report_sac_review(suggestions)
+        proceed_or_stop(
+            f"Carry on with {SAC_STUDENTS_XLSX.name} as it stands? "
+            f"(To edit it first, say no and rerun.)"
+        )
 
     cushion = int(settings["sac_cushion"])
     if args.spare is not None:
