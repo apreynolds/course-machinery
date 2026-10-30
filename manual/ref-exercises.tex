@@ -30,9 +30,13 @@ section~\ref{sec:assessments}.
   the class lists the name instead, and only when one is given.\\
 \env{qparts} / \cs{qpart} & dependent parts \emph{within} one problem file,
   lettered (a), (b); per-part points/workspace supplied at import.\\
-\env{solution}\texttt{[notitle]} & printed only in a solutions build;
+\env{solution}\texttt{[notitle, scale=0.9]} & printed only in a solutions build;
   the green box (\texttt{notitle} drops the corner tab). Zero-height
-  overlay by default (section~\ref{sec:overlay}).\\
+  overlay by default (section~\ref{sec:overlay}).
+  \texttt{scale} shrinks the overlay to fit its workspace -- for a solution just a little too long, typically one taller than a whole page.
+  The box keeps the full text width; its type shrinks, and its lines hold more words, so running text loses height faster than the factor.
+  Figures do not shrink: a graph sized to \cs{linewidth} stays the size it was, so a figure-heavy solution wants trimming instead.
+  Overlay mode only; under \cs{collapseworkspace} the box prints at full size.\\
 \env{hint} & printed only when this problem's hints are on; plain italic
   run-in under a \cs{HintLabel}. Never an overlay.\\
 \env{studentonly} & printed in the student copy; in the key its \emph{space}
