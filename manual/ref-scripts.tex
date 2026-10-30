@@ -218,6 +218,11 @@ Run it once per test, from the course's own checkout:
 \texttt{-{}-dry-run} goes through every step and writes nothing; \texttt{-{}-yes} answers every question with its default.
 The script is Python and declares its one dependency inline, so \texttt{uv} builds its environment on first run.
 
+Instructors drop their class-list exports in the shared folder and delete nothing, and the script reads the newest export per instructor.
+Once it has been told to carry on with those lists, it moves the exports they supersede into a \file{zzzzz/} subfolder, which it does not read.
+Nothing is deleted, so moving a file back out undoes it.
+A file it could not recognise stays in place, and so keeps earning its warning on every run.
+
 It holds no fact about any one course.
 It finds the course by walking up from its own location to the first directory that holds a \file{course-info/} --- not the first that holds \file{.git}, which inside a submodule would be the machinery itself --- and reads everything from there:
 
