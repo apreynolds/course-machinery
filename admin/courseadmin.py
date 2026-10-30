@@ -193,7 +193,8 @@ def find_mirror_dir():
 # both machines. Three things in it are what the scripts actually touch:
 #
 #   General/exported-classlists/   the registrar's exports
-#   General/sac-students.xlsx      who writes at the SAC
+#   General/student-records-that-we-maintain/sac-students.xlsx
+#                                  who writes at the SAC
 #   Tests/ADMIN/                   everything test-admin produces
 #
 # NEITHER FALLS BACK TO A LOCAL COPY, and for the same reason: a stale local file
@@ -269,7 +270,8 @@ COURSE_NUMBER = SETTINGS["course_number"]
 TEAM_DIR = Path.home() / SETTINGS["team_dir"]
 SHARED_DIR = TEAM_DIR / "General"
 DEFAULT_ROSTER_DIR = SHARED_DIR / "exported-classlists"
-SAC_STUDENTS_XLSX = SHARED_DIR / "sac-students.xlsx"
+RECORDS_DIR = SHARED_DIR / "student-records-that-we-maintain"
+SAC_STUDENTS_XLSX = RECORDS_DIR / "sac-students.xlsx"
 
 # Where the finished paperwork goes: the Team's Tests/ADMIN, beside the tests
 # themselves. The attendance-sheet PDF and the test's workbook land here
