@@ -85,6 +85,12 @@
 #
 # ("Cross-listed" is the registrar's word for it, not a real cross-listing.)
 #
+# A STUDENT WHO DROPS STAYS IN THE EXPORT, with the date added to their name:
+#
+#   "Last, First (Dropped 2026-10-20)"               -> not in the course any more
+#
+# They are left out of the counts and the sheets, and reported by section.
+#
 # So one download per instructor covers the whole course -- and THE FILENAME IS
 # DATA. It is the only record of where the un-suffixed students belong, so a
 # colleague who downloads their FR09A list rather than FR07A makes FR09A the
@@ -505,6 +511,15 @@ CROSSLIST_RE = re.compile(
     rf"\s+cross-listed as MATH\*{COURSE_NUMBER}\*([A-Z0-9]+)\s*$"
 )
 
+# The mark of a student who has left the section. NOT ANCHORED, unlike the suffix
+# above, so it is found on either side of a cross-listing; it is removed first, so
+# that the cross-listing is then at the end of the name, where its pattern wants it.
+DROPPED_RE = re.compile(r"\s*\(\s*dropped\s+(\d{4}-\d{2}-\d{2})\s*\)", re.IGNORECASE)
+
+# A drop in some other wording: the date in another format, say. Left in the class
+# and warned about, since the export no longer says plainly what it means.
+DROPPED_LOOSE_RE = re.compile(r"\(\s*dropped\b", re.IGNORECASE)
+
 # Characters TeX would read as markup if a name contained them. Applied one
 # character at a time (see latex_escape), which is what keeps the backslash rule
 # from then mangling the backslashes the other rules just introduced.
@@ -761,13 +776,21 @@ def report_freshness(current, sections, stale_days, total_files, roster_dir):
 def collect_students(current, known_sections):
     """Read the selected class lists and sort the students into sections.
 
-    Returns {section: [(display_name, student_id), ...]}. Sections with no
+    Returns {section: [(display_name, student_id), ...]} and the students who
+    dropped, {section: [(display_name, drop_date), ...]}. Sections with no
     students are simply absent; the caller still gives them a page.
+
+    A ROW MARKED DROPPED IS SET ASIDE BEFORE ANYTHING ELSE LOOKS AT IT, so it is
+    in no count, on no sheet, and cannot trip the two-sections warning when a
+    student has only changed section. A student with a live row in the same
+    section as a dropped one left and came back, so they are not reported.
     """
     students = {}
     # (section, student id) already taken. Selection should already have removed
     # superseded generations, so this is a safety net rather than the mechanism.
     seen = set()
+    # (section, the key used in seen, name, date), until seen is complete.
+    dropped_rows = []
 
     for path, nominal_section, _exported in current.values():
         rows_read = 0
@@ -780,9 +803,12 @@ def collect_students(current, known_sections):
                 raw_name = (row.get("Student Name") or "").strip()
                 if not raw_name:
                     continue  # the export ends with a blank line
-                rows_read += 1
 
                 student_id = (row.get("Student ID") or "").strip()
+
+                drop_mark = DROPPED_RE.search(raw_name)
+                if drop_mark:
+                    raw_name = DROPPED_RE.sub("", raw_name)
 
                 suffix = CROSSLIST_RE.search(raw_name)
                 if suffix:
@@ -791,6 +817,21 @@ def collect_students(current, known_sections):
                 else:
                     section = nominal_section
                     display_name = raw_name
+
+                if drop_mark:
+                    key = (section, student_id or display_name.casefold())
+                    dropped_rows.append(
+                        (section, key, display_name, drop_mark.group(1))
+                    )
+                    continue
+                rows_read += 1
+
+                if DROPPED_LOOSE_RE.search(display_name):
+                    warn(
+                        f"{path.name}: {display_name!r} looks like a dropped "
+                        f"student, but not in the form (Dropped YYYY-MM-DD), so "
+                        f"they were kept on {section}'s sheet and in its count."
+                    )
 
                 if section not in known_sections:
                     warn(
@@ -846,7 +887,26 @@ def collect_students(current, known_sections):
             else:
                 id_owner[student_id] = (section, display_name)
 
-    return students
+    dropped = {}
+    for section, key, display_name, drop_date in dropped_rows:
+        if key not in seen:
+            dropped.setdefault(section, []).append((display_name, drop_date))
+
+    return students, dropped
+
+
+def report_dropped(dropped, sections):
+    """Say how many students were left out for having dropped, section by section.
+
+    A count and not a list of names: the point is that the figures below are
+    explained, and course-sections.csv's corrections follow straight after.
+    """
+    counts = [
+        f"{section} {len(dropped[section])}" for section in sections if section in dropped
+    ]
+    if counts:
+        total = sum(len(entries) for entries in dropped.values())
+        say(f"  left out {total} dropped student(s): {', '.join(counts)}.")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1012,7 +1072,20 @@ def report_enrolment(updates, agreed, unchecked):
 #% THE ATTENDANCE SHEETS
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-def match_elsewhere(students, sac_marked):
+def same_person(display_name, fold_last, fold_first):
+    """Does a class-list name fit a folded last and first name? See match_elsewhere."""
+    their_last, _, their_first = display_name.partition(",")
+    if fold_name(their_last) != fold_last:
+        return False
+    theirs = fold_name(their_first)
+    return (
+        theirs == fold_first
+        or theirs.startswith(fold_first + " ")
+        or fold_first.startswith(theirs + " ")
+    )
+
+
+def match_elsewhere(students, sac_marked, dropped):
     """Which listed names belong to students writing elsewhere -> {section: {name}}.
 
     TWO FILES, TWO SPELLINGS OF THE SAME PERSON. The registrar gives one display
@@ -1031,26 +1104,33 @@ def match_elsewhere(students, sac_marked):
     order takes a booklet off the wrong section's stack. A row
     that matches two people cannot be resolved from what is written down, so it
     marks neither and says so.
+
+    A ROW FOR A STUDENT WHO DROPPED gets a warning of its own, because the class
+    list can say what happened rather than offering three guesses.
     """
     marked = {}
     for section, wanted in sac_marked.items():
         listed = students.get(section, [])
         for last, first in wanted:
             fold_last, fold_first = fold_name(last), fold_name(first)
-            hits = []
-            for display_name, _student_id in listed:
-                their_last, _, their_first = display_name.partition(",")
-                if fold_name(their_last) != fold_last:
-                    continue
-                theirs = fold_name(their_first)
-                if (
-                    theirs == fold_first
-                    or theirs.startswith(fold_first + " ")
-                    or fold_first.startswith(theirs + " ")
-                ):
-                    hits.append(display_name)
+            hits = [
+                display_name for display_name, _student_id in listed
+                if same_person(display_name, fold_last, fold_first)
+            ]
 
             if not hits:
+                drop_dates = [
+                    drop_date for display_name, drop_date in dropped.get(section, [])
+                    if same_person(display_name, fold_last, fold_first)
+                ]
+                if drop_dates:
+                    warn(
+                        f"{SAC_STUDENTS_XLSX.name}: {last}, {first} is recorded "
+                        f"in {section} but dropped it on {max(drop_dates)}. The "
+                        f"order still takes a booklet off {section} for them "
+                        f"until the row is removed."
+                    )
+                    continue
                 if not listed:
                     # The class list for this section is missing entirely, which
                     # is already reported once. Saying it again per student would
@@ -2170,7 +2250,8 @@ def main():
     current, total_files, superseded = select_current_exports(args.roster_dir, sections)
     report_freshness(current, sections, args.stale_days, total_files, args.roster_dir)
     proceed_or_stop("Carry on with these class lists?")
-    students = collect_students(current, sections)
+    students, dropped = collect_students(current, sections)
+    report_dropped(dropped, sections)
     stash_superseded(superseded, current, args.roster_dir, args.dry_run)
 
     # --- 3. ENROLMENT --------------------------------------------------------
@@ -2209,7 +2290,7 @@ def main():
         sac_counts = {}
     # Matched now rather than when the sheets are built, so a SAC row that fits
     # nobody on a class list is on screen while the SAC numbers are being chosen.
-    elsewhere = match_elsewhere(students, sac_marked)
+    elsewhere = match_elsewhere(students, sac_marked, dropped)
 
     cushion = int(settings["sac_cushion"])
     if args.spare is not None:
