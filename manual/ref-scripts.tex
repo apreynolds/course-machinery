@@ -223,6 +223,9 @@ Once it has been told to carry on with those lists, it moves the exports they su
 Nothing is deleted, so moving a file back out undoes it.
 A file it could not recognise stays in place, and so keeps earning its warning on every run.
 
+A student who drops stays in the export, with \texttt{(Dropped YYYY-MM-DD)} added to their name.
+The script leaves them out of the enrolment counts and the attendance sheets, and reports how many it left out of each section.
+
 It holds no fact about any one course.
 It finds the course by walking up from its own location to the first directory that holds a \file{course-info/} --- not the first that holds \file{.git}, which inside a submodule would be the machinery itself --- and reads everything from there:
 
