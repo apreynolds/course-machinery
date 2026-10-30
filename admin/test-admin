@@ -16,7 +16,7 @@
 #   N              the test number. A positive whole number; it names the outputs.
 #   --yes          answer every question with its default, asking nothing. The
 #                  steps done by hand are then listed, not asked about.
-#   --dry-run      go through every step but write no files at all.
+#   --dry-run      go through every step but write or move no files at all.
 #   --force        replace an existing test-N.xlsx, losing its `Scanned' ticks.
 #   --spare        extra booklets per section, without being asked (default:
 #                  print-job.csv's spare_per_section)
@@ -37,6 +37,7 @@
 #
 #   1. THE TEST FILES   are both days' PDFs built, with solutions?        (ask)
 #   2. THE CLASS LISTS  how old is each instructor's newest export?       (ask)
+#      a yes also moves the exports they supersede into zzzzz/
 #   3. ENROLMENT        correct course-sections.csv from the class lists? (ask)
 #   4. THE NUMBERS      spare booklets per section, and the SAC's block   (ask)
 #   5. the attendance sheets are built
@@ -95,7 +96,10 @@
 # and NOBODY DELETES ANYTHING -- the one instruction that stays reliable over a
 # term, and the only safe one, since every alternative invites a rename. The
 # filename also carries the export time, so this script takes the newest list per
-# instructor and ignores the rest.
+# instructor and ignores the rest. The tidying is this script's job too: once a
+# run has been told to carry on with its lists, the ones they supersede move into
+# a zzzzz/ subfolder, which the search below does not look inside. Nothing is
+# deleted, so moving a file back out undoes it.
 #
 # THE ATTENDANCE SHEET IS BUILT IN THE REPO, DELIVERED TO THE TEAM. Its .tex is
 # written to TESTS/ADMIN/ and compiled there with pr-latexmk, because the
@@ -490,6 +494,10 @@ FILENAME_SECTION_RE = re.compile(
 # and tolerates the unpadded hour.
 EXPORT_TIME_FORMAT = "%Y-%m-%d_%I_%M %p"
 
+# Where superseded class lists go, inside the class-list folder. ROSTER_GLOB does
+# not descend into subfolders, so a list moved here is no longer read.
+STASH_DIRNAME = "zzzzz"
+
 # The suffix that overrides it. The asterisks are literal in the export, hence
 # the escaping; the trailing $ anchors it so a student whose name somehow
 # contained the phrase mid-string would not be silently truncated.
@@ -573,7 +581,8 @@ def select_current_exports(roster_dir, sections):
 
     Instructors drop a fresh export in every week or two and never delete
     anything, so the folder holds many generations at once. Returns
-    {instructor: (path, nominal_section, exported)}.
+    {instructor: (path, nominal_section, exported)}, how many files were looked
+    at, and the losers as a list of (path, instructor) for stash_superseded.
 
     GROUPED BY INSTRUCTOR, NOT BY SECTION CODE, and that is the whole subtlety.
     An instructor's export covers all of their sections whichever one it is
@@ -597,6 +606,7 @@ def select_current_exports(roster_dir, sections):
         die(f"no {ROSTER_GLOB} files in {roster_dir}")
 
     current = {}
+    recognised = []
     for path in roster_files:
         match = FILENAME_SECTION_RE.search(path.name)
         if not match:
@@ -623,13 +633,78 @@ def select_current_exports(roster_dir, sections):
 
         instructor = sections[nominal_section]["instructor"] or nominal_section
         exported = export_time(path, stamp_text)
+        recognised.append((path, instructor))
         if instructor not in current or exported > current[instructor][2]:
             current[instructor] = (path, nominal_section, exported)
 
     if not current:
         die(f"no usable class lists in {roster_dir}")
 
-    return current, len(roster_files)
+    superseded = [
+        (path, instructor) for path, instructor in recognised
+        if path != current[instructor][0]
+    ]
+    return current, len(roster_files), superseded
+
+
+def stash_superseded(superseded, current, roster_dir, dry_run):
+    """Move the class lists that lost to a newer one into the zzzzz/ subfolder.
+
+    ONLY PROVEN LOSERS MOVE. A file skipped by select_current_exports stays put,
+    because a renamed list or an unknown section needs someone to look at it, and
+    staying is what keeps its warning coming on every run.
+
+    A WINNER DATED IN THE FUTURE PROVES NOTHING. The clock or the filename is
+    wrong, and that one file has beaten every real list of that instructor's, so
+    those lists stay until it has been sorted out.
+
+    NEVER OVERWRITES. On macOS a rename silently replaces whatever already has the
+    new name, so a name already taken in zzzzz/ leaves the file where it is. None
+    of this can stop the run: the lists have been read by now, and a file left
+    behind costs nothing, because the next run simply tries it again.
+    """
+    now = datetime.now()
+    stash_dir = roster_dir / STASH_DIRNAME
+    to_move = []
+    held_back = OrderedDict()
+    for path, instructor in superseded:
+        if current[instructor][2] > now:
+            held_back[instructor] = held_back.get(instructor, 0) + 1
+        else:
+            to_move.append(path)
+
+    for instructor, count in held_back.items():
+        warn(
+            f"{instructor}'s newest class list is dated in the future, so their "
+            f"{count} older list(s) were not moved to {STASH_DIRNAME}/."
+        )
+
+    if not to_move:
+        return
+    if dry_run:
+        say(f"  dry run: {len(to_move)} superseded class list(s) not moved to "
+            f"{STASH_DIRNAME}/.")
+        return
+
+    moved = 0
+    for path in to_move:
+        target = stash_dir / path.name
+        if target.exists():
+            warn(
+                f"{path.name}: already in {STASH_DIRNAME}/, so this copy was "
+                f"left where it is."
+            )
+            continue
+        try:
+            stash_dir.mkdir(exist_ok=True)
+            path.rename(target)
+        except OSError as error:
+            warn(f"{path.name}: could not be moved to {STASH_DIRNAME}/ ({error}).")
+            continue
+        moved += 1
+
+    if moved:
+        say(f"  moved {moved} superseded class list(s) to {STASH_DIRNAME}/.")
 
 
 def report_freshness(current, sections, stale_days, total_files, roster_dir):
@@ -1997,7 +2072,8 @@ def main():
         epilog="Run once per test. It asks before each step that needs a "
         "decision; Enter accepts the default shown, and --yes accepts them "
         "all. Instructors drop their class-list exports in the shared folder "
-        "UNRENAMED and delete nothing; the newest per instructor is used.",
+        "UNRENAMED and delete nothing; the newest per instructor is used, and "
+        f"the older ones are moved to {STASH_DIRNAME}/.",
     )
     parser.add_argument(
         "test_number",
@@ -2014,9 +2090,9 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="go through every step and print the result, but write no files "
-        "-- not the workbook, not the attendance sheets, not "
-        "course-sections.csv",
+        help="go through every step and print the result, but write or move no "
+        "files -- not the workbook, not the attendance sheets, not "
+        "course-sections.csv, not the superseded class lists",
     )
     parser.add_argument(
         "--force",
@@ -2091,10 +2167,11 @@ def main():
     proceed_or_stop("Are these the tests to print?")
 
     # --- 2. THE CLASS LISTS --------------------------------------------------
-    current, total_files = select_current_exports(args.roster_dir, sections)
+    current, total_files, superseded = select_current_exports(args.roster_dir, sections)
     report_freshness(current, sections, args.stale_days, total_files, args.roster_dir)
     proceed_or_stop("Carry on with these class lists?")
     students = collect_students(current, sections)
+    stash_superseded(superseded, current, args.roster_dir, args.dry_run)
 
     # --- 3. ENROLMENT --------------------------------------------------------
     # CORRECTED BEFORE ANYTHING IS COUNTED, so the sheets, the envelopes and the
