@@ -699,7 +699,22 @@ def parse_date(text):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Look up a student, or a whole class, across the course's records."
+        description="Look up a student, or a whole class, across the course's records.",
+        # Keeps the line breaks in the examples below, which argparse would rewrap.
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  student-record --show smith\n"
+            "  student-record --class FR05A\n"
+            "  student-record --class --as-of 2026-11-06      as if it were that date\n"
+            "  student-record --class --scheme ~/trial.csv    try a different grading scheme\n"
+            "\n"
+            "--as-of counts everything due before that date, and only the marks in the\n"
+            "export. A blank on a test counts as 0 once half its students have marks.\n"
+            "\n"
+            "--grades-dir always uses the newest export in the folder, so to see an older\n"
+            "one, point it at a folder holding only that export."
+        ),
     )
     parser.add_argument("query", nargs="?", help="start the interactive search with this")
     parser.add_argument("--show", metavar="QUERY", help="print matching records and stop")
@@ -708,12 +723,23 @@ def main():
     parser.add_argument("--check", action="store_true", help="what was read, and every warning")
     parser.add_argument("--as-of", type=parse_date, default=date.today(), metavar="YYYY-MM-DD",
                         help="calculate as if it were this date")
-    parser.add_argument("--roster-dir", type=Path, default=DEFAULT_ROSTER_DIR)
-    parser.add_argument("--sac-workbook", type=Path, default=SAC_STUDENTS_XLSX)
-    parser.add_argument("--grades-dir", type=Path, default=GRADES_DIR)
-    parser.add_argument("--assessments", type=Path, default=ASSESSMENTS_CSV)
-    parser.add_argument("--scheme", type=Path, default=GRADING_SCHEME_CSV)
-    parser.add_argument("--staff", type=Path, default=STAFF_CSV)
+
+    sources = parser.add_argument_group(
+        "read something else instead",
+        "Rarely needed, since the defaults are the real files. Each one needs a path.",
+    )
+    sources.add_argument("--roster-dir", type=Path, default=DEFAULT_ROSTER_DIR, metavar="DIR",
+                         help="class lists (default: the Team's exported-classlists)")
+    sources.add_argument("--sac-workbook", type=Path, default=SAC_STUDENTS_XLSX, metavar="F",
+                         help="SAC list (default: the Team's sac-students.xlsx)")
+    sources.add_argument("--grades-dir", type=Path, default=GRADES_DIR, metavar="DIR",
+                         help="D2L exports (default: the Team's grades-exported-from-d2l)")
+    sources.add_argument("--staff", type=Path, default=STAFF_CSV, metavar="F",
+                         help="staff list (default: the Team's TAs-and-other-staff.csv)")
+    sources.add_argument("--assessments", type=Path, default=ASSESSMENTS_CSV, metavar="F",
+                         help="assessments and due dates (default: course-info/assessments.csv)")
+    sources.add_argument("--scheme", type=Path, default=GRADING_SCHEME_CSV, metavar="F",
+                         help="grading scheme (default: course-info/grading-scheme.csv)")
     args = parser.parse_args()
 
     course = Course(args)
