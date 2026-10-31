@@ -15,6 +15,7 @@
 #   --grades-dir DIR    the D2L exports (default: the Team's grades-exported-from-d2l)
 #   --assessments F     (default: course-info/assessments.csv)
 #   --scheme F          (default: course-info/grading-scheme.csv)
+#   --staff F           (default: course-info/additional-staff.csv)
 #
 # In the interactive search, Tab marks several students and Enter copies all of
 # their emails, separated by semicolons, ready for Outlook's To line.
@@ -42,6 +43,7 @@
 # The marks follow gradebook.py, whose header gives the rules.
 
 import argparse
+import csv
 import shutil
 import subprocess
 import sys
@@ -51,11 +53,13 @@ from pathlib import Path
 import courseadmin
 import gradebook
 from courseadmin import (
+    ADDITIONAL_STAFF_CSV,
     ASSESSMENTS_CSV,
     COURSE_NUMBER,
     DEFAULT_ROSTER_DIR,
     GRADES_DIR,
     GRADING_SCHEME_CSV,
+    INSTRUCTORS_CSV,
     SAC_STUDENTS_XLSX,
     die,
     flush_report,
@@ -137,6 +141,57 @@ def build_records(class_rows, export, sac_rows, sections):
     return records
 
 
+def read_csv_rows(path):
+    """A CSV as a list of dicts, or an empty list if it isn't there."""
+    if not path.is_file():
+        return []
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def read_known_staff(sections, additional_staff_path):
+    """Who the course already knows is teaching staff -> names, initials, emails.
+
+    D2L's gradebook also holds everyone on the teaching team. They come from three
+    places, each written its own way, hence three sets:
+
+      course-sections.csv    TAs, as "First Last"
+      instructors.csv        instructors, as "F. Last", with an email
+      additional-staff.csv   anyone else, as "First Last"; optional
+    """
+    names = {fold_name(info["ta"]) for info in sections.values() if info["ta"]}
+    initials, emails = set(), set()
+
+    for row in read_csv_rows(INSTRUCTORS_CSV):
+        instructor = fold_name(row.get("Instructor") or "")
+        if instructor:
+            initials.add(instructor)
+        email = (row.get("Email") or "").strip().casefold()
+        if email:
+            emails.add(email)
+
+    for row in read_csv_rows(additional_staff_path):
+        name = fold_name(row.get("name") or "")
+        if name:
+            names.add(name)
+    return {"names": names, "initials": initials, "emails": emails}
+
+
+def is_known_staff(student, staff):
+    """Is this D2L row one of the people read_known_staff found?
+
+    Only ever asked of someone on no class list, so a student who shares a TA's
+    name cannot be hidden by it. A name written differently in D2L simply fails to
+    match: that person gets named by --check and can go in additional-staff.csv.
+    """
+    first, last = fold_name(student["first"]), fold_name(student["last"])
+    return (
+        f"{first} {last}" in staff["names"]
+        or f"{first[:1]}. {last}" in staff["initials"]
+        or student["email"].casefold() in staff["emails"]
+    )
+
+
 def attach_sac(records, sac_rows):
     """Put each SAC row on its student: by ID, or failing that by name."""
     for row in sac_rows:
@@ -185,6 +240,7 @@ class Course:
 
         self.records = build_records(class_rows, self.export, sac_rows, self.sections)
         self.enrolled = [r for r in self.records.values() if r["live"]]
+        self.known_staff = read_known_staff(self.sections, args.staff)
 
         self.scheme, self.assessments = None, []
         if args.scheme.is_file() and args.assessments.is_file():
@@ -555,14 +611,13 @@ def run_class(course, section):
 def print_unmatched(course, listed):
     """Who appears in only one of the class lists and D2L, naming those who matter.
 
-    D2L's gradebook also holds every instructor, TA and helper, none of whom is on
-    a class list. They are told apart from students by having no mark on any item
-    in assessments.csv, so nobody has to keep a list of staff. The cost: a late
-    registrant with no marks yet goes unnamed until they get a mark or reach a
-    class list, and with no marks they have nothing to misplace.
+    D2L's gradebook also holds the teaching team, who are on no class list, and who
+    may have tried an online assignment and so have marks of no meaning. Marks
+    therefore say nothing about who someone is. Everyone not known to be staff is
+    named, marks or not; see read_known_staff.
 
     AN ABSENT CLASS LIST WOULD NAME THAT INSTRUCTOR'S WHOLE CLASS, so in that case
-    the count stands alone and the NO CLASS LIST line above gives the reason.
+    the counts stand alone and the NO CLASS LIST line above gives the reason.
     """
     only_list = [r for r in course.enrolled if not r["d2l"]]
     only_d2l = [r for r in course.records.values() if not r["class_rows"]]
@@ -574,19 +629,18 @@ def print_unmatched(course, listed):
             print(f"    {record['name']}, {record['section']}, {record['id']}")
 
     print(f"  in D2L but on no class list:    {len(only_d2l)}")
-    if not listed or not only_d2l:
+    if not only_d2l:
         return
-    with_marks = []
-    for record in only_d2l:
-        grades = record["d2l"]["grades"]
-        count = sum(1 for item in listed if grades.get(item) is not None)
-        if count:
-            with_marks.append((record, count))
-    print(f"    with marks on listed items:   {len(with_marks)}")
+    unknown = [r for r in only_d2l if not is_known_staff(r["d2l"], course.known_staff)]
+    print(f"    known staff:                  {len(only_d2l) - len(unknown)}")
+    print(f"    not known:                    {len(unknown)}")
     if course.absent_instructors():
         return
-    for record, count in sorted(with_marks, key=lambda pair: pair[0]["name"]):
-        print(f"      {record['name']}, {record['id']}, {count} item(s)")
+    for record in sorted(unknown, key=lambda r: r["name"]):
+        grades = record["d2l"]["grades"]
+        count = sum(1 for item in listed if grades.get(item) is not None)
+        marks = f", marks on {count} listed item(s)" if count else ""
+        print(f"      {record['name']}, {record['id']}{marks}")
 
 
 def run_check(course):
@@ -639,6 +693,7 @@ def main():
     parser.add_argument("--grades-dir", type=Path, default=GRADES_DIR)
     parser.add_argument("--assessments", type=Path, default=ASSESSMENTS_CSV)
     parser.add_argument("--scheme", type=Path, default=GRADING_SCHEME_CSV)
+    parser.add_argument("--staff", type=Path, default=ADDITIONAL_STAFF_CSV)
     args = parser.parse_args()
 
     course = Course(args)

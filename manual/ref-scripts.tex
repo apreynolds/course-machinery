@@ -265,7 +265,8 @@ It writes nothing, and keeps no cache.
 With no option it opens an \texttt{fzf} search with each student's record in the preview, and Enter copies the selected emails.
 \texttt{-{}-check} says what was read, how old it is, and every warning, so it is the first thing to run when a figure looks wrong.
 The sources are joined on student ID, and a SAC row with no ID falls back to its name and says so.
-D2L's gradebook also holds the teaching staff, who are on no class list, so \texttt{-{}-check} names only the people on no class list who have a mark on a listed item, along with anyone on a class list who is not in D2L.
+\texttt{-{}-check} names anyone on a class list who is not in D2L, and anyone in D2L who is on no class list and is not known staff.
+D2L's gradebook also holds the teaching team, and staff are recognised from \file{instructors.csv}, \file{course-sections.csv} and an optional \file{additional-staff.csv} in \file{course-info/}, with columns \texttt{name} (first then last) and \texttt{note}.
 
 The D2L gradebook cannot calculate this mark, since it does not know who writes on which day or who chose which homework system.
 \file{gradebook.py} does, from two files in the course's \file{course-info/}:

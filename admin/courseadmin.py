@@ -290,6 +290,8 @@ SAC_STUDENTS_RETIRED_CSV = SHARED_DIR / "sac-students.csv"
 PRINT_JOB_CSV = (DATA_DIR or SCRIPT_DIR) / "print-job.csv"
 ASSESSMENTS_CSV = (DATA_DIR or SCRIPT_DIR) / "assessments.csv"
 GRADING_SCHEME_CSV = (DATA_DIR or SCRIPT_DIR) / "grading-scheme.csv"
+INSTRUCTORS_CSV = (DATA_DIR or SCRIPT_DIR) / "instructors.csv"
+ADDITIONAL_STAFF_CSV = (DATA_DIR or SCRIPT_DIR) / "additional-staff.csv"
 
 # Settings that must be present in print-job.csv, and must be whole numbers.
 # Policy rather than form answers, which is why they carry no label there.
