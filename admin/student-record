@@ -552,19 +552,53 @@ def run_class(course, section):
     return 0
 
 
+def print_unmatched(course, listed):
+    """Who appears in only one of the class lists and D2L, naming those who matter.
+
+    D2L's gradebook also holds every instructor, TA and helper, none of whom is on
+    a class list. They are told apart from students by having no mark on any item
+    in assessments.csv, so nobody has to keep a list of staff. The cost: a late
+    registrant with no marks yet goes unnamed until they get a mark or reach a
+    class list, and with no marks they have nothing to misplace.
+
+    AN ABSENT CLASS LIST WOULD NAME THAT INSTRUCTOR'S WHOLE CLASS, so in that case
+    the count stands alone and the NO CLASS LIST line above gives the reason.
+    """
+    only_list = [r for r in course.enrolled if not r["d2l"]]
+    only_d2l = [r for r in course.records.values() if not r["class_rows"]]
+
+    print(f"  on a class list but not in D2L: {len(only_list)}")
+    # With no export at all, this would be everyone.
+    if course.export:
+        for record in sorted(only_list, key=lambda r: r["name"]):
+            print(f"    {record['name']}, {record['section']}, {record['id']}")
+
+    print(f"  in D2L but on no class list:    {len(only_d2l)}")
+    if not listed or not only_d2l:
+        return
+    with_marks = []
+    for record in only_d2l:
+        grades = record["d2l"]["grades"]
+        count = sum(1 for item in listed if grades.get(item) is not None)
+        if count:
+            with_marks.append((record, count))
+    print(f"    with marks on listed items:   {len(with_marks)}")
+    if course.absent_instructors():
+        return
+    for record, count in sorted(with_marks, key=lambda pair: pair[0]["name"]):
+        print(f"      {record['name']}, {record['id']}, {count} item(s)")
+
+
 def run_check(course):
     print(paint("What was read", "bold"))
     for line in course.source_lines():
         print(f"  {line}")
     print(f"  {len(course.enrolled)} registered, {len(course.records)} records in all")
 
-    only_list = [r for r in course.enrolled if not r["d2l"]]
-    only_d2l = [r for r in course.records.values() if not r["class_rows"]]
-    print(f"  on a class list but not in D2L: {len(only_list)}")
-    print(f"  in D2L but on no class list:    {len(only_d2l)}")
+    listed = {item for a in course.assessments for item in a["items"]}
+    print_unmatched(course, listed)
 
     if course.graded:
-        listed = {item for a in course.assessments for item in a["items"]}
         unlisted = {}
         for item, info in course.export["items"].items():
             if item not in listed:
