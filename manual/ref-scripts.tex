@@ -266,7 +266,7 @@ With no option it opens an \texttt{fzf} search with each student's record in the
 \texttt{-{}-check} says what was read, how old it is, and every warning, so it is the first thing to run when a figure looks wrong.
 The sources are joined on student ID, and a SAC row with no ID falls back to its name and says so.
 \texttt{-{}-check} names anyone on a class list who is not in D2L, and anyone in D2L who is on no class list and is not known staff.
-D2L's gradebook also holds the teaching team, and staff are recognised from \file{instructors.csv}, \file{course-sections.csv} and an optional \file{additional-staff.csv} in \file{course-info/}, with columns \texttt{name} (first then last) and \texttt{note}.
+D2L's gradebook also holds the teaching team, and staff are recognised from \file{instructors.csv}, \file{course-sections.csv} and an optional \file{TAs-and-other-staff.csv} in \file{course-info/}, which needs a \texttt{name} column (first then last).
 
 The D2L gradebook cannot calculate this mark, since it does not know who writes on which day or who chose which homework system.
 \file{gradebook.py} does, from two files in the course's \file{course-info/}:

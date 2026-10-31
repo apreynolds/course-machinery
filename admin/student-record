@@ -15,7 +15,7 @@
 #   --grades-dir DIR    the D2L exports (default: the Team's grades-exported-from-d2l)
 #   --assessments F     (default: course-info/assessments.csv)
 #   --scheme F          (default: course-info/grading-scheme.csv)
-#   --staff F           (default: course-info/additional-staff.csv)
+#   --staff F           (default: course-info/TAs-and-other-staff.csv)
 #
 # In the interactive search, Tab marks several students and Enter copies all of
 # their emails, separated by semicolons, ready for Outlook's To line.
@@ -53,7 +53,6 @@ from pathlib import Path
 import courseadmin
 import gradebook
 from courseadmin import (
-    ADDITIONAL_STAFF_CSV,
     ASSESSMENTS_CSV,
     COURSE_NUMBER,
     DEFAULT_ROSTER_DIR,
@@ -61,6 +60,7 @@ from courseadmin import (
     GRADING_SCHEME_CSV,
     INSTRUCTORS_CSV,
     SAC_STUDENTS_XLSX,
+    STAFF_CSV,
     die,
     flush_report,
     fold_name,
@@ -149,15 +149,15 @@ def read_csv_rows(path):
         return list(csv.DictReader(handle))
 
 
-def read_known_staff(sections, additional_staff_path):
+def read_known_staff(sections, staff_path):
     """Who the course already knows is teaching staff -> names, initials, emails.
 
     D2L's gradebook also holds everyone on the teaching team. They come from three
     places, each written its own way, hence three sets:
 
-      course-sections.csv    TAs, as "First Last"
-      instructors.csv        instructors, as "F. Last", with an email
-      additional-staff.csv   anyone else, as "First Last"; optional
+      course-sections.csv      TAs, as "First Last"
+      instructors.csv          instructors, as "F. Last", with an email
+      TAs-and-other-staff.csv  anyone else, as "First Last"; optional
     """
     names = {fold_name(info["ta"]) for info in sections.values() if info["ta"]}
     initials, emails = set(), set()
@@ -170,8 +170,10 @@ def read_known_staff(sections, additional_staff_path):
         if email:
             emails.add(email)
 
-    for row in read_csv_rows(additional_staff_path):
-        name = fold_name(row.get("name") or "")
+    for row in read_csv_rows(staff_path):
+        # This file's column names are hand-typed, so their capitals don't matter.
+        columns = {(key or "").strip().casefold(): value for key, value in row.items()}
+        name = fold_name(columns.get("name") or "")
         if name:
             names.add(name)
     return {"names": names, "initials": initials, "emails": emails}
@@ -182,7 +184,7 @@ def is_known_staff(student, staff):
 
     Only ever asked of someone on no class list, so a student who shares a TA's
     name cannot be hidden by it. A name written differently in D2L simply fails to
-    match: that person gets named by --check and can go in additional-staff.csv.
+    match: that person gets named by --check and can go in TAs-and-other-staff.csv.
     """
     first, last = fold_name(student["first"]), fold_name(student["last"])
     return (
@@ -693,7 +695,7 @@ def main():
     parser.add_argument("--grades-dir", type=Path, default=GRADES_DIR)
     parser.add_argument("--assessments", type=Path, default=ASSESSMENTS_CSV)
     parser.add_argument("--scheme", type=Path, default=GRADING_SCHEME_CSV)
-    parser.add_argument("--staff", type=Path, default=ADDITIONAL_STAFF_CSV)
+    parser.add_argument("--staff", type=Path, default=STAFF_CSV)
     args = parser.parse_args()
 
     course = Course(args)
