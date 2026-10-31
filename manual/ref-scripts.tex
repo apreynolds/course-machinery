@@ -249,3 +249,35 @@ Each sheet is headed with its day and the range of booklets that go in its envel
 It reads no data file.
 \texttt{test-admin} writes a document that is a run of \env{attendancesheet} environments with one \cs{Student} line per name, and that generated file holds student names, so a course should git-ignore it.
 The package takes the course's name from the course's own \file{courseinfo.sty}.
+
+\subsection*{admin/student-record and gradebook.py}
+
+Looks up a student, or a whole class, across the class lists, the SAC list and the newest D2L grades export, and calculates each student's mark so far.
+It writes nothing, and keeps no cache.
+
+\begin{manexsource}
+.course-machinery/admin/student-record [QUERY]
+.course-machinery/admin/student-record --show QUERY
+.course-machinery/admin/student-record --class [SECTION]
+.course-machinery/admin/student-record --check
+\end{manexsource}
+
+With no option it opens an \texttt{fzf} search with each student's record in the preview, and Enter copies the selected emails.
+\texttt{-{}-check} says what was read, how old it is, and every warning, so it is the first thing to run when a figure looks wrong.
+The sources are joined on student ID, and a SAC row with no ID falls back to its name and says so.
+
+The D2L gradebook cannot calculate this mark, since it does not know who writes on which day or who chose which homework system.
+\file{gradebook.py} does, from two files in the course's \file{course-info/}:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\file{grading-scheme.csv} & columns \texttt{category}, \texttt{weight}, \texttt{rule}, where the rule is \texttt{ranked-1-2-3}, \texttt{best-track} or \texttt{single}.\\
+\file{assessments.csv} & columns \texttt{title}, \texttt{due-date}, \texttt{category}, \texttt{track}, \texttt{d2l-items}: every assessment that counts. The last names its gradebook items, separated by \texttt{|}, and may be empty when the only item has the assessment's title.\\
+\end{tabularx}
+\end{center}
+
+A gradebook item in neither file is ignored, which is how practice sets stay out of the way.
+An assessment counts once the day after its due date has arrived.
+A blank then counts as 0, unless the item is hand-marked and fewer than half of the students expected to write it have anything recorded, in which case it is taken to be unmarked and left out.
+An \texttt{Exempt} is left out, and the category's rule applies to what remains.
+The header of \file{gradebook.py} gives the rules in full.
