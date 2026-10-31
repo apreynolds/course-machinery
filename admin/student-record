@@ -166,6 +166,8 @@ def read_known_staff(sections, staff_path):
     """
     names = {fold_name(info["ta"]) for info in sections.values() if info["ta"]}
     ids, initials, emails = set(), set(), set()
+    # For showing a TA's email: the staff file's emails, under each folded name.
+    emails_by_name = {}
 
     for row in read_csv_rows(INSTRUCTORS_CSV):
         instructor = fold_name(row.get("Instructor") or "")
@@ -190,10 +192,12 @@ def read_known_staff(sections, staff_path):
         staff_id = gradebook.clean_org_id(columns.get("id"))
         if staff_id:
             ids.add(staff_id)
-        email = (columns.get("email") or "").strip().casefold()
+        email = (columns.get("email") or "").strip()
         if email:
-            emails.add(email)
-    return {"ids": ids, "names": names, "initials": initials, "emails": emails}
+            emails.add(email.casefold())
+            emails_by_name.setdefault(name, []).append(email)
+    return {"ids": ids, "names": names, "initials": initials, "emails": emails,
+            "emails_by_name": emails_by_name}
 
 
 def is_known_staff(record, staff):
@@ -569,6 +573,14 @@ def run_emails(course, section):
     exported = course.current[instructor][2]
     print(f"{section}: {len(records)} registered, from {instructor}'s class list of "
           f"{exported.strftime('%Y-%m-%d')} ({(course.as_of - exported.date()).days} days old)")
+    info = course.sections[section]
+    print(f"Tutorial: {info['day'] or 'no day listed'}, {info['room'] or 'no room listed'}")
+    if info["ta"]:
+        ta_emails = course.known_staff["emails_by_name"].get(fold_name(info["ta"]))
+        print(f"TA: {info['ta']}, "
+              f"{', '.join(ta_emails) if ta_emails else 'no email in the staff file'}")
+    else:
+        print("TA: none listed")
     for record in records:
         if not record["email"]:
             print(paint(f"No email on record for {record['name']}", "yellow"))
