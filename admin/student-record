@@ -7,6 +7,7 @@
 # Usage: student-record [QUERY]             search interactively; Enter copies email
 #        student-record --show QUERY        print every matching record and stop
 #        student-record --class [SECTION]   how the class, or one section, is doing
+#        student-record --emails SECTION    copy the emails of everyone in a section
 #        student-record --check             what was read, and every warning
 #
 #   --as-of YYYY-MM-DD  calculate as if it were this date (default: today)
@@ -534,6 +535,11 @@ def run_search(course, query):
         print("No email on record for that selection.")
         return
 
+    copy_emails(emails)
+
+
+def copy_emails(emails):
+    """Print emails and put them on the clipboard, ready for Outlook's To line."""
     joined = "; ".join(emails)
     print(joined)
     try:
@@ -541,6 +547,36 @@ def run_search(course, query):
         print(f"Copied {len(emails)} email(s).")
     except (FileNotFoundError, subprocess.CalledProcessError):
         print("Could not reach the clipboard; the text is above.")
+
+
+def run_emails(course, section):
+    """Copy the email of everyone registered in one section, leaving out drops."""
+    section = section.strip().upper()
+    if section not in course.sections:
+        die(f"{section} is not in course-sections.csv.")
+
+    # Without that instructor's class list, nobody can be placed in this section.
+    instructor = course.sections[section]["instructor"]
+    if instructor not in course.current:
+        die(f"no class list from {instructor}, so who is in {section} is unknown.")
+
+    # A student registered in two sections belongs on both of their lists.
+    records = [r for r in sorted_records(course) if r["live"]
+               and (r["section"] == section or section in r["other_sections"])]
+    if not records:
+        die(f"nobody is registered in {section}, according to {instructor}'s class list.")
+
+    exported = course.current[instructor][2]
+    print(f"{section}: {len(records)} registered, from {instructor}'s class list of "
+          f"{exported.strftime('%Y-%m-%d')} ({(course.as_of - exported.date()).days} days old)")
+    for record in records:
+        if not record["email"]:
+            print(paint(f"No email on record for {record['name']}", "yellow"))
+
+    emails = [r["email"] for r in records if r["email"]]
+    if emails:
+        copy_emails(emails)
+    return 0
 
 
 def run_show(course, query):
@@ -706,6 +742,7 @@ def main():
             "examples:\n"
             "  student-record --show smith\n"
             "  student-record --class FR05A\n"
+            "  student-record --emails FR05A\n"
             "  student-record --class --as-of 2026-11-06      as if it were that date\n"
             "  student-record --class --scheme ~/trial.csv    try a different grading scheme\n"
             "\n"
@@ -720,6 +757,8 @@ def main():
     parser.add_argument("--show", metavar="QUERY", help="print matching records and stop")
     parser.add_argument("--class", dest="class_section", nargs="?", const="", metavar="SECTION",
                         help="how the class, or one section, is doing")
+    parser.add_argument("--emails", metavar="SECTION",
+                        help="copy the emails of everyone registered in a section")
     parser.add_argument("--check", action="store_true", help="what was read, and every warning")
     parser.add_argument("--as-of", type=parse_date, default=date.today(), metavar="YYYY-MM-DD",
                         help="calculate as if it were this date")
@@ -747,6 +786,14 @@ def main():
         return run_check(course)
     if args.class_section is not None:
         return run_class(course, args.class_section)
+    if args.emails is not None:
+        status = run_emails(course, args.emails)
+        # Mostly about marks and the SAC list, so only counted here, as in the search.
+        warnings = len(courseadmin.report_warnings)
+        courseadmin.report_warnings.clear()
+        if warnings:
+            print(paint(f"{warnings} warning(s): see student-record --check", "dim"))
+        return status
     if args.show is not None:
         status = run_show(course, args.show)
         flush_report(tally=False)

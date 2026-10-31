@@ -259,10 +259,12 @@ It writes nothing, and keeps no cache.
 .course-machinery/admin/student-record [QUERY]
 .course-machinery/admin/student-record --show QUERY
 .course-machinery/admin/student-record --class [SECTION]
+.course-machinery/admin/student-record --emails SECTION
 .course-machinery/admin/student-record --check
 \end{manexsource}
 
 With no option it opens an \texttt{fzf} search with each student's record in the preview, and Enter copies the selected emails.
+\texttt{-{}-emails} copies the emails of everyone registered in one section, leaving out students who have dropped.
 \texttt{-{}-check} says what was read, how old it is, and every warning, so it is the first thing to run when a figure looks wrong.
 The sources are joined on student ID, and a SAC row with no ID falls back to its name and says so.
 \texttt{-{}-check} names anyone on a class list who is not in D2L, and anyone in D2L who is on no class list and is not known staff.
