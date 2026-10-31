@@ -323,6 +323,7 @@ warning_count = 0
 USE_COLOUR = sys.stderr.isatty() and "NO_COLOR" not in os.environ
 
 COLOURS = {"red": "\033[31m", "yellow": "\033[33m", "green": "\033[32m",
+           "cyan": "\033[36m", "heading": "\033[1;36m",
            "bold": "\033[1m", "dim": "\033[2m"}
 
 

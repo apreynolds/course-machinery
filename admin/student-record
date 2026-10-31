@@ -351,6 +351,19 @@ def percent(value):
     return "--" if value is None else f"{value:.1f}%"
 
 
+def shade(text, value):
+    """Colour already-formatted text by a percentage: failing, weak, or fine.
+
+    Takes the text separately so that padding can happen first: the escape codes
+    would otherwise count towards the width and throw the columns out.
+    """
+    if value is None:
+        return paint(text, "dim")
+    if value < 50:
+        return paint(text, "red")
+    return paint(text, "yellow" if value < 70 else "green")
+
+
 def points(value):
     """30.0 as 30 and 22.5 as 22.5."""
     return f"{value:g}"
@@ -381,8 +394,8 @@ def describe(evaluation, record, course, counts=True):
         when = f"due {due}" if due else "no due date set"
         return label + paint(f"not due, {when}", "dim")
 
-    text = (f"{points(evaluation['score'])}/{points(evaluation['max'])}"
-            f"  {percent(evaluation['percent']):>6}")
+    text = (f"{points(evaluation['score'])}/{points(evaluation['max'])}  "
+            + shade(f"{percent(evaluation['percent']):>6}", evaluation["percent"]))
     if status == "not-due":
         text += paint("  still open", "dim")
     if "times" in evaluation:
@@ -404,7 +417,7 @@ def render_grades(record, course):
 
     result = course.standing_of(record)
     due, total = result["due_weight"], sum(e["weight"] for e in course.scheme.values())
-    lines = [paint(f"MARK SO FAR  {percent(result['mark'])}", "bold")
+    lines = [paint("MARK SO FAR  ", "heading") + shade(percent(result["mark"]), result["mark"])
              + f"   ({due:g}% of the {total:g}% has come due)", ""]
 
     for name, category in result["categories"].items():
@@ -419,7 +432,7 @@ def render_grades(record, course):
                 heading += f"   {category['best_track']} {percent(category['value'])}"
         else:
             heading += f"   {percent(category['value'])}"
-        lines.append(paint(heading, "bold"))
+        lines.append(paint(heading, "heading"))
 
         if category["rule"] == "best-track":
             for track, info in category["tracks"].items():
@@ -435,7 +448,7 @@ def render_grades(record, course):
 
 
 def render_record(record, course):
-    lines = [paint(record["name"], "bold") + f"   {record['id'] or 'no ID'}   {record['email']}"]
+    lines = [paint(record["name"], "heading") + f"   {record['id'] or 'no ID'}   {record['email']}"]
 
     info = course.sections.get(record["section"])
     if info:
@@ -445,7 +458,7 @@ def render_record(record, course):
         lines.append(f"{record['section']} (not in course-sections.csv)")
 
     if record["live"]:
-        status = "Registered"
+        status = paint("Registered", "green")
         for section, when in record["moved"]:
             status += f", moved from {section} on {when}"
         if record["other_sections"]:
@@ -458,7 +471,7 @@ def render_record(record, course):
 
     sac = record["sac"]
     if sac:
-        text = f"on the list, writes-at-sac: {sac['where']}"
+        text = paint(f"on the list, writes-at-sac: {sac['where']}", "cyan")
         if sac["section"] != record["section"] and record["section"]:
             text += paint(f", list says {sac['section']}", "yellow")
         if record["sac_by_name"]:
@@ -545,10 +558,10 @@ def run_search(course, query):
 def copy_emails(emails):
     """Print emails and put them on the clipboard, ready for Outlook's To line."""
     joined = "; ".join(emails)
-    print(joined)
+    print(paint(joined, "dim"))
     try:
         subprocess.run(["pbcopy"], input=joined, text=True, check=True)
-        print(f"Copied {len(emails)} email(s).")
+        print(paint(f"Copied {len(emails)} email(s).", "green"))
     except (FileNotFoundError, subprocess.CalledProcessError):
         print("Could not reach the clipboard; the text is above.")
 
@@ -571,16 +584,18 @@ def run_emails(course, section):
         die(f"nobody is registered in {section}, according to {instructor}'s class list.")
 
     exported = course.current[instructor][2]
-    print(f"{section}: {len(records)} registered, from {instructor}'s class list of "
-          f"{exported.strftime('%Y-%m-%d')} ({(course.as_of - exported.date()).days} days old)")
+    print(paint(f"{section}: {len(records)} registered", "heading")
+          + paint(f", from {instructor}'s class list of {exported.strftime('%Y-%m-%d')} "
+                  f"({(course.as_of - exported.date()).days} days old)", "dim"))
     info = course.sections[section]
-    print(f"Tutorial: {info['day'] or 'no day listed'}, {info['room'] or 'no room listed'}")
+    print(paint("Tutorial: ", "cyan")
+          + f"{info['day'] or 'no day listed'}, {info['room'] or 'no room listed'}")
     if info["ta"]:
         ta_emails = course.known_staff["emails_by_name"].get(fold_name(info["ta"]))
-        print(f"TA: {info['ta']}, "
+        print(paint("TA: ", "cyan") + f"{info['ta']}, "
               f"{', '.join(ta_emails) if ta_emails else 'no email in the staff file'}")
     else:
-        print("TA: none listed")
+        print(paint("TA: ", "cyan") + "none listed")
     for record in records:
         if not record["email"]:
             print(paint(f"No email on record for {record['name']}", "yellow"))
@@ -609,32 +624,44 @@ def run_show(course, query):
 
 
 def statistic_row(stats):
-    text = f"{percent(stats['mean']):>6}  median {percent(stats['median']):>6}  n={stats['n']:<4}"
+    text = (shade(f"{percent(stats['mean']):>6}", stats["mean"])
+            + f"  median {percent(stats['median']):>6}  " + paint(f"n={stats['n']:<4}", "dim"))
     return text + (f" exempt={stats['exempt']}" if stats["exempt"] else "")
 
 
 def run_class(course, section):
     if not course.graded:
         die("there are no grades to summarise. See student-record --check.")
+    section = section.strip().upper()
     if section and section not in course.sections:
         die(f"{section} is not in course-sections.csv.")
+
+    # A section writes on one day, so the other day's version of a test isn't its own.
+    day = course.sections[section]["day"] if section else ""
 
     records = [r for r in course.enrolled if not section or r["section"] == section]
     ids = [r["id"] for r in records]
     print(paint(f"MATH {COURSE_NUMBER}{' ' + section if section else ''}: "
-                f"{len(records)} registered, as of {course.as_of}", "bold"))
-    print("Dropped students are left out; blanks are left out of averages.\n")
+                f"{len(records)} registered, as of {course.as_of}", "heading"))
+    print(paint("Dropped students are left out; blanks are left out of averages.\n", "dim"))
 
     items = course.export["items"]
     students = course.export["students"]
     for category in course.scheme:
-        print(paint(category, "bold"))
+        print(paint(category, "heading"))
         for assessment in course.assessments:
             if assessment["category"] != category:
                 continue
             due = f"due {assessment['due']}" if assessment["due"] else "no due date"
-            print(f" {assessment['title']}  ({due})")
+            print(f" {assessment['title']}  " + paint(f"({due})", "dim"))
             for item in assessment["items"]:
+                if item in items and not gradebook.item_applies(item, day):
+                    # Hidden, but someone who wrote it on the other day is still said.
+                    stats = gradebook.item_statistics(item, items[item]["max"], ids, students)
+                    if stats["n"]:
+                        print(paint(f"  {item}: {stats['n']} of this section wrote this version",
+                                    "yellow"))
+                    continue
                 if item not in items:
                     print(f"  {item:<34}" + paint("not in the D2L export", "red"))
                     continue
@@ -649,10 +676,12 @@ def run_class(course, section):
     standings = [(r, course.standing_of(r)) for r in records]
     marks = [s["mark"] for _r, s in standings if s["mark"] is not None]
     if marks:
-        print(paint("Mark so far", "bold"))
-        print(f"  mean {percent(gradebook.mean(marks))}  "
-              f"median {percent(gradebook.statistics.median(marks))}  n={len(marks)}  "
-              f"below 50: {sum(mark < 50 for mark in marks)}")
+        print(paint("Mark so far", "heading"))
+        average = gradebook.mean(marks)
+        below = sum(mark < 50 for mark in marks)
+        print("  mean " + shade(percent(average), average)
+              + f"  median {percent(gradebook.statistics.median(marks))}  n={len(marks)}  "
+              + paint(f"below 50: {below}", "red" if below else "green"))
         both = sum(any(c["both_tracks"] for c in s["categories"].values()) for _r, s in standings)
         undetermined = sum(any(c["undetermined"] for c in s["categories"].values()) for _r, s in standings)
         if both:
@@ -662,18 +691,24 @@ def run_class(course, section):
         print()
 
     if not section:
-        print(paint(f"  {'section':<8}{'day':<7}{'who':<6}{'n':>4}{'mark':>8}", "bold"))
+        print(paint(f"  {'section':<8}{'day':<7}{'who':<6}{'n':>4}{'mark':>8}", "heading"))
         for code, info in course.sections.items():
             marks = [s["mark"] for r, s in standings
                      if r["section"] == code and s["mark"] is not None]
+            average = gradebook.mean(marks)
             print(f"  {code:<8}{info['day']:<7}{info['instructor']:<6}{len(marks):>4}"
-                  f"{percent(gradebook.mean(marks)):>8}")
+                  + shade(f"{percent(average):>8}", average))
         print()
 
     for line in course.source_lines():
         print(paint(line, "dim"))
     flush_report(tally=False)
     return 0
+
+
+def count_shade(count):
+    """A count of things that ought to be zero: green if it is, yellow if not."""
+    return paint(str(count), "yellow" if count else "green")
 
 
 def print_unmatched(course, listed):
@@ -690,29 +725,29 @@ def print_unmatched(course, listed):
     only_list = [r for r in course.enrolled if not r["d2l"]]
     only_d2l = [r for r in course.records.values() if not r["class_rows"]]
 
-    print(f"  on a class list but not in D2L: {len(only_list)}")
+    print("  on a class list but not in D2L: " + count_shade(len(only_list)))
     # With no export at all, this would be everyone.
     if course.export:
         for record in sorted(only_list, key=lambda r: r["name"]):
-            print(f"    {record['name']}, {record['section']}, {record['id']}")
+            print(paint(f"    {record['name']}, {record['section']}, {record['id']}", "yellow"))
 
     print(f"  in D2L but on no class list:    {len(only_d2l)}")
     if not only_d2l:
         return
     unknown = [r for r in only_d2l if not is_known_staff(r, course.known_staff)]
     print(f"    known staff:                  {len(only_d2l) - len(unknown)}")
-    print(f"    not known:                    {len(unknown)}")
+    print("    not known:                    " + count_shade(len(unknown)))
     if course.absent_instructors():
         return
     for record in sorted(unknown, key=lambda r: r["name"]):
         grades = record["d2l"]["grades"]
         count = sum(1 for item in listed if grades.get(item) is not None)
         marks = f", marks on {count} listed item(s)" if count else ""
-        print(f"      {record['name']}, {record['id']}{marks}")
+        print(paint(f"      {record['name']}, {record['id']}{marks}", "yellow"))
 
 
 def run_check(course):
-    print(paint("What was read", "bold"))
+    print(paint("What was read", "heading"))
     for line in course.source_lines():
         print(f"  {line}")
     print(f"  {len(course.enrolled)} registered, {len(course.records)} records in all")
@@ -725,13 +760,14 @@ def run_check(course):
         for item, info in course.export["items"].items():
             if item not in listed:
                 unlisted.setdefault(info["category"] or "(no category)", []).append(item)
-        print(paint("\nIn the D2L export but not in assessments.csv, so not shown", "bold"))
+        print(paint("\nIn the D2L export but not in assessments.csv, so not shown", "heading"))
         for category, items in unlisted.items():
             print(f"  {category}: {len(items)}")
 
-        print(paint("\nHand-marked items", "bold"))
+        print(paint("\nHand-marked items", "heading"))
         for item, (recorded, expected) in course.progress.items():
-            state = "marked" if gradebook.is_marked(item, course.progress) else "not marked yet"
+            state = (paint("marked", "green") if gradebook.is_marked(item, course.progress)
+                     else paint("not marked yet", "dim"))
             print(f"  {item:<34}{recorded:>4} of {expected:<4} {state}")
 
     flush_report(tally=False)
