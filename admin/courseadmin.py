@@ -1,5 +1,5 @@
-# courseadmin.py — the plumbing under test-admin: paths, the report, the readers
-# Usage: imported by test-admin; not run directly.
+# courseadmin.py — the plumbing under test-admin and student-record: paths, the report, the readers
+# Usage: imported by test-admin and student-record; not run directly.
 #
 # Not a program; there is nothing to run here. test-admin produces every piece
 # of paper a test needs -- the per-section attendance sheets, the Print Services
@@ -30,9 +30,11 @@
 import argparse
 import csv
 import os
+import re
 import sys
 import unicodedata
 from collections import OrderedDict
+from datetime import datetime
 from pathlib import Path
 
 # THE ONE THIRD-PARTY IMPORT, and it is guarded on purpose. Everything else here
@@ -272,6 +274,7 @@ SHARED_DIR = TEAM_DIR / "General"
 DEFAULT_ROSTER_DIR = SHARED_DIR / "exported-classlists"
 RECORDS_DIR = SHARED_DIR / "student-records-that-we-maintain"
 SAC_STUDENTS_XLSX = RECORDS_DIR / "sac-students.xlsx"
+GRADES_DIR = SHARED_DIR / "grades-exported-from-d2l"
 
 # Where the finished paperwork goes: the Team's Tests/ADMIN, beside the tests
 # themselves. The attendance-sheet PDF and the test's workbook land here
@@ -285,6 +288,8 @@ SAC_STUDENTS_RETIRED_CSV = SHARED_DIR / "sac-students.csv"
 # ---------------------------------------------------------------------------
 
 PRINT_JOB_CSV = (DATA_DIR or SCRIPT_DIR) / "print-job.csv"
+ASSESSMENTS_CSV = (DATA_DIR or SCRIPT_DIR) / "assessments.csv"
+GRADING_SCHEME_CSV = (DATA_DIR or SCRIPT_DIR) / "grading-scheme.csv"
 
 # Settings that must be present in print-job.csv, and must be whole numbers.
 # Policy rather than form answers, which is why they carry no label there.
@@ -549,6 +554,206 @@ def read_print_job():
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE CLASS LISTS
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Here rather than in test-admin because student-record reads them too, and two
+# copies of these rules would drift apart. test-admin's header explains why the
+# registrar's export needs this much reading.
+
+# What the class lists are called, e.g.
+#   section-rosters_MATH_1003_FR01A_2026-08-23_9_06 PM.csv
+ROSTER_GLOB = f"section-rosters_MATH_{COURSE_NUMBER}_*.csv"
+
+# The nominal section AND the export time, both taken from that filename.
+#
+# See WHY THE CLASS LISTS NEED A SCRIPT in test-admin's header for why the section here is load-bearing. The
+# timestamp is what lets the shared folder simply accumulate: the newest export
+# per instructor wins and nobody has to delete anything.
+#
+# THE SECTION CODE IS CAPTURED GENERICALLY, not matched against a pattern. It
+# used to be FR\d{2}A, which is right for this course and wrong for the next one
+# along -- MATH 1013's sections are FR01B, so that pattern would match nothing
+# and the run would end at "no class lists in ...", a message pointing nowhere
+# near the cause. What vouches for a code now is membership in
+# course-sections.csv, tested in select_current_exports; that check is the only
+# validation left, so do not weaken it.
+#
+# Nothing anchors the end, so a second download in one browser session --
+# "... 9_06 PM (1).csv" -- still parses.
+FILENAME_SECTION_RE = re.compile(
+    rf"section-rosters_MATH_{COURSE_NUMBER}_([A-Z0-9]+)_"
+    rf"(\d{{4}}-\d{{2}}-\d{{2}}_\d{{1,2}}_\d{{2}} [AP]M)"
+)
+
+# The registrar's timestamp format: 2026-08-23_9_06 PM. %I is the 12-hour clock
+# and tolerates the unpadded hour.
+EXPORT_TIME_FORMAT = "%Y-%m-%d_%I_%M %p"
+
+# The suffix that overrides it. The asterisks are literal in the export, hence
+# the escaping; the trailing $ anchors it so a student whose name somehow
+# contained the phrase mid-string would not be silently truncated.
+CROSSLIST_RE = re.compile(
+    rf"\s+cross-listed as MATH\*{COURSE_NUMBER}\*([A-Z0-9]+)\s*$"
+)
+
+# The mark of a student who has left the section. NOT ANCHORED, unlike the suffix
+# above, so it is found on either side of a cross-listing; it is removed first, so
+# that the cross-listing is then at the end of the name, where its pattern wants it.
+DROPPED_RE = re.compile(r"\s*\(\s*dropped\s+(\d{4}-\d{2}-\d{2})\s*\)", re.IGNORECASE)
+
+# A drop in some other wording: the date in another format, say. Left in the class
+# and warned about, since the export no longer says plainly what it means.
+DROPPED_LOOSE_RE = re.compile(r"\(\s*dropped\b", re.IGNORECASE)
+
+def export_time(path, stamp_text):
+    """When this class list was exported.
+
+    The filename's timestamp is preferred because it records when the registrar
+    produced the data, which is the thing that goes stale. The file's mtime only
+    records when the file happened to land in the folder -- a re-sync or a copy
+    between machines can move it, and OneDrive is exactly that kind of folder.
+    mtime is the fallback for when the registrar changes the filename format.
+    """
+    try:
+        return datetime.strptime(stamp_text, EXPORT_TIME_FORMAT)
+    except ValueError:
+        warn(
+            f"{path.name}: cannot read the export time {stamp_text!r}; falling "
+            f"back to the file's modification time, which may be later than the "
+            f"actual export"
+        )
+        return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+def select_current_exports(roster_dir, sections):
+    """Pick the newest class list per INSTRUCTOR from a folder that accumulates.
+
+    Instructors drop a fresh export in every week or two and never delete
+    anything, so the folder holds many generations at once. Returns
+    {instructor: (path, nominal_section, exported)}, how many files were looked
+    at, and the losers as a list of (path, instructor) for stash_superseded.
+
+    GROUPED BY INSTRUCTOR, NOT BY SECTION CODE, and that is the whole subtlety.
+    An instructor's export covers all of their sections whichever one it is
+    nominally named for, so the same instructor may file FR07A in September and
+    FR09A in October. Keyed by section code those look like two independent
+    sources and both would be read, silently double-counting every section that
+    instructor teaches. Keyed by instructor, October simply supersedes September.
+    """
+    if not roster_dir.is_dir():
+        die(
+            f"class-list folder not found:\n  {roster_dir}\n"
+            f"If this is the shared OneDrive folder, it may not be mounted or "
+            f"synced yet. Pass --roster-dir to build from somewhere else -- but "
+            f"note that an old local copy will produce confidently wrong sheets."
+        )
+
+    roster_files = sorted(roster_dir.glob(ROSTER_GLOB))
+    # The anonymised sample is not a class list.
+    roster_files = [p for p in roster_files if not p.stem.endswith("-DEMO")]
+    if not roster_files:
+        die(f"no {ROSTER_GLOB} files in {roster_dir}")
+
+    current = {}
+    recognised = []
+    for path in roster_files:
+        match = FILENAME_SECTION_RE.search(path.name)
+        if not match:
+            # A WARNING, NOT AN ERROR: this is a shared folder that will collect
+            # stray files over a term, and one of them must not stop the build.
+            # Safe to be lenient because a class list skipped here is not lost
+            # quietly -- that instructor's sections turn up in the freshness
+            # report as absent and in the PDF as "No class-list data" pages.
+            warn(
+                f"{path.name}: not a recognisable class-list filename, skipped. "
+                f"If this is a class list that was renamed, restore the "
+                f"registrar's original name -- the filename is the only record "
+                f"of which section the un-suffixed students belong to."
+            )
+            continue
+
+        nominal_section, stamp_text = match.group(1), match.group(2)
+        if nominal_section not in sections:
+            warn(
+                f"{path.name}: section {nominal_section} is not in "
+                f"course-sections.csv, skipped"
+            )
+            continue
+
+        instructor = sections[nominal_section]["instructor"] or nominal_section
+        exported = export_time(path, stamp_text)
+        recognised.append((path, instructor))
+        if instructor not in current or exported > current[instructor][2]:
+            current[instructor] = (path, nominal_section, exported)
+
+    if not current:
+        die(f"no usable class lists in {roster_dir}")
+
+    superseded = [
+        (path, instructor) for path, instructor in recognised
+        if path != current[instructor][0]
+    ]
+    return current, len(roster_files), superseded
+
+
+def read_class_list(path, nominal_section):
+    """One class list -> one dict per student: name, id, email, section, dropped.
+
+    `dropped' is the drop date as text, or None for a student still in the course.
+    `name' is as the registrar prints it, "Last, First", with the suffixes removed.
+    The rules for those suffixes are in test-admin's header.
+
+    THE EMAIL COLUMN IS FOUND BY LOOKING FOR "mail" IN ITS NAME, not by an exact
+    name, because nothing else here reads it and it should not be able to stop
+    anything else that reads this file. A list without one gives empty emails.
+    """
+    # utf-8-sig: the export carries a byte-order mark, which would otherwise
+    # ride along on the first column name and break the DictReader lookup.
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        email_column = next(
+            (name for name in reader.fieldnames or [] if "mail" in name.casefold()),
+            None,
+        )
+        for row in reader:
+            name = (row.get("Student Name") or "").strip()
+            if not name:
+                continue  # the export ends with a blank line
+
+            drop_mark = DROPPED_RE.search(name)
+            if drop_mark:
+                name = DROPPED_RE.sub("", name)
+
+            suffix = CROSSLIST_RE.search(name)
+            if suffix:
+                section = suffix.group(1)
+                name = name[: suffix.start()].strip()
+            else:
+                section = nominal_section
+
+            yield {
+                "name": name,
+                "id": (row.get("Student ID") or "").strip(),
+                "email": (row.get(email_column) or "").strip() if email_column else "",
+                "section": section,
+                "dropped": drop_mark.group(1) if drop_mark else None,
+            }
+
+
+def same_person(display_name, fold_last, fold_first):
+    """Does a class-list name fit a folded last and first name? See match_elsewhere."""
+    their_last, _, their_first = display_name.partition(",")
+    if fold_name(their_last) != fold_last:
+        return False
+    theirs = fold_name(their_first)
+    return (
+        theirs == fold_first
+        or theirs.startswith(fold_first + " ")
+        or fold_first.startswith(theirs + " ")
+    )
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #% WHO WRITES AT THE SAC
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # REGISTERING WITH THE SAC IS NOT WRITING THERE. Some students who register keep
@@ -583,6 +788,10 @@ SAC_UNKNOWN = {"unknown", "?", "tbd", "not yet"}
 
 SAC_COLUMNS = ("last", "first", "section", "writes-at-sac")
 
+# The student-ID column is optional, because test-admin has no use for it and a
+# row can be added before anyone knows the number. student-record joins on it.
+SAC_ID_HEADERS = {"id", "student id", "student-id", "student_id", "studentid"}
+
 
 def fold_name(text):
     """Casefold and strip accents, for comparing two spellings of one name.
@@ -604,9 +813,10 @@ def read_sac_students(sections):
                                                      the attendance sheet
         available        False when the file could not be read at all
         rows             every counted row as a dict: number, last, first,
-                         section, where -- for test-admin to check against the
-                         class lists. This file stays hand-maintained: nothing
-                         here or there ever writes to it.
+                         section, where, id -- for test-admin to check against
+                         the class lists, and for student-record to join on.
+                         This file stays hand-maintained: nothing here or there
+                         ever writes to it.
 
     NOT FATAL WHEN ABSENT -- OneDrive may simply not be there. The caller falls
     back to print-job.csv's sac_fallback, which is the old flat ballpark: it
@@ -699,6 +909,8 @@ def read_sac_students(sections):
             value = row[index] if index < len(row) else None
             return "" if value is None else str(value).strip()
 
+        id_header = next((name for name in column if name in SAC_ID_HEADERS), None)
+
         # start=2 because the header was row 1, so `row' counts as Excel counts.
         for number, row in enumerate(rows, start=2):
             last = field(row, "last")
@@ -749,6 +961,8 @@ def read_sac_students(sections):
                 "first": first,
                 "section": section,
                 "where": where,
+                # Excel may hold an ID as the number 3712345.0.
+                "id": field(row, id_header).removesuffix(".0") if id_header else "",
             })
             tally = counts.setdefault(section, {"yes": 0, "unknown": 0})
             if where == "yes":
