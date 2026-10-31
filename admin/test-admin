@@ -182,6 +182,7 @@ from courseadmin import (
     COURSE_NUMBER,
     DATA_DIR,
     DEFAULT_ROSTER_DIR,
+    DROPPED_LOOSE_RE,
     OUTPUT_DIR,
     PRINT_JOB_CSV,
     REPO_ROOT,
@@ -196,10 +197,13 @@ from courseadmin import (
     fold_name,
     paint,
     parse_test_number,
+    read_class_list,
     read_print_job,
     read_sac_students,
     read_sections,
+    same_person,
     say,
+    select_current_exports,
     warn,
 )
 
@@ -208,10 +212,10 @@ from courseadmin import (
 #
 # COURSE_NUMBER is not set here any more: it comes from the course's own
 # course-info/admin-settings.csv, by way of courseadmin.py, because this script
-# is shared across courses. What IS still assumed here is the subject, MATH --
-# in COURSE_NAME below and in the two patterns that recognise the registrar's
-# exports (ROSTER_GLOB, FILENAME_SECTION_RE and its cross-listing twin) -- and
-# the Tuesday/Thursday tutorial days in DAYS.
+# is shared across courses. What IS still assumed is the subject, MATH -- in
+# COURSE_NAME below and in courseadmin.py's patterns that recognise the
+# registrar's exports (ROSTER_GLOB, FILENAME_SECTION_RE, CROSSLIST_RE) -- and the
+# Tuesday/Thursday tutorial days in DAYS.
 #
 # Everything else adapts on its own. How many sections there are, what order the
 # pages come in, who the instructors are, how many sections each of them has, and
@@ -472,54 +476,9 @@ def find_test_files(test_number, pages_override):
 #% THE CLASS LISTS
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-# What the class lists are called, e.g.
-#   section-rosters_MATH_1003_FR01A_2026-08-23_9_06 PM.csv
-ROSTER_GLOB = f"section-rosters_MATH_{COURSE_NUMBER}_*.csv"
-
-# The nominal section AND the export time, both taken from that filename.
-#
-# See WHY THIS SCRIPT EXISTS above for why the section here is load-bearing. The
-# timestamp is what lets the shared folder simply accumulate: the newest export
-# per instructor wins and nobody has to delete anything.
-#
-# THE SECTION CODE IS CAPTURED GENERICALLY, not matched against a pattern. It
-# used to be FR\d{2}A, which is right for this course and wrong for the next one
-# along -- MATH 1013's sections are FR01B, so that pattern would match nothing
-# and the run would end at "no class lists in ...", a message pointing nowhere
-# near the cause. What vouches for a code now is membership in
-# course-sections.csv, tested in select_current_exports; that check is the only
-# validation left, so do not weaken it.
-#
-# Nothing anchors the end, so a second download in one browser session --
-# "... 9_06 PM (1).csv" -- still parses.
-FILENAME_SECTION_RE = re.compile(
-    rf"section-rosters_MATH_{COURSE_NUMBER}_([A-Z0-9]+)_"
-    rf"(\d{{4}}-\d{{2}}-\d{{2}}_\d{{1,2}}_\d{{2}} [AP]M)"
-)
-
-# The registrar's timestamp format: 2026-08-23_9_06 PM. %I is the 12-hour clock
-# and tolerates the unpadded hour.
-EXPORT_TIME_FORMAT = "%Y-%m-%d_%I_%M %p"
-
 # Where superseded class lists go, inside the class-list folder. ROSTER_GLOB does
 # not descend into subfolders, so a list moved here is no longer read.
 STASH_DIRNAME = "zzzzz"
-
-# The suffix that overrides it. The asterisks are literal in the export, hence
-# the escaping; the trailing $ anchors it so a student whose name somehow
-# contained the phrase mid-string would not be silently truncated.
-CROSSLIST_RE = re.compile(
-    rf"\s+cross-listed as MATH\*{COURSE_NUMBER}\*([A-Z0-9]+)\s*$"
-)
-
-# The mark of a student who has left the section. NOT ANCHORED, unlike the suffix
-# above, so it is found on either side of a cross-listing; it is removed first, so
-# that the cross-listing is then at the end of the name, where its pattern wants it.
-DROPPED_RE = re.compile(r"\s*\(\s*dropped\s+(\d{4}-\d{2}-\d{2})\s*\)", re.IGNORECASE)
-
-# A drop in some other wording: the date in another format, say. Left in the class
-# and warned about, since the export no longer says plainly what it means.
-DROPPED_LOOSE_RE = re.compile(r"\(\s*dropped\b", re.IGNORECASE)
 
 # Characters TeX would read as markup if a name contained them. Applied one
 # character at a time (see latex_escape), which is what keeps the backslash rule
@@ -570,97 +529,6 @@ def check_typesettable(name, section):
                 f"pdflatex with T1 fonts cannot typeset -- the build may fail"
             )
             return
-
-
-def export_time(path, stamp_text):
-    """When this class list was exported.
-
-    The filename's timestamp is preferred because it records when the registrar
-    produced the data, which is the thing that goes stale. The file's mtime only
-    records when the file happened to land in the folder -- a re-sync or a copy
-    between machines can move it, and OneDrive is exactly that kind of folder.
-    mtime is the fallback for when the registrar changes the filename format.
-    """
-    try:
-        return datetime.strptime(stamp_text, EXPORT_TIME_FORMAT)
-    except ValueError:
-        warn(
-            f"{path.name}: cannot read the export time {stamp_text!r}; falling "
-            f"back to the file's modification time, which may be later than the "
-            f"actual export"
-        )
-        return datetime.fromtimestamp(path.stat().st_mtime)
-
-
-def select_current_exports(roster_dir, sections):
-    """Pick the newest class list per INSTRUCTOR from a folder that accumulates.
-
-    Instructors drop a fresh export in every week or two and never delete
-    anything, so the folder holds many generations at once. Returns
-    {instructor: (path, nominal_section, exported)}, how many files were looked
-    at, and the losers as a list of (path, instructor) for stash_superseded.
-
-    GROUPED BY INSTRUCTOR, NOT BY SECTION CODE, and that is the whole subtlety.
-    An instructor's export covers all of their sections whichever one it is
-    nominally named for, so the same instructor may file FR07A in September and
-    FR09A in October. Keyed by section code those look like two independent
-    sources and both would be read, silently double-counting every section that
-    instructor teaches. Keyed by instructor, October simply supersedes September.
-    """
-    if not roster_dir.is_dir():
-        die(
-            f"class-list folder not found:\n  {roster_dir}\n"
-            f"If this is the shared OneDrive folder, it may not be mounted or "
-            f"synced yet. Pass --roster-dir to build from somewhere else -- but "
-            f"note that an old local copy will produce confidently wrong sheets."
-        )
-
-    roster_files = sorted(roster_dir.glob(ROSTER_GLOB))
-    # The anonymised sample is not a class list.
-    roster_files = [p for p in roster_files if not p.stem.endswith("-DEMO")]
-    if not roster_files:
-        die(f"no {ROSTER_GLOB} files in {roster_dir}")
-
-    current = {}
-    recognised = []
-    for path in roster_files:
-        match = FILENAME_SECTION_RE.search(path.name)
-        if not match:
-            # A WARNING, NOT AN ERROR: this is a shared folder that will collect
-            # stray files over a term, and one of them must not stop the build.
-            # Safe to be lenient because a class list skipped here is not lost
-            # quietly -- that instructor's sections turn up in the freshness
-            # report as absent and in the PDF as "No class-list data" pages.
-            warn(
-                f"{path.name}: not a recognisable class-list filename, skipped. "
-                f"If this is a class list that was renamed, restore the "
-                f"registrar's original name -- the filename is the only record "
-                f"of which section the un-suffixed students belong to."
-            )
-            continue
-
-        nominal_section, stamp_text = match.group(1), match.group(2)
-        if nominal_section not in sections:
-            warn(
-                f"{path.name}: section {nominal_section} is not in "
-                f"course-sections.csv, skipped"
-            )
-            continue
-
-        instructor = sections[nominal_section]["instructor"] or nominal_section
-        exported = export_time(path, stamp_text)
-        recognised.append((path, instructor))
-        if instructor not in current or exported > current[instructor][2]:
-            current[instructor] = (path, nominal_section, exported)
-
-    if not current:
-        die(f"no usable class lists in {roster_dir}")
-
-    superseded = [
-        (path, instructor) for path, instructor in recognised
-        if path != current[instructor][0]
-    ]
-    return current, len(roster_files), superseded
 
 
 def stash_superseded(superseded, current, roster_dir, dry_run):
@@ -797,58 +665,38 @@ def collect_students(current, known_sections):
         rows_read = 0
         rows_duplicate = 0
 
-        # utf-8-sig: the export carries a byte-order mark, which would otherwise
-        # ride along on the first column name and break the DictReader lookup.
-        with path.open(encoding="utf-8-sig", newline="") as handle:
-            for row in csv.DictReader(handle):
-                raw_name = (row.get("Student Name") or "").strip()
-                if not raw_name:
-                    continue  # the export ends with a blank line
+        for row in read_class_list(path, nominal_section):
+            section, student_id = row["section"], row["id"]
+            display_name = row["name"]
 
-                student_id = (row.get("Student ID") or "").strip()
-
-                drop_mark = DROPPED_RE.search(raw_name)
-                if drop_mark:
-                    raw_name = DROPPED_RE.sub("", raw_name)
-
-                suffix = CROSSLIST_RE.search(raw_name)
-                if suffix:
-                    section = suffix.group(1)
-                    display_name = raw_name[: suffix.start()].strip()
-                else:
-                    section = nominal_section
-                    display_name = raw_name
-
-                if drop_mark:
-                    key = (section, student_id or display_name.casefold())
-                    dropped_rows.append(
-                        (section, key, display_name, drop_mark.group(1))
-                    )
-                    continue
-                rows_read += 1
-
-                if DROPPED_LOOSE_RE.search(display_name):
-                    warn(
-                        f"{path.name}: {display_name!r} looks like a dropped "
-                        f"student, but not in the form (Dropped YYYY-MM-DD), so "
-                        f"they were kept on {section}'s sheet and in its count."
-                    )
-
-                if section not in known_sections:
-                    warn(
-                        f"{path.name}: student in section {section}, which is "
-                        f"not in course-sections.csv -- skipped"
-                    )
-                    continue
-
+            if row["dropped"]:
                 key = (section, student_id or display_name.casefold())
-                if key in seen:
-                    rows_duplicate += 1
-                    continue
-                seen.add(key)
+                dropped_rows.append((section, key, display_name, row["dropped"]))
+                continue
+            rows_read += 1
 
-                check_typesettable(display_name, section)
-                students.setdefault(section, []).append((display_name, student_id))
+            if DROPPED_LOOSE_RE.search(display_name):
+                warn(
+                    f"{path.name}: {display_name!r} looks like a dropped "
+                    f"student, but not in the form (Dropped YYYY-MM-DD), so "
+                    f"they were kept on {section}'s sheet and in its count."
+                )
+
+            if section not in known_sections:
+                warn(
+                    f"{path.name}: student in section {section}, which is "
+                    f"not in course-sections.csv -- skipped"
+                )
+                continue
+
+            key = (section, student_id or display_name.casefold())
+            if key in seen:
+                rows_duplicate += 1
+                continue
+            seen.add(key)
+
+            check_typesettable(display_name, section)
+            students.setdefault(section, []).append((display_name, student_id))
 
         if rows_duplicate:
             # Reported per file rather than per row: the case this catches is a
@@ -1072,19 +920,6 @@ def report_enrolment(updates, agreed, unchecked):
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #% THE ATTENDANCE SHEETS
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-def same_person(display_name, fold_last, fold_first):
-    """Does a class-list name fit a folded last and first name? See match_elsewhere."""
-    their_last, _, their_first = display_name.partition(",")
-    if fold_name(their_last) != fold_last:
-        return False
-    theirs = fold_name(their_first)
-    return (
-        theirs == fold_first
-        or theirs.startswith(fold_first + " ")
-        or fold_first.startswith(theirs + " ")
-    )
-
 
 def match_elsewhere(students, sac_marked):
     """Which listed names belong to students writing elsewhere -> {section: {name}}.
