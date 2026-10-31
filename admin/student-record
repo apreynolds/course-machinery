@@ -9,6 +9,7 @@
 #        student-record --class [SECTION]   how the class, or one section, is doing
 #        student-record --emails SECTION    copy the emails of everyone in a section
 #        student-record --check             what was read, and every warning
+#        student-record --d2l-import        write the file that updates D2L's grade so far
 #
 #   --as-of YYYY-MM-DD  calculate as if it were this date (default: today)
 #   --roster-dir DIR    the class lists (default: the Team's exported-classlists)
@@ -21,7 +22,8 @@
 # In the interactive search, Tab marks several students and Enter copies all of
 # their emails, separated by semicolons, ready for Outlook's To line.
 #
-# IT WRITES NOTHING. Every file is read fresh on each run and there is no cache,
+# IT WRITES NOTHING, except the one file --d2l-import is asked for, which it puts
+# beside the D2L exports. Every file is read fresh on each run and there is no cache,
 # because a cache would be one more copy of names and grades on disk. The preview
 # text travels inside fzf's input for the same reason.
 #
@@ -606,6 +608,85 @@ def run_emails(course, section):
     return 0
 
 
+def run_d2l_import(course, grades_dir):
+    """Write a file for D2L's grade import, holding each student's mark so far.
+
+    The format is D2L's: an identifier, "<item> Points Grade", and an End-of-Line
+    Indicator of #. The item is named by grade_so_far_item in admin-settings.csv,
+    and it is itself in the export, which is harmless: it is not in assessments.csv,
+    so last week's value plays no part in this week's.
+
+    STUDENTS WILL SEE THIS, so it refuses when a class list is missing rather than
+    write a file that quietly skips a whole instructor, and it ends with what to
+    look at before uploading. Only registered students get a row, so staff and
+    students who have dropped are never touched.
+    """
+    item = courseadmin.SETTINGS.get("grade_so_far_item")
+    if not item:
+        die("add a grade_so_far_item row to admin-settings.csv, naming the D2L grade item.")
+    if not course.graded:
+        die("there are no grades to work from. See student-record --check.")
+    absent = course.absent_instructors()
+    if absent:
+        die(f"no class list from {', '.join(absent)}, so their sections can't be worked out.")
+    if item not in course.export["items"]:
+        die(f"{item!r} is not in the D2L export. Is that its exact name in D2L, "
+            f"and is the export newer than the item?")
+
+    # The marks are out of 100, and the item need not be.
+    maximum = course.export["items"][item]["max"]
+    rows, marks, no_d2l, no_mark = [], [], [], []
+    for record in sorted_records(course):
+        if not record["live"]:
+            continue
+        if not record["d2l"]:
+            no_d2l.append(record)
+            continue
+        mark = course.standing_of(record)["mark"]
+        if mark is None:
+            no_mark.append(record)
+            continue
+        marks.append(mark)
+        rows.append([record["id"], f"{mark * maximum / 100:.1f}", "#"])
+
+    path = grades_dir / f"grade-so-far-import-{course.as_of}.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["OrgDefinedId", f"{item} Points Grade", "End-of-Line Indicator"])
+        writer.writerows(rows)
+
+    print(paint(f"{item}: {len(rows)} students, as of {course.as_of}", "heading"))
+    average = gradebook.mean(marks)
+    print("  mean " + shade(percent(average), average)
+          + paint(f"  from the export of {course.export_stamp.strftime('%Y-%m-%d')}", "dim"))
+    for label, group in (("not in D2L", no_d2l), ("nothing due yet", no_mark)):
+        for record in group:
+            print(paint(f"  left out, {label}: {record['name']}, {record['section']}", "yellow"))
+
+    print(paint("\nBefore you upload", "heading"))
+    clear = True
+    for assessment in course.assessments:
+        if not assessment["due"] or assessment["due"] >= course.as_of:
+            continue
+        for test in assessment["items"]:
+            recorded, expected = course.progress.get(test, (0, 0))
+            if recorded == expected:
+                continue
+            clear = False
+            if gradebook.is_marked(test, course.progress):
+                print(paint(f"  {test}: {recorded} of {expected} recorded, "
+                            f"so {expected - recorded} blank(s) count as 0", "yellow"))
+            else:
+                print(paint(f"  {test}: {recorded} of {expected} recorded, "
+                            f"so it is taken as not marked and left out", "yellow"))
+    if clear:
+        print(paint("  every test and exam that has come due is fully recorded", "green"))
+
+    flush_report(tally=False)
+    print(paint(f"\nWrote {path}", "green"))
+    return 0
+
+
 def run_show(course, query):
     wanted = fold_name(query)
     found = [
@@ -791,6 +872,7 @@ def main():
             "  student-record --show smith\n"
             "  student-record --class FR05A\n"
             "  student-record --emails FR05A\n"
+            "  student-record --d2l-import\n"
             "  student-record --class --as-of 2026-11-06      as if it were that date\n"
             "  student-record --class --scheme ~/trial.csv    try a different grading scheme\n"
             "\n"
@@ -808,6 +890,8 @@ def main():
     parser.add_argument("--emails", metavar="SECTION",
                         help="copy the emails of everyone registered in a section")
     parser.add_argument("--check", action="store_true", help="what was read, and every warning")
+    parser.add_argument("--d2l-import", action="store_true",
+                        help="write the file that updates D2L's grade so far, beside the exports")
     parser.add_argument("--as-of", type=parse_date, default=date.today(), metavar="YYYY-MM-DD",
                         help="calculate as if it were this date")
 
@@ -832,6 +916,8 @@ def main():
     course = Course(args)
     if args.check:
         return run_check(course)
+    if args.d2l_import:
+        return run_d2l_import(course, args.grades_dir)
     if args.class_section is not None:
         return run_class(course, args.class_section)
     if args.emails is not None:

@@ -261,6 +261,7 @@ It writes nothing, and keeps no cache.
 .course-machinery/admin/student-record --class [SECTION]
 .course-machinery/admin/student-record --emails SECTION
 .course-machinery/admin/student-record --check
+.course-machinery/admin/student-record --d2l-import
 \end{manexsource}
 
 With no option it opens an \texttt{fzf} search with each student's record in the preview, and Enter copies the selected emails.
@@ -268,6 +269,8 @@ With no option it opens an \texttt{fzf} search with each student's record in the
 \texttt{-{}-class} with a section shows only the version of each test that section writes, and says if any of its students wrote the other one.
 \texttt{-{}-check} says what was read, how old it is, and every warning, so it is the first thing to run when a figure looks wrong.
 The sources are joined on student ID, and a SAC row with no ID falls back to its name and says so.
+\texttt{-{}-d2l-import} writes each registered student's mark so far to a file beside the D2L exports, ready for D2L's grade import, and lists what to look at before uploading it.
+The D2L grade item it fills is named by an optional \texttt{grade\_so\_far\_item} row in \file{admin-settings.csv}.
 \texttt{-{}-check} names anyone on a class list who is not in D2L, and anyone in D2L who is on no class list and is not known staff.
 D2L's gradebook also holds the teaching team, and staff are recognised from \file{instructors.csv}, \file{course-sections.csv} and \file{TAs-and-other-staff.csv} in the Team's \file{student-records-that-we-maintain}.
 That last file has columns \texttt{name} (first then last), \texttt{ID} and \texttt{email}, and it is the reliable one, since an ID or email matches however the name is written in D2L.
