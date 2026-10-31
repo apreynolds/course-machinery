@@ -274,6 +274,7 @@ SHARED_DIR = TEAM_DIR / "General"
 DEFAULT_ROSTER_DIR = SHARED_DIR / "exported-classlists"
 RECORDS_DIR = SHARED_DIR / "student-records-that-we-maintain"
 SAC_STUDENTS_XLSX = RECORDS_DIR / "sac-students.xlsx"
+STAFF_CSV = RECORDS_DIR / "TAs-and-other-staff.csv"
 GRADES_DIR = SHARED_DIR / "grades-exported-from-d2l"
 
 # Where the finished paperwork goes: the Team's Tests/ADMIN, beside the tests
@@ -291,7 +292,6 @@ PRINT_JOB_CSV = (DATA_DIR or SCRIPT_DIR) / "print-job.csv"
 ASSESSMENTS_CSV = (DATA_DIR or SCRIPT_DIR) / "assessments.csv"
 GRADING_SCHEME_CSV = (DATA_DIR or SCRIPT_DIR) / "grading-scheme.csv"
 INSTRUCTORS_CSV = (DATA_DIR or SCRIPT_DIR) / "instructors.csv"
-STAFF_CSV = (DATA_DIR or SCRIPT_DIR) / "TAs-and-other-staff.csv"
 
 # Settings that must be present in print-job.csv, and must be whole numbers.
 # Policy rather than form answers, which is why they carry no label there.

@@ -15,7 +15,7 @@
 #   --grades-dir DIR    the D2L exports (default: the Team's grades-exported-from-d2l)
 #   --assessments F     (default: course-info/assessments.csv)
 #   --scheme F          (default: course-info/grading-scheme.csv)
-#   --staff F           (default: course-info/TAs-and-other-staff.csv)
+#   --staff F           (default: the Team's TAs-and-other-staff.csv)
 #
 # In the interactive search, Tab marks several students and Enter copies all of
 # their emails, separated by semicolons, ready for Outlook's To line.
@@ -150,17 +150,21 @@ def read_csv_rows(path):
 
 
 def read_known_staff(sections, staff_path):
-    """Who the course already knows is teaching staff -> names, initials, emails.
+    """Who the course already knows is teaching staff -> IDs, emails, names, initials.
 
     D2L's gradebook also holds everyone on the teaching team. They come from three
-    places, each written its own way, hence three sets:
+    places, each written its own way, hence the several sets:
 
+      TAs-and-other-staff.csv  anyone, by ID, email or "First Last"
       course-sections.csv      TAs, as "First Last"
       instructors.csv          instructors, as "F. Last", with an email
-      TAs-and-other-staff.csv  anyone else, as "First Last"; optional
+
+    THE STAFF FILE'S ID AND EMAIL ARE WHAT MAKE THIS RELIABLE, since they survive a
+    TA who goes by Rick and is Richard in D2L. The names remain for a new TA who is
+    in course-sections.csv and not yet in the staff file.
     """
     names = {fold_name(info["ta"]) for info in sections.values() if info["ta"]}
-    initials, emails = set(), set()
+    ids, initials, emails = set(), set(), set()
 
     for row in read_csv_rows(INSTRUCTORS_CSV):
         instructor = fold_name(row.get("Instructor") or "")
@@ -170,25 +174,39 @@ def read_known_staff(sections, staff_path):
         if email:
             emails.add(email)
 
+    # In the shared folder, which may not have synced: say so, since otherwise this
+    # looks like staff who have all become strangers.
+    if not staff_path.is_file():
+        warn(f"{staff_path} not found, so staff are recognised by name only.")
+
     for row in read_csv_rows(staff_path):
         # This file's column names are hand-typed, so their capitals don't matter.
         columns = {(key or "").strip().casefold(): value for key, value in row.items()}
         name = fold_name(columns.get("name") or "")
         if name:
             names.add(name)
-    return {"names": names, "initials": initials, "emails": emails}
+        # Cleaned as D2L's are, in case a spreadsheet or a `#' got in the way.
+        staff_id = gradebook.clean_org_id(columns.get("id"))
+        if staff_id:
+            ids.add(staff_id)
+        email = (columns.get("email") or "").strip().casefold()
+        if email:
+            emails.add(email)
+    return {"ids": ids, "names": names, "initials": initials, "emails": emails}
 
 
-def is_known_staff(student, staff):
-    """Is this D2L row one of the people read_known_staff found?
+def is_known_staff(record, staff):
+    """Is this D2L-only record one of the people read_known_staff found?
 
     Only ever asked of someone on no class list, so a student who shares a TA's
-    name cannot be hidden by it. A name written differently in D2L simply fails to
-    match: that person gets named by --check and can go in TAs-and-other-staff.csv.
+    name cannot be hidden by it. Someone matching on nothing gets named by --check
+    and can go in TAs-and-other-staff.csv.
     """
+    student = record["d2l"]
     first, last = fold_name(student["first"]), fold_name(student["last"])
     return (
-        f"{first} {last}" in staff["names"]
+        record["id"] in staff["ids"]
+        or f"{first} {last}" in staff["names"]
         or f"{first[:1]}. {last}" in staff["initials"]
         or student["email"].casefold() in staff["emails"]
     )
@@ -633,7 +651,7 @@ def print_unmatched(course, listed):
     print(f"  in D2L but on no class list:    {len(only_d2l)}")
     if not only_d2l:
         return
-    unknown = [r for r in only_d2l if not is_known_staff(r["d2l"], course.known_staff)]
+    unknown = [r for r in only_d2l if not is_known_staff(r, course.known_staff)]
     print(f"    known staff:                  {len(only_d2l) - len(unknown)}")
     print(f"    not known:                    {len(unknown)}")
     if course.absent_instructors():
