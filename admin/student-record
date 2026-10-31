@@ -1,0 +1,624 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = ["openpyxl"]
+# ///
+#
+# student-record — look up a student, or a whole class, across the course's records
+# Usage: student-record [QUERY]             search interactively; Enter copies email
+#        student-record --show QUERY        print every matching record and stop
+#        student-record --class [SECTION]   how the class, or one section, is doing
+#        student-record --check             what was read, and every warning
+#
+#   --as-of YYYY-MM-DD  calculate as if it were this date (default: today)
+#   --roster-dir DIR    the class lists (default: the Team's exported-classlists)
+#   --sac-workbook F    the SAC list (default: the Team's sac-students.xlsx)
+#   --grades-dir DIR    the D2L exports (default: the Team's grades-exported-from-d2l)
+#   --assessments F     (default: course-info/assessments.csv)
+#   --scheme F          (default: course-info/grading-scheme.csv)
+#
+# In the interactive search, Tab marks several students and Enter copies all of
+# their emails, separated by semicolons, ready for Outlook's To line.
+#
+# IT WRITES NOTHING. Every file is read fresh on each run and there is no cache,
+# because a cache would be one more copy of names and grades on disk. The preview
+# text travels inside fzf's input for the same reason.
+#
+# THE JOIN IS ON STUDENT ID. A student comes from up to three places:
+#
+#   class lists   name, section, whether they dropped (newest list per instructor)
+#   D2L export    grades, and an email if the class list has none
+#   sac-students  whether they are on the list, and writes-at-sac
+#
+# A SAC row with no ID yet falls back to matching its name, and says so. Someone
+# found in only one place is shown anyway and labelled, because that is usually
+# the thing worth knowing about them.
+#
+# WHAT A RECORD CAN'T TELL YOU, and so always shows alongside:
+#
+#   how old each source is      "not dropped" only means "not as of that export"
+#   instructors with no list    their students are absent, not out of the course
+#   "not on the SAC list"       the list is hand-kept, so this is not "not registered"
+#
+# The marks follow gradebook.py, whose header gives the rules.
+
+import argparse
+import shutil
+import subprocess
+import sys
+from datetime import date, datetime
+from pathlib import Path
+
+import courseadmin
+import gradebook
+from courseadmin import (
+    ASSESSMENTS_CSV,
+    COURSE_NUMBER,
+    DEFAULT_ROSTER_DIR,
+    GRADES_DIR,
+    GRADING_SCHEME_CSV,
+    SAC_STUDENTS_XLSX,
+    die,
+    flush_report,
+    fold_name,
+    paint,
+    read_class_list,
+    read_sac_students,
+    read_sections,
+    same_person,
+    select_current_exports,
+    warn,
+)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% READING EVERYTHING
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def new_record(key):
+    return {
+        "key": key, "id": "", "name": "", "email": "", "section": "", "day": "",
+        "class_rows": [], "d2l": None, "live": False, "dropped": None,
+        "moved": [], "other_sections": [], "sac": None, "sac_by_name": False,
+    }
+
+
+def build_records(class_rows, export, sac_rows, sections):
+    """Join the three sources -> {key: record}, where the key is the student ID.
+
+    A class-list row with no ID is keyed by its folded name instead, so it still
+    gets a record even though nothing else can be joined to it.
+    """
+    records = {}
+    for row in class_rows:
+        key = row["id"] or fold_name(row["name"])
+        record = records.setdefault(key, new_record(key))
+        record["class_rows"].append(row)
+
+    if export:
+        for student_id, student in export["students"].items():
+            record = records.setdefault(student_id, new_record(student_id))
+            record["d2l"] = student
+
+    for key, record in records.items():
+        rows = record["class_rows"]
+        live = [row for row in rows if not row["dropped"]]
+        gone = [row for row in rows if row["dropped"]]
+        student = record["d2l"]
+
+        record["id"] = next((row["id"] for row in rows if row["id"]), key if student else "")
+        record["name"] = (
+            rows[0]["name"] if rows
+            else f"{student['last']}, {student['first']}"
+        )
+        record["email"] = next((row["email"] for row in rows if row["email"]), "") or (
+            student["email"] if student else ""
+        )
+
+        if live:
+            record["live"] = True
+            record["section"] = live[0]["section"]
+            record["other_sections"] = sorted(
+                {row["section"] for row in live} - {record["section"]}
+            )
+            # A dropped row in the same section means they left and came back.
+            record["moved"] = sorted(
+                (row["section"], row["dropped"]) for row in gone
+                if row["section"] != record["section"]
+            )
+        elif gone:
+            latest = max(gone, key=lambda row: row["dropped"])
+            record["section"] = latest["section"]
+            record["dropped"] = latest["dropped"]
+
+        info = sections.get(record["section"])
+        record["day"] = info["day"] if info else ""
+
+    attach_sac(records, sac_rows)
+    return records
+
+
+def attach_sac(records, sac_rows):
+    """Put each SAC row on its student: by ID, or failing that by name."""
+    for row in sac_rows:
+        record = records.get(row["id"]) if row["id"] else None
+        by_name = False
+        if record is None:
+            fold_last, fold_first = fold_name(row["last"]), fold_name(row["first"])
+            matches = [r for r in records.values()
+                       if same_person(r["name"], fold_last, fold_first)]
+            # Their own section settles it if a namesake is elsewhere in the course.
+            in_section = [r for r in matches if r["section"] == row["section"]]
+            matches = in_section or matches
+            if len(matches) != 1:
+                what = f"matches {len(matches)} students" if matches else "matches nobody"
+                warn(f"sac-students.xlsx row {row['number']} {what}, so it is on no "
+                     f"record. Add its student ID.")
+                continue
+            record, by_name = matches[0], True
+        record["sac"] = row
+        record["sac_by_name"] = by_name
+
+
+class Course:
+    """Everything read for one run, in one place to pass around."""
+
+    def __init__(self, args):
+        self.as_of = args.as_of
+        self.sections = read_sections()
+
+        self.current, _total, _superseded = select_current_exports(args.roster_dir, self.sections)
+        class_rows = []
+        for path, nominal_section, _exported in self.current.values():
+            class_rows.extend(read_class_list(path, nominal_section))
+
+        # Module-level in courseadmin, so that its messages name the right file.
+        courseadmin.SAC_STUDENTS_XLSX = args.sac_workbook
+        _counts, _marked, self.sac_read, sac_rows = read_sac_students(self.sections)
+
+        self.export_path, self.export_stamp, self.export = None, None, None
+        if args.grades_dir.is_dir():
+            self.export_path, self.export_stamp = gradebook.newest_export(args.grades_dir)
+        if self.export_path:
+            self.export = gradebook.read_d2l_export(self.export_path)
+        else:
+            warn(f"no D2L grades export in {args.grades_dir}, so no grades are shown.")
+
+        self.records = build_records(class_rows, self.export, sac_rows, self.sections)
+        self.enrolled = [r for r in self.records.values() if r["live"]]
+
+        self.scheme, self.assessments = None, []
+        if args.scheme.is_file() and args.assessments.is_file():
+            self.scheme = gradebook.read_grading_scheme(args.scheme)
+            self.assessments = gradebook.read_assessments(self.scheme, args.assessments)
+        elif self.export:
+            warn(f"{args.scheme.name} or {args.assessments.name} is missing, so no "
+                 f"grades are shown.")
+
+        self.progress = {}
+        self.graded = bool(self.export and self.assessments)
+        if self.graded:
+            gradebook.check_items(self.assessments, self.export["items"])
+            self.progress = gradebook.find_marked_items(
+                self.assessments, self.scheme, self.export,
+                [(r["id"], r["day"]) for r in self.enrolled],
+            )
+            self.class_stats, self.section_stats = self.all_statistics()
+
+    def absent_instructors(self):
+        named = {info["instructor"] for info in self.sections.values() if info["instructor"]}
+        return sorted(named - set(self.current))
+
+    def ids_in(self, section=None):
+        return [r["id"] for r in self.enrolled if not section or r["section"] == section]
+
+    def all_statistics(self):
+        """Every listed item's figures, for the class and for each section."""
+        items = self.export["items"]
+        listed = [item for a in self.assessments for item in a["items"] if item in items]
+        by_section = {}
+        for record in self.enrolled:
+            by_section.setdefault(record["section"], []).append(record["id"])
+
+        class_stats, section_stats = {}, {}
+        everyone = self.ids_in()
+        students = self.export["students"]
+        for item in listed:
+            max_points = items[item]["max"]
+            class_stats[item] = gradebook.item_statistics(item, max_points, everyone, students)
+            for section, ids in by_section.items():
+                section_stats[(item, section)] = gradebook.item_statistics(
+                    item, max_points, ids, students)
+        return class_stats, section_stats
+
+    def standing_of(self, record):
+        grades = record["d2l"]["grades"] if record["d2l"] else {}
+        return gradebook.standing(
+            grades, record["day"], self.assessments, self.scheme,
+            self.export["items"], self.progress, self.as_of,
+        )
+
+    def source_lines(self, record=None):
+        """Where the figures came from, and how old that is."""
+        lines = []
+        today = datetime.now()
+        if record and record["section"] in self.sections:
+            instructor = self.sections[record["section"]]["instructor"]
+            if instructor in self.current:
+                exported = self.current[instructor][2]
+                lines.append(f"class list  {instructor}'s, {exported.strftime('%Y-%m-%d')} "
+                             f"({(today - exported).days} days old)")
+        elif not record:
+            for instructor, (_path, _section, exported) in self.current.items():
+                lines.append(f"class list  {instructor}'s, {exported.strftime('%Y-%m-%d')} "
+                             f"({(today - exported).days} days old)")
+        if self.export_stamp:
+            # The clock in the filename may not be local, so only the date is claimed.
+            lines.append(f"D2L export  {self.export_stamp.strftime('%Y-%m-%d')}, "
+                         f"{self.export_path.name}")
+        absent = self.absent_instructors()
+        if absent:
+            lines.append(paint(f"NO CLASS LIST from {', '.join(absent)}: "
+                               f"their students' sections are unknown", "yellow"))
+        return lines
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% ONE RECORD, AS TEXT
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def percent(value):
+    return "--" if value is None else f"{value:.1f}%"
+
+
+def points(value):
+    """30.0 as 30 and 22.5 as 22.5."""
+    return f"{value:g}"
+
+
+def describe(evaluation, record, course, counts=True):
+    """One assessment's line: what they got, and how that compares.
+
+    `counts' is False for a homework track that is not the student's better one.
+    A blank there is no cause for alarm, since nobody is meant to do both.
+    """
+    item, status = evaluation["item"], evaluation["status"]
+    label = f"  {item:<34}"
+    due = evaluation["assessment"]["due"]
+
+    if status == "not-in-export":
+        return label + paint("not in the D2L export", "red")
+    if status == "exempt":
+        return label + "Exempt"
+    if status == "missing" and not counts:
+        return label + paint("blank", "dim")
+    if status == "missing":
+        return label + paint(f"MISSING, counts as 0 (due {due})", "red")
+    if status == "pending":
+        recorded, expected = course.progress.get(item, (0, 0))
+        return label + paint(f"not marked yet ({recorded} of {expected} recorded)", "dim")
+    if status == "not-due" and evaluation["score"] is None:
+        when = f"due {due}" if due else "no due date set"
+        return label + paint(f"not due, {when}", "dim")
+
+    text = (f"{points(evaluation['score'])}/{points(evaluation['max'])}"
+            f"  {percent(evaluation['percent']):>6}")
+    if status == "not-due":
+        text += paint("  still open", "dim")
+    if "times" in evaluation:
+        text += f"  x{evaluation['times']}"
+
+    class_mean = course.class_stats.get(item, {}).get("mean")
+    section_mean = course.section_stats.get((item, record["section"]), {}).get("mean")
+    text += paint(f"   class {percent(class_mean)}", "dim")
+    if section_mean is not None:
+        text += paint(f"  {record['section']} {percent(section_mean)}", "dim")
+    if evaluation["note"]:
+        text += "  " + paint(evaluation["note"], "yellow")
+    return label + text
+
+
+def render_grades(record, course):
+    if not record["d2l"]:
+        return [paint("Not in the D2L export, so no grades.", "yellow")]
+
+    result = course.standing_of(record)
+    due, total = result["due_weight"], sum(e["weight"] for e in course.scheme.values())
+    lines = [paint(f"MARK SO FAR  {percent(result['mark'])}", "bold")
+             + f"   ({due:g}% of the {total:g}% has come due)", ""]
+
+    for name, category in result["categories"].items():
+        heading = f"{name} ({category['weight']:g}%)"
+        if category["rule"] == "ranked-1-2-3":
+            heading += (f"   ranked {percent(category['value'])}"
+                        f"   plain average {percent(category['average'])}")
+        elif category["rule"] == "best-track":
+            if category["undetermined"]:
+                heading += "   " + paint("left out: its better track is not due yet", "yellow")
+            elif category["best_track"]:
+                heading += f"   {category['best_track']} {percent(category['value'])}"
+        else:
+            heading += f"   {percent(category['value'])}"
+        lines.append(paint(heading, "bold"))
+
+        if category["rule"] == "best-track":
+            for track, info in category["tracks"].items():
+                lines.append(f" {track}: {percent(info['value'])}, {info['due']} due so far")
+                counts = track == category["best_track"]
+                lines.extend(describe(e, record, course, counts) for e in info["evaluations"])
+            if category["both_tracks"]:
+                lines.append(" " + paint("Has work in more than one track.", "yellow"))
+        else:
+            lines.extend(describe(e, record, course) for e in category["evaluations"])
+        lines.append("")
+    return lines
+
+
+def render_record(record, course):
+    lines = [paint(record["name"], "bold") + f"   {record['id'] or 'no ID'}   {record['email']}"]
+
+    info = course.sections.get(record["section"])
+    if info:
+        lines.append(f"{record['section']}  {info['day']}  Room: {info['room']}  "
+                     f"TA: {info['ta'] or '--'}  Instructor: {info['instructor'] or '--'}")
+    elif record["section"]:
+        lines.append(f"{record['section']} (not in course-sections.csv)")
+
+    if record["live"]:
+        status = "Registered"
+        for section, when in record["moved"]:
+            status += f", moved from {section} on {when}"
+        if record["other_sections"]:
+            status += paint(f", ALSO LISTED IN {', '.join(record['other_sections'])}", "red")
+    elif record["dropped"]:
+        status = paint(f"DROPPED {record['dropped']}", "red")
+    else:
+        status = paint("Not on any class list", "yellow")
+    lines.append(f"Status: {status}")
+
+    sac = record["sac"]
+    if sac:
+        text = f"on the list, writes-at-sac: {sac['where']}"
+        if sac["section"] != record["section"] and record["section"]:
+            text += paint(f", list says {sac['section']}", "yellow")
+        if record["sac_by_name"]:
+            text += paint(", matched by name, so please confirm", "yellow")
+    elif course.sac_read:
+        text = "not on the list"
+    else:
+        text = paint("could not read the list", "yellow")
+    lines.append(f"SAC: {text}")
+    lines.append("")
+
+    if course.graded:
+        lines.extend(render_grades(record, course))
+    lines.extend(paint(line, "dim") for line in course.source_lines(record))
+    return "\n".join(lines)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% THE MODES
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def sorted_records(course):
+    return sorted(course.records.values(), key=lambda r: fold_name(r["name"]))
+
+
+def encode_for_printf(text):
+    """Make text safe as one fzf field, for printf %b to turn back.
+
+    A field cannot contain a newline, because a line is one student. The escape
+    character is encoded too, since fzf's --ansi would otherwise consume it.
+    """
+    return (text.replace("\\", "\\\\").replace("\033", "\\0033")
+            .replace("\n", "\\n").replace("\t", " "))
+
+
+def run_search(course, query):
+    if not shutil.which("fzf"):
+        die("fzf is not on PATH. --show QUERY works without it.")
+
+    # Fields: name, section, ID, email-or-status, then two that are not displayed:
+    # the record, for the preview, and the bare email, for copying.
+    lines = []
+    for record in sorted_records(course):
+        shown = record["email"]
+        if record["dropped"]:
+            shown += "  DROPPED"
+        elif not record["class_rows"]:
+            shown += "  no class list"
+        lines.append("\t".join([
+            record["name"].ljust(32), record["section"].ljust(7), record["id"].ljust(9),
+            shown, encode_for_printf(render_record(record, course)), record["email"],
+        ]))
+
+    # Warnings would vanish behind fzf's screen, so they are counted in its header.
+    warnings = len(courseadmin.report_warnings)
+    courseadmin.report_warnings.clear()
+    header = [paint(line, "dim") for line in course.source_lines() if "D2L" in line or "NO CLASS" in line]
+    if warnings:
+        header.append(f"{warnings} warning(s): see student-record --check")
+    header.append("Enter copies email, Tab marks several, Esc leaves")
+
+    # printf %b is run by fzf's shell, and a bash builtin and a zsh builtin agree on it.
+    command = ["fzf", "--ansi", "--multi", "--delimiter=\t", "--with-nth=1,2,3,4",
+               "--tabstop=2", "--preview", "printf '%b' {5}",
+               "--preview-window=down,65%,wrap", "--header", "\n".join(header),
+               "--query", query or ""]
+    result = subprocess.run(command, input="\n".join(lines), stdout=subprocess.PIPE, text=True)
+
+    # fzf exits 130 on Esc and 1 on no match; neither is a mistake worth reporting.
+    if result.returncode != 0 or not result.stdout.strip():
+        return
+    emails = []
+    for line in result.stdout.splitlines():
+        email = line.split("\t")[5] if line.count("\t") >= 5 else ""
+        if email:
+            emails.append(email)
+    if not emails:
+        print("No email on record for that selection.")
+        return
+
+    joined = "; ".join(emails)
+    print(joined)
+    try:
+        subprocess.run(["pbcopy"], input=joined, text=True, check=True)
+        print(f"Copied {len(emails)} email(s).")
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        print("Could not reach the clipboard; the text is above.")
+
+
+def run_show(course, query):
+    wanted = fold_name(query)
+    found = [
+        record for record in sorted_records(course)
+        if wanted in fold_name(" ".join([record["name"], record["id"], record["email"]]))
+    ]
+    for record in found:
+        print(render_record(record, course))
+        print()
+    if not found:
+        print(f"No student matches {query!r}.")
+        absent = course.absent_instructors()
+        if absent:
+            print(f"That does not rule them out: no class list from {', '.join(absent)}.")
+    return 0 if found else 1
+
+
+def statistic_row(stats):
+    text = f"{percent(stats['mean']):>6}  median {percent(stats['median']):>6}  n={stats['n']:<4}"
+    return text + (f" exempt={stats['exempt']}" if stats["exempt"] else "")
+
+
+def run_class(course, section):
+    if not course.graded:
+        die("there are no grades to summarise. See student-record --check.")
+    if section and section not in course.sections:
+        die(f"{section} is not in course-sections.csv.")
+
+    records = [r for r in course.enrolled if not section or r["section"] == section]
+    ids = [r["id"] for r in records]
+    print(paint(f"MATH {COURSE_NUMBER}{' ' + section if section else ''}: "
+                f"{len(records)} registered, as of {course.as_of}", "bold"))
+    print("Dropped students are left out; blanks are left out of averages.\n")
+
+    items = course.export["items"]
+    students = course.export["students"]
+    for category in course.scheme:
+        print(paint(category, "bold"))
+        for assessment in course.assessments:
+            if assessment["category"] != category:
+                continue
+            due = f"due {assessment['due']}" if assessment["due"] else "no due date"
+            print(f" {assessment['title']}  ({due})")
+            for item in assessment["items"]:
+                if item not in items:
+                    print(f"  {item:<34}" + paint("not in the D2L export", "red"))
+                    continue
+                stats = gradebook.item_statistics(item, items[item]["max"], ids, students)
+                line = f"  {item:<34}{statistic_row(stats)}"
+                if item in course.progress and not gradebook.is_marked(item, course.progress):
+                    recorded, expected = course.progress[item]
+                    line += paint(f"  not marked yet ({recorded}/{expected})", "dim")
+                print(line)
+        print()
+
+    standings = [(r, course.standing_of(r)) for r in records]
+    marks = [s["mark"] for _r, s in standings if s["mark"] is not None]
+    if marks:
+        print(paint("Mark so far", "bold"))
+        print(f"  mean {percent(gradebook.mean(marks))}  "
+              f"median {percent(gradebook.statistics.median(marks))}  n={len(marks)}  "
+              f"below 50: {sum(mark < 50 for mark in marks)}")
+        both = sum(any(c["both_tracks"] for c in s["categories"].values()) for _r, s in standings)
+        undetermined = sum(any(c["undetermined"] for c in s["categories"].values()) for _r, s in standings)
+        if both:
+            print(f"  {both} with work in more than one homework track")
+        if undetermined:
+            print(f"  {undetermined} with homework left out: their better track is not due yet")
+        print()
+
+    if not section:
+        print(paint(f"  {'section':<8}{'day':<7}{'who':<6}{'n':>4}{'mark':>8}", "bold"))
+        for code, info in course.sections.items():
+            marks = [s["mark"] for r, s in standings
+                     if r["section"] == code and s["mark"] is not None]
+            print(f"  {code:<8}{info['day']:<7}{info['instructor']:<6}{len(marks):>4}"
+                  f"{percent(gradebook.mean(marks)):>8}")
+        print()
+
+    for line in course.source_lines():
+        print(paint(line, "dim"))
+    flush_report(tally=False)
+    return 0
+
+
+def run_check(course):
+    print(paint("What was read", "bold"))
+    for line in course.source_lines():
+        print(f"  {line}")
+    print(f"  {len(course.enrolled)} registered, {len(course.records)} records in all")
+
+    only_list = [r for r in course.enrolled if not r["d2l"]]
+    only_d2l = [r for r in course.records.values() if not r["class_rows"]]
+    print(f"  on a class list but not in D2L: {len(only_list)}")
+    print(f"  in D2L but on no class list:    {len(only_d2l)}")
+
+    if course.graded:
+        listed = {item for a in course.assessments for item in a["items"]}
+        unlisted = {}
+        for item, info in course.export["items"].items():
+            if item not in listed:
+                unlisted.setdefault(info["category"] or "(no category)", []).append(item)
+        print(paint("\nIn the D2L export but not in assessments.csv, so not shown", "bold"))
+        for category, items in unlisted.items():
+            print(f"  {category}: {len(items)}")
+
+        print(paint("\nHand-marked items", "bold"))
+        for item, (recorded, expected) in course.progress.items():
+            state = "marked" if gradebook.is_marked(item, course.progress) else "not marked yet"
+            print(f"  {item:<34}{recorded:>4} of {expected:<4} {state}")
+
+    flush_report(tally=False)
+    return 0
+
+
+def parse_date(text):
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not YYYY-MM-DD")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Look up a student, or a whole class, across the course's records."
+    )
+    parser.add_argument("query", nargs="?", help="start the interactive search with this")
+    parser.add_argument("--show", metavar="QUERY", help="print matching records and stop")
+    parser.add_argument("--class", dest="class_section", nargs="?", const="", metavar="SECTION",
+                        help="how the class, or one section, is doing")
+    parser.add_argument("--check", action="store_true", help="what was read, and every warning")
+    parser.add_argument("--as-of", type=parse_date, default=date.today(), metavar="YYYY-MM-DD",
+                        help="calculate as if it were this date")
+    parser.add_argument("--roster-dir", type=Path, default=DEFAULT_ROSTER_DIR)
+    parser.add_argument("--sac-workbook", type=Path, default=SAC_STUDENTS_XLSX)
+    parser.add_argument("--grades-dir", type=Path, default=GRADES_DIR)
+    parser.add_argument("--assessments", type=Path, default=ASSESSMENTS_CSV)
+    parser.add_argument("--scheme", type=Path, default=GRADING_SCHEME_CSV)
+    args = parser.parse_args()
+
+    course = Course(args)
+    if args.check:
+        return run_check(course)
+    if args.class_section is not None:
+        return run_class(course, args.class_section)
+    if args.show is not None:
+        status = run_show(course, args.show)
+        flush_report(tally=False)
+        return status
+    run_search(course, args.query)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
