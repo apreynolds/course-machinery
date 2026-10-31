@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+# crowdmark-no-zero — list the students with no 0 on any question of a Crowdmark export
+# Usage: crowdmark-no-zero [FILE]    FILE is a csv in the Team's crowdmark-exports
+#                                    (default: the most recently changed one)
+#        crowdmark-no-zero --dir DIR [FILE]    look in DIR instead of that folder
+#
+# WHY. Students answer all but one of the long questions and say clearly which one
+# they do not want marked, and the grader gives that question a 0. A student with
+# no 0 anywhere probably did not say, so a grader may have marked every question.
+#
+# WHAT IT CANNOT TELL YOU. A 0 is only ever a 0: a student who earned a 0 on a
+# question they wanted marked looks the same as one who left it out. So this list
+# is everyone with no 0, not everyone who failed to choose.
+#
+# A BLANK IS NOT A 0. Crowdmark's blank means no score was entered:
+#   - all questions blank: nobody to check, usually someone who did not write.
+#     They are left off the list and only counted.
+#   - some questions blank: on the list, because no 0 was entered. The blank shows
+#     as "-" in their row, in case that is where the marking is unfinished.
+#
+# IT WRITES NOTHING, and prints names and grades only to the terminal.
+
+import argparse
+import csv
+import re
+import sys
+from pathlib import Path
+
+# A plain sibling import; courseadmin.py explains why this needs no path setup.
+# It also supplies TEAM_DIR, read from course-info/admin-settings.csv.
+from courseadmin import TEAM_DIR
+
+EXPORTS_DIR = TEAM_DIR / "General" / "crowdmark-exports"
+
+# The columns this script prints or uses, besides the questions themselves.
+REQUIRED_COLUMNS = ("Name", "Student ID Number", "Email", "Score URL")
+
+# Questions are found by their header, Q1, Q2, ..., so a test with a different
+# number of questions needs no edit here. MC-total does not match, on purpose.
+QUESTION_COLUMN = re.compile(r"^Q\d+$")
+
+
+def stop(message):
+    """Print an error and end the program with a failing exit code."""
+    print(f"crowdmark-no-zero: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def choose_csv(name, folder):
+    """Return the csv to read: the one named, or else the newest in the folder."""
+    if not folder.is_dir():
+        stop(f"no such folder: {folder}")
+
+    csvs = sorted(folder.glob("*.csv"))
+    if not csvs:
+        stop(f"no csv files in {folder}")
+
+    if name is None:
+        # st_mtime is the time the file last changed.
+        return max(csvs, key=lambda path: path.stat().st_mtime)
+
+    # A path with a folder in it is taken as it stands.
+    # A bare file name is looked for in the exports folder.
+    typed = Path(name)
+    candidate = typed if typed.parent != Path(".") else folder / typed.name
+    if candidate.is_file():
+        return candidate
+
+    available = "\n".join(f"  {path.name}" for path in csvs)
+    stop(f"no such file: {candidate}\nAvailable in {folder}:\n{available}")
+
+
+def is_zero(score):
+    """True if this cell is a score of zero, however it is written (0, 0.0, 0.00)."""
+    try:
+        return float(score) == 0
+    except ValueError:
+        # A blank, or any text. Not a 0, and the row prints it for a person to see.
+        return False
+
+
+def read_export(path):
+    """Return (question column names, list of rows) from a Crowdmark export."""
+    # utf-8-sig quietly drops the invisible marker a spreadsheet program may put at
+    # the start of a csv. Left there, it would become part of the first header.
+    # newline="" is what the csv module asks for, so it can handle line endings.
+    with open(path, encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        headers = reader.fieldnames or []
+        rows = list(reader)
+
+    questions = [header for header in headers if QUESTION_COLUMN.match(header)]
+    missing = [column for column in REQUIRED_COLUMNS if column not in headers]
+    if missing:
+        stop(f"{path.name} has no column named: {', '.join(missing)}")
+    if not questions:
+        stop(f"{path.name} has no question columns (Q1, Q2, ...)")
+    return questions, rows
+
+
+def print_table(headers, rows):
+    """Print rows in columns, each as wide as its widest entry."""
+    widths = [
+        max(len(row[column]) for row in [headers] + rows)
+        for column in range(len(headers))
+    ]
+    for row in [headers] + rows:
+        cells = [cell.ljust(width) for cell, width in zip(row, widths)]
+        print("  ".join(cells).rstrip())
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="List the students with no 0 on any question of a Crowdmark export."
+    )
+    parser.add_argument(
+        "file",
+        nargs="?",
+        metavar="FILE",
+        help="a csv in the exports folder (default: the most recently changed one)",
+    )
+    parser.add_argument(
+        "--dir",
+        type=Path,
+        default=EXPORTS_DIR,
+        help="the exports folder (default: the Team's General/crowdmark-exports)",
+    )
+    args = parser.parse_args()
+
+    path = choose_csv(args.file, args.dir)
+    questions, rows = read_export(path)
+
+    # Sort every row into one of three groups.
+    not_scored = 0  # every question blank
+    has_zero = 0    # at least one 0, so nothing to check
+    no_zero = []    # the list we are here for
+    for row in rows:
+        scores = [(row[question] or "").strip() for question in questions]
+        if not any(scores):
+            not_scored += 1
+        elif any(is_zero(score) for score in scores):
+            has_zero += 1
+        else:
+            no_zero.append(row)
+
+    print(path.name)
+    print(
+        f"{len(rows)} students: {has_zero} with a 0, "
+        f"{len(no_zero)} with no 0, {not_scored} with no scores at all"
+    )
+    if not no_zero:
+        return
+
+    # Blanks print as "-" so that the columns stay readable.
+    table = [
+        [row["Name"], row["Student ID Number"], row["Email"]]
+        + [(row[question] or "").strip() or "-" for question in questions]
+        + [row["Score URL"]]
+        for row in no_zero
+    ]
+    print()
+    print_table(["Name", "ID", "Email"] + questions + ["Score URL"], table)
+
+
+if __name__ == "__main__":
+    main()

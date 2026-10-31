@@ -290,3 +290,19 @@ An assessment counts once the day after its due date has arrived.
 A blank then counts as 0, unless the item is hand-marked and fewer than half of the students expected to write it have anything recorded, in which case it is taken to be unmarked and left out.
 An \texttt{Exempt} is left out, and the category's rule applies to what remains.
 The header of \file{gradebook.py} gives the rules in full.
+
+\subsection*{admin/crowdmark-no-zero}
+
+Lists the students with no 0 on any question of a Crowdmark export, who may not have said which question to leave unmarked.
+It writes nothing.
+
+\begin{manexsource}
+.course-machinery/admin/crowdmark-no-zero [FILE]
+.course-machinery/admin/crowdmark-no-zero --dir DIR [FILE]
+\end{manexsource}
+
+\texttt{FILE} is a csv in the Team's \file{General/crowdmark-exports}, and without one the script reads the most recently changed csv there.
+It needs the columns \texttt{Name}, \texttt{Student ID Number}, \texttt{Email} and \texttt{Score URL}, and it treats every column named \texttt{Q} and a number as a question.
+A student with every question blank is counted but not listed.
+A student with only some questions blank is listed, with each blank shown as a dash.
+A 0 the student earned looks the same as a 0 for the question left out, so the list cannot catch a student who has one of those and made no choice.
