@@ -562,7 +562,13 @@ def read_print_job():
 
 # What the class lists are called, e.g.
 #   section-rosters_MATH_1003_FR01A_2026-08-23_9_06 PM.csv
-ROSTER_GLOB = f"section-rosters_MATH_{COURSE_NUMBER}_*.csv"
+#   section-rosters_MATH-1003-FR22A_2026-10-29_11_46 AM.csv
+#
+# BROADER THAN WHAT FILENAME_SECTION_RE ACCEPTS, ON PURPOSE. A file this misses is
+# ignored without a word, while one that reaches the pattern below and fails gets
+# a warning that names it. So a new variation on the name is reported, and does
+# not just look like an instructor who never sent a class list.
+ROSTER_GLOB = "section-rosters_*.csv"
 
 # The nominal section AND the export time, both taken from that filename.
 #
@@ -580,8 +586,11 @@ ROSTER_GLOB = f"section-rosters_MATH_{COURSE_NUMBER}_*.csv"
 #
 # Nothing anchors the end, so a second download in one browser session --
 # "... 9_06 PM (1).csv" -- still parses.
+#
+# THE COURSE AND SECTION MAY BE JOINED BY HYPHENS OR UNDERSCORES, because the 26f
+# exports came in both forms.
 FILENAME_SECTION_RE = re.compile(
-    rf"section-rosters_MATH_{COURSE_NUMBER}_([A-Z0-9]+)_"
+    rf"section-rosters_MATH[-_]{COURSE_NUMBER}[-_]([A-Z0-9]+)_"
     rf"(\d{{4}}-\d{{2}}-\d{{2}}_\d{{1,2}}_\d{{2}} [AP]M)"
 )
 
