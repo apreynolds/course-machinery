@@ -262,6 +262,7 @@ It writes nothing, and keeps no cache.
 .course-machinery/admin/student-record --emails SECTION
 .course-machinery/admin/student-record --check
 .course-machinery/admin/student-record --d2l-import
+.course-machinery/admin/student-record --exemptions
 \end{manexsource}
 
 With no option it opens an \texttt{fzf} search with each student's record in the preview, and Enter copies the selected emails.
@@ -271,6 +272,11 @@ With no option it opens an \texttt{fzf} search with each student's record in the
 The sources are joined on student ID, and a SAC row with no ID falls back to its name and says so.
 \texttt{-{}-d2l-import} writes each registered student's mark so far to a file beside the D2L exports, ready for D2L's grade import, and lists what to look at before uploading it.
 The D2L grade item it fills is named by an optional \texttt{grade\_so\_far\_item} row in \file{admin-settings.csv}.
+\texttt{-{}-exemptions} compares a Microsoft Forms exemption workbook with the newest D2L export, and it only ever reads the workbook, which an optional \texttt{exemption\_workbook} row in \file{admin-settings.csv} names relative to your home.
+The workbook needs columns \texttt{Student ID}, \texttt{Email}, \texttt{First name}, \texttt{Last name}, \texttt{APPROVED}, \texttt{RECORDED} and one whose heading contains ``select the test'', and the student's explanation is never read.
+For a response that is approved, with \texttt{RECORDED} blank and nothing in D2L for that test, it writes \texttt{Exempt} to a file for the version the student's section writes, one file per grade item, beside the exports.
+A student with a mark, or whose ID disagrees with both their email and their name, goes in no file and is listed instead.
+It also names approvals containing ``follow up'', rows whose \texttt{RECORDED} can now be filled in, and any \texttt{Exempt} in D2L with no approved response.
 \texttt{-{}-check} names anyone on a class list who is not in D2L, and anyone in D2L who is on no class list and is not known staff.
 D2L's gradebook also holds the teaching team, and staff are recognised from \file{instructors.csv}, \file{course-sections.csv} and \file{TAs-and-other-staff.csv} in the Team's \file{student-records-that-we-maintain}.
 That last file has columns \texttt{name} (first then last), \texttt{ID} and \texttt{email}, and it is the reliable one, since an ID or email matches however the name is written in D2L.

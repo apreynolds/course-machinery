@@ -10,6 +10,8 @@
 #        student-record --emails SECTION    copy the emails of everyone in a section
 #        student-record --check             what was read, and every warning
 #        student-record --d2l-import        write the file that updates D2L's grade so far
+#        student-record --exemptions        compare the exemption form with D2L, and write
+#                                           the files that record what is approved
 #
 #   --as-of YYYY-MM-DD  calculate as if it were this date (default: today)
 #   --roster-dir DIR    the class lists (default: the Team's exported-classlists)
@@ -18,12 +20,13 @@
 #   --assessments F     (default: course-info/assessments.csv)
 #   --scheme F          (default: course-info/grading-scheme.csv)
 #   --staff F           (default: the Team's TAs-and-other-staff.csv)
+#   --exemption-workbook F  (default: exemption_workbook in admin-settings.csv)
 #
 # In the interactive search, Tab marks several students and Enter copies all of
 # their emails, separated by semicolons, ready for Outlook's To line.
 #
-# IT WRITES NOTHING, except the one file --d2l-import is asked for, which it puts
-# beside the D2L exports. Every file is read fresh on each run and there is no cache,
+# IT WRITES NOTHING, except the files --d2l-import and --exemptions are asked for,
+# which it puts beside the D2L exports. Every file is read fresh on each run and there is no cache,
 # because a cache would be one more copy of names and grades on disk. The preview
 # text travels inside fzf's input for the same reason.
 #
@@ -47,11 +50,14 @@
 
 import argparse
 import csv
+import re
 import shutil
 import subprocess
 import sys
 from datetime import date, datetime
 from pathlib import Path
+
+from openpyxl import load_workbook
 
 import courseadmin
 import gradebook
@@ -687,6 +693,261 @@ def run_d2l_import(course, grades_dir):
     return 0
 
 
+def cell_text(cell):
+    """A workbook cell as text. A number can arrive as 3712345 or as 3712345.0."""
+    if isinstance(cell, float) and cell.is_integer():
+        cell = int(cell)
+    return "" if cell is None else str(cell).strip()
+
+
+def read_exemption_form(path):
+    """The Forms workbook -> a list of responses, holding only the columns needed.
+
+    Opened read-only, so nothing here is able to save it. THE STUDENT'S EXPLANATION
+    IS NEVER READ, since it can be medical and nothing below needs it. The form's own
+    Id column is a response number, not a student ID, and is not read either.
+    """
+    book = load_workbook(path, read_only=True, data_only=True)
+    rows = list(book.worksheets[0].iter_rows(values_only=True))
+    book.close()
+    if not rows:
+        die(f"{path.name} is empty.")
+
+    headings = [cell_text(cell).casefold() for cell in rows[0]]
+    wanted = {"id": "student id", "email": "email", "first": "first name", "last": "last name",
+              "approved": "approved", "recorded": "recorded"}
+    columns = {key: headings.index(name) for key, name in wanted.items() if name in headings}
+    # The test's column is the form's whole question, so only part of it is looked for.
+    for at, heading in enumerate(headings):
+        if "select the test" in heading:
+            columns["test"] = at
+    if len(columns) < len(wanted) + 1:
+        absent = [name for key, name in {**wanted, "test": "select the test"}.items()
+                  if key not in columns]
+        die(f"{path.name} has no column for: {', '.join(absent)}.")
+
+    responses = []
+    # Numbered as the sheet is, so that a printed row can be found to fill in RECORDED.
+    for number, row in enumerate(rows[1:], start=2):
+        if not any(cell is not None for cell in row):
+            continue
+        response = {key: cell_text(row[at]) if at < len(row) else ""
+                    for key, at in columns.items()}
+        response["row"] = number
+        response["id"] = gradebook.clean_org_id(response["id"])
+        responses.append(response)
+    return responses
+
+
+def locate_student(response, course, by_email):
+    """Whose response is this -> (record, note, problem); one of record and problem is empty.
+
+    THE ID IS TYPED BY HAND AND A SLIP WOULD EXEMPT SOMEONE ELSE, so it is believed
+    only when the response's email or name agrees with it. The email is the one the
+    student signed in with, so it can stand in for an ID that matches nobody, and the
+    name is there for a student whose sign-in differs from the class list's email.
+    """
+    student_id, email = response["id"], response["email"].casefold()
+    by_id = course.records.get(student_id) if student_id else None
+    matches = by_email.get(email, []) if email else []
+
+    if by_id:
+        others = [record for record in matches if record is not by_id]
+        if others:
+            return None, "", (f"ID {student_id} is {by_id['name']}'s, "
+                              f"but the email is {others[0]['name']}'s")
+        same_name = same_person(by_id["name"], fold_name(response["last"]),
+                                fold_name(response["first"]))
+        if matches or same_name:
+            return by_id, "", ""
+        return None, "", (f"ID {student_id} is {by_id['name']}'s, "
+                          f"but neither the name nor the email agrees")
+    if len(matches) == 1:
+        return matches[0], f"matched by email, since nobody has ID {student_id}", ""
+    return None, "", f"nobody has ID {student_id} or this email"
+
+
+def exemption_state(grades, assessment):
+    """A test as D2L has it, across its versions -> ("exempt"|"marked"|"blank", item).
+
+    Across all of them, because a student can write on the other day. Exempt comes
+    first, as it does in gradebook.evaluate.
+    """
+    values = {item: grades.get(item) for item in assessment["items"]}
+    for item, value in values.items():
+        if value == gradebook.EXEMPT:
+            return "exempt", item
+    for item, value in values.items():
+        if value is not None:
+            return "marked", item
+    return "blank", None
+
+
+def run_exemptions(course, grades_dir, workbook):
+    """Compare the exemption form with D2L, and write a D2L import for what is outstanding.
+
+    A response goes in a file when it is approved, RECORDED is blank, and D2L has
+    nothing for that test yet. D2L's import reads the text Exempt as an exemption.
+
+    ONE FILE PER GRADE ITEM, so that no file has a blank cell: whether a blank leaves a
+    grade alone is something D2L's documents don't settle. A student with a mark is
+    only ever listed, so an upload can't touch a real grade. Rerunning is safe, as
+    anything already Exempt in the newest export is skipped.
+
+    The workbook is never written to, so RECORDED remains a job done by hand, and this
+    says which rows it applies to.
+    """
+    if not course.graded:
+        die("there are no grades to work from. See student-record --check.")
+    absent = course.absent_instructors()
+    if absent:
+        die(f"no class list from {', '.join(absent)}, so their students can't be placed.")
+    if workbook is None:
+        if not courseadmin.SETTINGS.get("exemption_workbook"):
+            die("add an exemption_workbook row to admin-settings.csv, "
+                "giving the form's workbook relative to your home.")
+        workbook = Path.home() / courseadmin.SETTINGS["exemption_workbook"]
+    if not workbook.is_file():
+        die(f"{workbook} not found.")
+
+    responses = read_exemption_form(workbook)
+
+    by_email = {}
+    for record in course.records.values():
+        emails = {record["email"].casefold()}
+        if record["d2l"]:
+            emails.add(record["d2l"]["email"].casefold())
+        for email in emails - {""}:
+            by_email.setdefault(email, []).append(record)
+
+    assessments = {a["title"].casefold(): a for a in course.assessments}
+    items = course.export["items"]
+    undecided, declined, follow_ups, to_fill_in, problems = [], [], [], [], []
+    uploads, tally, claimed, first_row = {}, {}, set(), {}
+
+    for response in responses:
+        row, test = response["row"], response["test"]
+        form_name = f"{response['first']} {response['last']}"
+        approved = response["approved"].casefold()
+        if not approved:
+            undecided.append(f"{form_name}, {test}, row {row}")
+            continue
+        if not approved.startswith("yes"):
+            declined.append(f"{form_name}, {test}, row {row}: APPROVED says {response['approved']!r}")
+            continue
+
+        counts = tally.setdefault(test, {"approved": 0, "exempt": 0, "upload": 0, "other": 0})
+        counts["approved"] += 1
+        record, note, problem = locate_student(response, course, by_email)
+
+        if "follow up" in approved:
+            where = record["section"] if record else "section unknown"
+            email = (record["email"] if record else "") or response["email"]
+            follow_ups.append(f"{record['name'] if record else form_name}, {where}, {email}, {test}")
+
+        assessment = assessments.get(test.casefold())
+        if not problem and not assessment:
+            problem = f"{test!r} is not in assessments.csv"
+        if not problem and not record["live"]:
+            problem = (f"{record['name']} dropped on {record['dropped']}" if record["dropped"]
+                       else f"{record['name']} is on no class list")
+        if not problem and not record["d2l"]:
+            problem = f"{record['name']} is not in D2L"
+        if problem:
+            counts["other"] += 1
+            problems.append(f"row {row}, {test}: {problem}")
+            continue
+
+        label = f"{record['name']}, {record['section']}, {test}, row {row}"
+        if note:
+            problems.append(f"row {row}, {test}: {record['name']}, {note} (still handled)")
+
+        key = (record["id"], assessment["title"])
+        if key in first_row:
+            counts["other"] += 1
+            problems.append(f"row {row}, {test}: {record['name']} already has row {first_row[key]}")
+            continue
+        first_row[key] = row
+        claimed.add(key)
+
+        state, item = exemption_state(record["d2l"]["grades"], assessment)
+        recorded = bool(response["recorded"])
+        if state == "exempt":
+            counts["exempt"] += 1
+            if not recorded:
+                to_fill_in.append(label)
+        elif state == "marked":
+            counts["other"] += 1
+            problems.append(f"{label}: has a mark on {item}, so it is in no file")
+        elif recorded:
+            counts["other"] += 1
+            problems.append(f"{label}: RECORDED is filled in, but D2L has no Exempt")
+        else:
+            versions = [i for i in assessment["items"] if gradebook.item_applies(i, record["day"])]
+            if len(versions) != 1:
+                counts["other"] += 1
+                problems.append(f"{label}: can't tell which version, since the section has no day")
+            elif versions[0] not in items:
+                counts["other"] += 1
+                problems.append(f"{label}: {versions[0]} is not in the D2L export")
+            else:
+                counts["upload"] += 1
+                uploads.setdefault(versions[0], []).append(record)
+
+    # What D2L has that the form can't account for. Any item at all, since an exemption
+    # may have been given some other way, and it is only ever listed.
+    title_of = {item: a["title"] for a in course.assessments for item in a["items"]}
+    unexplained = []
+    for student_id, student in course.export["students"].items():
+        for item, value in student["grades"].items():
+            if value == gradebook.EXEMPT and (student_id, title_of.get(item, item)) not in claimed:
+                record = course.records[student_id]
+                unexplained.append(f"{record['name']}, {record['section'] or 'no section'}, {item}")
+
+    print(paint(f"Exemptions: {len(responses)} form responses, {len(undecided)} not yet decided",
+                "heading")
+          + paint(f"  from the export of {course.export_stamp.strftime('%Y-%m-%d')}", "dim"))
+    print(paint(f"  {'':<10}{'approved':>9}{'in D2L':>8}{'to upload':>11}{'see below':>11}", "dim"))
+    for test in sorted(tally):
+        counts = tally[test]
+        print(f"  {test:<10}{counts['approved']:>9}{counts['exempt']:>8}"
+              f"{counts['upload']:>11}{counts['other']:>11}")
+
+    sections = (("Follow up", follow_ups, "cyan"),
+                ("Exempt in D2L, so fill in RECORDED", to_fill_in, "green"),
+                ("Look at these", problems, "yellow"),
+                ("Exempt in D2L with no approved response", sorted(unexplained), "yellow"),
+                ("Not decided yet", undecided, "dim"),
+                ("Not approved", declined, "dim"))
+    for heading, lines, colour in sections:
+        if lines:
+            print(paint(f"\n{heading} ({len(lines)})", "heading"))
+            for line in lines:
+                print(paint(f"  {line}", colour))
+
+    flush_report(tally=False)
+
+    if not uploads:
+        print(paint("\nNothing to upload.", "green"))
+        return 0
+    print(paint("\nTo upload, one file at a time", "heading"))
+    for item in title_of:
+        if item not in uploads:
+            continue
+        # Hyphens, so that "Test 3 (Thu)" makes a file name with no spaces or brackets.
+        slug = re.sub(r"[^A-Za-z0-9]+", "-", item).strip("-")
+        path = grades_dir / f"exemption-import-{slug}-{course.as_of}.csv"
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["OrgDefinedId", f"{item} Points Grade", "End-of-Line Indicator"])
+            for record in uploads[item]:
+                writer.writerow([record["id"], "Exempt", "#"])
+        print(paint(f"  {item}: {len(uploads[item])}, ", "green") + str(path))
+        for record in uploads[item]:
+            print(paint(f"    {record['name']}, {record['section']}", "dim"))
+    return 0
+
+
 def run_show(course, query):
     wanted = fold_name(query)
     found = [
@@ -873,6 +1134,7 @@ def main():
             "  student-record --class FR05A\n"
             "  student-record --emails FR05A\n"
             "  student-record --d2l-import\n"
+            "  student-record --exemptions\n"
             "  student-record --class --as-of 2026-11-06      as if it were that date\n"
             "  student-record --class --scheme ~/trial.csv    try a different grading scheme\n"
             "\n"
@@ -892,6 +1154,9 @@ def main():
     parser.add_argument("--check", action="store_true", help="what was read, and every warning")
     parser.add_argument("--d2l-import", action="store_true",
                         help="write the file that updates D2L's grade so far, beside the exports")
+    parser.add_argument("--exemptions", action="store_true",
+                        help="compare the exemption form with D2L, and write import files for "
+                             "what is approved and not yet there, beside the exports")
     parser.add_argument("--as-of", type=parse_date, default=date.today(), metavar="YYYY-MM-DD",
                         help="calculate as if it were this date")
 
@@ -907,6 +1172,9 @@ def main():
                          help="D2L exports (default: the Team's grades-exported-from-d2l)")
     sources.add_argument("--staff", type=Path, default=STAFF_CSV, metavar="F",
                          help="staff list (default: the Team's TAs-and-other-staff.csv)")
+    sources.add_argument("--exemption-workbook", type=Path, metavar="F",
+                         help="the exemption form's workbook, only ever read "
+                              "(default: exemption_workbook in admin-settings.csv)")
     sources.add_argument("--assessments", type=Path, default=ASSESSMENTS_CSV, metavar="F",
                          help="assessments and due dates (default: course-info/assessments.csv)")
     sources.add_argument("--scheme", type=Path, default=GRADING_SCHEME_CSV, metavar="F",
@@ -918,6 +1186,8 @@ def main():
         return run_check(course)
     if args.d2l_import:
         return run_d2l_import(course, args.grades_dir)
+    if args.exemptions:
+        return run_exemptions(course, args.grades_dir, args.exemption_workbook)
     if args.class_section is not None:
         return run_class(course, args.class_section)
     if args.emails is not None:
