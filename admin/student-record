@@ -694,6 +694,10 @@ def run_d2l_import(course, grades_dir):
     return 0
 
 
+# What a RECORDED cell says when it means "D2L has this". Anything else is a note.
+RECORDED_CLAIM = re.compile(r"(yes|y|x|done|recorded)\b", re.IGNORECASE)
+
+
 def cell_text(cell):
     """A workbook cell as text. A number can arrive as 3712345 or as 3712345.0."""
     if isinstance(cell, float) and cell.is_integer():
@@ -803,6 +807,10 @@ def run_exemptions(course, grades_dir, workbook):
 
     The workbook is never written to, so RECORDED remains a job done by hand, and this
     says which rows it applies to.
+
+    RECORDED CAN ALSO CLOSE A ROW. A plain "yes" says D2L has it, and that claim is
+    checked. Anything else, such as "No need; DROPPED", is a decision already made, so
+    that row is printed back with its note, whatever else might be true of it.
     """
     if not course.graded:
         die("there are no grades to work from. See student-record --check.")
@@ -829,13 +837,26 @@ def run_exemptions(course, grades_dir, workbook):
 
     assessments = {a["title"].casefold(): a for a in course.assessments}
     items = course.export["items"]
-    undecided, declined, follow_ups, to_fill_in, problems = [], [], [], [], []
+    undecided, declined, to_fill_in, problems, closed = [], [], [], [], []
     uploads, tally, claimed, first_row = {}, {}, set(), {}
+    blank_counts = dict.fromkeys(("approved", "exempt", "upload", "other", "closed"), 0)
 
     for response in responses:
         row, test = response["row"], response["test"]
         form_name = f"{response['first']} {response['last']}"
         approved = response["approved"].casefold()
+
+        if response["recorded"] and not RECORDED_CLAIM.match(response["recorded"]):
+            record, _note, _problem = locate_student(response, course, by_email)
+            closed.append(f"{record['name'] if record else form_name}, {test}, row {row}: "
+                          f"{response['recorded']}")
+            tally.setdefault(test, dict(blank_counts))["closed"] += 1
+            # So that an Exempt on this test isn't then listed as having no response.
+            assessment = assessments.get(test.casefold())
+            if record and assessment:
+                claimed.add((record["id"], assessment["title"]))
+            continue
+
         if not approved:
             undecided.append(f"{form_name}, {test}, row {row}")
             continue
@@ -843,14 +864,9 @@ def run_exemptions(course, grades_dir, workbook):
             declined.append(f"{form_name}, {test}, row {row}: APPROVED says {response['approved']!r}")
             continue
 
-        counts = tally.setdefault(test, {"approved": 0, "exempt": 0, "upload": 0, "other": 0})
+        counts = tally.setdefault(test, dict(blank_counts))
         counts["approved"] += 1
         record, note, problem = locate_student(response, course, by_email)
-
-        if "follow up" in approved:
-            where = record["section"] if record else "section unknown"
-            email = (record["email"] if record else "") or response["email"]
-            follow_ups.append(f"{record['name'] if record else form_name}, {where}, {email}, {test}")
 
         assessment = assessments.get(test.casefold())
         if not problem and not assessment:
@@ -914,16 +930,17 @@ def run_exemptions(course, grades_dir, workbook):
     print(paint(f"Exemptions: {len(responses)} form responses, {len(undecided)} not yet decided",
                 "heading")
           + paint(f"  from the export of {course.export_stamp.strftime('%Y-%m-%d')}", "dim"))
-    print(paint(f"  {'':<10}{'approved':>9}{'in D2L':>8}{'to upload':>11}{'see below':>11}", "dim"))
+    print(paint(f"  {'':<10}{'approved':>9}{'in D2L':>8}{'to upload':>11}{'see below':>11}"
+                f"{'closed':>8}", "dim"))
     for test in sorted(tally):
         counts = tally[test]
         print(f"  {test:<10}{counts['approved']:>9}{counts['exempt']:>8}"
-              f"{counts['upload']:>11}{counts['other']:>11}")
+              f"{counts['upload']:>11}{counts['other']:>11}{counts['closed']:>8}")
 
-    sections = (("Follow up", follow_ups, "cyan"),
-                ("Exempt in D2L, so fill in RECORDED", to_fill_in, "green"),
+    sections = (("Exempt in D2L, so fill in RECORDED", to_fill_in, "green"),
                 ("Look at these", problems, "yellow"),
                 ("Exempt in D2L with no approved response", sorted(unexplained), "yellow"),
+                ("Closed off in RECORDED", closed, "dim"),
                 ("Not decided yet", undecided, "dim"),
                 ("Not approved", declined, "dim"))
     for heading, lines, colour in sections:

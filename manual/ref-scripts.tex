@@ -276,7 +276,9 @@ The D2L grade item it fills is named by an optional \texttt{grade\_so\_far\_item
 The workbook needs columns \texttt{Student ID}, \texttt{Email}, \texttt{First name}, \texttt{Last name}, \texttt{APPROVED}, \texttt{RECORDED} and one whose heading contains ``select the test'', and the student's explanation is never read.
 For a response that is approved, with \texttt{RECORDED} blank and nothing in D2L for that test, it writes \texttt{Exempt} to a file for the version the student's section writes, one file per grade item, beside the exports.
 A student with a mark, or whose ID disagrees with both their email and their name, goes in no file and is listed instead.
-It also names approvals containing ``follow up'', rows whose \texttt{RECORDED} can now be filled in, and any \texttt{Exempt} in D2L with no approved response.
+It also names rows whose \texttt{RECORDED} can now be filled in, and any \texttt{Exempt} in D2L with no approved response.
+A \texttt{RECORDED} beginning \texttt{yes}, \texttt{y}, \texttt{x}, \texttt{done} or \texttt{recorded} says D2L has the exemption, and is checked against the export.
+Anything else, such as \texttt{No need; DROPPED}, closes the row: it goes in no file and no warning, and is printed back with its note.
 \texttt{-{}-check} names anyone on a class list who is not in D2L, and anyone in D2L who is on no class list and is not known staff.
 D2L's gradebook also holds the teaching team, and staff are recognised from \file{instructors.csv}, \file{course-sections.csv} and \file{TAs-and-other-staff.csv} in the Team's \file{student-records-that-we-maintain}.
 That last file has columns \texttt{name} (first then last), \texttt{ID} and \texttt{email}, and it is the reliable one, since an ID or email matches however the name is written in D2L.
