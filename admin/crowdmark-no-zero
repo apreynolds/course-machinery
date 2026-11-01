@@ -15,8 +15,8 @@
 # A BLANK IS NOT A 0. Crowdmark's blank means no score was entered:
 #   - all questions blank: nobody to check, usually someone who did not write.
 #     They are left off the list and only counted.
-#   - some questions blank: on the list, because no 0 was entered. The blank shows
-#     as "-" in their row, in case that is where the marking is unfinished.
+#   - some questions blank: on the list, because no 0 was entered. So a run before
+#     marking is finished lists extra students, and nothing in the row says so.
 #
 # IT WRITES NOTHING, and prints names and grades only to the terminal.
 
@@ -33,8 +33,8 @@ from courseadmin import TEAM_DIR
 EXPORTS_DIR = TEAM_DIR / "General" / "crowdmark-exports"
 
 # The columns this script prints or uses, besides the questions themselves.
-# Crowdmark ID is the booklet number, so it prints under the heading Booklet.
-REQUIRED_COLUMNS = ("Crowdmark ID", "Name", "Student ID Number")
+# Crowdmark ID is the booklet number, so it prints under the heading Book.
+REQUIRED_COLUMNS = ("Crowdmark ID", "Name")
 
 # Questions are found by their header, Q1, Q2, ..., so a test with a different
 # number of questions needs no edit here. MC-total does not match, on purpose.
@@ -80,12 +80,11 @@ def is_zero(score):
         return False
 
 
-def lowest_questions(row, questions):
+def lowest_question(row, questions):
     """Return the number of the lowest-scored question, as text: Q4 gives "4".
 
-    Several questions tied for lowest are all named, as "2,5", because picking one
-    would be a decision about which to leave unmarked. Scores are compared as raw
-    points. Blanks and text have no score, so they cannot be the lowest.
+    If several tie for lowest, this is the first of them. Scores are compared as
+    raw points. Blanks and text have no score, so they cannot be the lowest.
     """
     scores = {}
     for question in questions:
@@ -97,9 +96,11 @@ def lowest_questions(row, questions):
 
     if not scores:
         return "-"
-    lowest = min(scores.values())
-    # question[1:] drops the Q from the front of the column name.
-    return ",".join(q[1:] for q, score in scores.items() if score == lowest)
+    # min() keeps the first of any tie, and scores is in column order, so a tie
+    # goes to the earliest question. key=scores.get compares scores, not names.
+    lowest = min(scores, key=scores.get)
+    # lowest[1:] drops the Q from the front of the column name.
+    return lowest[1:]
 
 
 def read_export(path):
@@ -174,19 +175,12 @@ def main():
     if not no_zero:
         return
 
-    # Blanks print as "-" so that the columns stay readable.
     table = [
-        [
-            row["Crowdmark ID"],
-            lowest_questions(row, questions),
-            row["Name"],
-            row["Student ID Number"],
-        ]
-        + [(row[question] or "").strip() or "-" for question in questions]
+        [row["Crowdmark ID"], lowest_question(row, questions), row["Name"]]
         for row in no_zero
     ]
     print()
-    print_table(["Booklet", "Lowest", "Name", "ID"] + questions, table)
+    print_table(["Book", "Lowest", "Name"], table)
 
 
 if __name__ == "__main__":
