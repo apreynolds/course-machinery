@@ -33,7 +33,8 @@ from courseadmin import TEAM_DIR
 EXPORTS_DIR = TEAM_DIR / "General" / "crowdmark-exports"
 
 # The columns this script prints or uses, besides the questions themselves.
-REQUIRED_COLUMNS = ("Name", "Student ID Number", "Email", "Score URL")
+# Crowdmark ID is the booklet number, so it prints under the heading Booklet.
+REQUIRED_COLUMNS = ("Crowdmark ID", "Name", "Student ID Number", "Email", "Score URL")
 
 # Questions are found by their header, Q1, Q2, ..., so a test with a different
 # number of questions needs no edit here. MC-total does not match, on purpose.
@@ -153,13 +154,13 @@ def main():
 
     # Blanks print as "-" so that the columns stay readable.
     table = [
-        [row["Name"], row["Student ID Number"], row["Email"]]
+        [row["Crowdmark ID"], row["Name"], row["Student ID Number"], row["Email"]]
         + [(row[question] or "").strip() or "-" for question in questions]
         + [row["Score URL"]]
         for row in no_zero
     ]
     print()
-    print_table(["Name", "ID", "Email"] + questions + ["Score URL"], table)
+    print_table(["Booklet", "Name", "ID", "Email"] + questions + ["Score URL"], table)
 
 
 if __name__ == "__main__":
