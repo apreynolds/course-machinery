@@ -54,6 +54,7 @@ import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
@@ -707,9 +708,15 @@ def read_exemption_form(path):
     IS NEVER READ, since it can be medical and nothing below needs it. The form's own
     Id column is a response number, not a student ID, and is not read either.
     """
-    book = load_workbook(path, read_only=True, data_only=True)
-    rows = list(book.worksheets[0].iter_rows(values_only=True))
-    book.close()
+    # It lives in OneDrive, which can be mid-sync just after an edit: the read then
+    # times out, or finds a partial file, and either is usually cured by waiting.
+    try:
+        book = load_workbook(path, read_only=True, data_only=True)
+        rows = list(book.worksheets[0].iter_rows(values_only=True))
+        book.close()
+    except (OSError, zipfile.BadZipFile) as error:
+        die(f"could not read {path.name} ({error}). If it was edited just now, OneDrive "
+            f"may still be syncing it, so wait a minute and run this again. Nothing was written.")
     if not rows:
         die(f"{path.name} is empty.")
 
