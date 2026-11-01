@@ -302,8 +302,9 @@ It writes nothing.
 \end{manexsource}
 
 \texttt{FILE} is a csv in the Team's \file{General/crowdmark-exports}, and without one the script reads the most recently changed csv there.
-It needs the columns \texttt{Crowdmark ID}, \texttt{Name}, \texttt{Student ID Number}, \texttt{Email} and \texttt{Score URL}, and it treats every column named \texttt{Q} and a number as a question.
+It needs the columns \texttt{Crowdmark ID}, \texttt{Name} and \texttt{Student ID Number}, and it treats every column named \texttt{Q} and a number as a question.
 \texttt{Crowdmark ID} is the booklet number, and it prints under the heading \texttt{Booklet}.
+The \texttt{Lowest} column gives the number of the question with the fewest raw points, or all of them if several tie.
 A student with every question blank is counted but not listed.
 A student with only some questions blank is listed, with each blank shown as a dash.
 A 0 the student earned looks the same as a 0 for the question left out, so the list cannot catch a student who has one of those and made no choice.

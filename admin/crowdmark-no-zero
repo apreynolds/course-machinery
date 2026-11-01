@@ -34,7 +34,7 @@ EXPORTS_DIR = TEAM_DIR / "General" / "crowdmark-exports"
 
 # The columns this script prints or uses, besides the questions themselves.
 # Crowdmark ID is the booklet number, so it prints under the heading Booklet.
-REQUIRED_COLUMNS = ("Crowdmark ID", "Name", "Student ID Number", "Email", "Score URL")
+REQUIRED_COLUMNS = ("Crowdmark ID", "Name", "Student ID Number")
 
 # Questions are found by their header, Q1, Q2, ..., so a test with a different
 # number of questions needs no edit here. MC-total does not match, on purpose.
@@ -78,6 +78,28 @@ def is_zero(score):
     except ValueError:
         # A blank, or any text. Not a 0, and the row prints it for a person to see.
         return False
+
+
+def lowest_questions(row, questions):
+    """Return the number of the lowest-scored question, as text: Q4 gives "4".
+
+    Several questions tied for lowest are all named, as "2,5", because picking one
+    would be a decision about which to leave unmarked. Scores are compared as raw
+    points. Blanks and text have no score, so they cannot be the lowest.
+    """
+    scores = {}
+    for question in questions:
+        try:
+            scores[question] = float(row[question])
+        except (TypeError, ValueError):
+            # float("") raises ValueError, and a short row gives None: TypeError.
+            continue
+
+    if not scores:
+        return "-"
+    lowest = min(scores.values())
+    # question[1:] drops the Q from the front of the column name.
+    return ",".join(q[1:] for q, score in scores.items() if score == lowest)
 
 
 def read_export(path):
@@ -154,13 +176,17 @@ def main():
 
     # Blanks print as "-" so that the columns stay readable.
     table = [
-        [row["Crowdmark ID"], row["Name"], row["Student ID Number"], row["Email"]]
+        [
+            row["Crowdmark ID"],
+            lowest_questions(row, questions),
+            row["Name"],
+            row["Student ID Number"],
+        ]
         + [(row[question] or "").strip() or "-" for question in questions]
-        + [row["Score URL"]]
         for row in no_zero
     ]
     print()
-    print_table(["Booklet", "Name", "ID", "Email"] + questions + ["Score URL"], table)
+    print_table(["Booklet", "Lowest", "Name", "ID"] + questions, table)
 
 
 if __name__ == "__main__":
