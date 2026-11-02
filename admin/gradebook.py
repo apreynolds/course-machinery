@@ -24,6 +24,12 @@
 #                 alone, and two are weighted 1:3.
 #   best-track    each row names a track, the scores in a track are averaged, and
 #                 the student gets whichever track is higher.
+#   best-k-pooled each row names a track, and every score past due in any track
+#                 goes in one pool. The best k of the pool are averaged, where k
+#                 is the number past due in the track with the fewest, so a
+#                 student who switched systems part way loses nothing. Never
+#                 below what best-track gives. k is 0, and the category left
+#                 out, until every track has something due.
 #   single        a plain average, which for one assessment is just its score.
 #
 # WHEN A SCORE COUNTS. A due date has passed only on the day AFTER it, since work
@@ -51,7 +57,10 @@ from courseadmin import ASSESSMENTS_CSV, GRADING_SCHEME_CSV, die, warn
 
 EXEMPT = "exempt"
 
-RULES = ("ranked-1-2-3", "best-track", "single")
+RULES = ("ranked-1-2-3", "best-track", "best-k-pooled", "single")
+
+# Rules whose assessments each name a track.
+TRACK_RULES = ("best-track", "best-k-pooled")
 
 # Rules whose scores are entered by someone after the fact, rather than arriving
 # as the work is done. Only these can be blank because marking is unfinished.
@@ -121,9 +130,9 @@ def read_assessments(scheme, path=ASSESSMENTS_CSV):
                     f"grading-scheme.csv ({', '.join(scheme)}).")
 
             track = (row.get("track") or "").strip()
-            if scheme[category]["rule"] == "best-track" and not track:
+            if scheme[category]["rule"] in TRACK_RULES and not track:
                 die(f"{path.name} line {number}: {title} needs a track, because "
-                    f"{category} uses the best-track rule.")
+                    f"{category} uses the {scheme[category]['rule']} rule.")
 
             text = (row.get("due-date") or "").strip()
             due = None
@@ -395,14 +404,8 @@ def apply_ranked(result):
     result["average"] = mean([e["percent"] for e in ordered])
 
 
-def apply_best_track(result):
-    """The best-track rule.
-
-    A TRACK WITH NOTHING DUE CANNOT BE COMPARED. If a student's work is all in a
-    track with no due dates passed, its average so far beating the other track
-    means the better track is unknown, so the category is left out of the mark and
-    says so. Otherwise that student would be given the other track's 0.
-    """
+def group_tracks(result):
+    """Sort a category's evaluations into its tracks, as result["tracks"]."""
     tracks = OrderedDict()
     for evaluation in result["evaluations"]:
         tracks.setdefault(evaluation["assessment"]["track"], []).append(evaluation)
@@ -420,6 +423,38 @@ def apply_best_track(result):
             "has_work": any(e["percent"] for e in evaluations),
         }
 
+    if sum(info["has_work"] for info in result["tracks"].values()) > 1:
+        result["both_tracks"] = True
+
+
+def apply_best_k_pooled(result):
+    """The best-k-pooled rule. Marks each evaluation that counts with `chosen'.
+
+    k COMES FROM THE TRACK WITH FEWEST DUE, so that mid-term an ALEKS student
+    isn't averaged with a WeBWorK zero just because more quizzes have come due.
+    An Exempt is left out of its track's count, as everywhere else.
+    """
+    group_tracks(result)
+    result["k"] = min(info["due"] for info in result["tracks"].values())
+    # sorted() keeps equal scores in their listed order, so a tie is stable.
+    pool = sorted(counting(result["evaluations"]), key=lambda e: e["percent"], reverse=True)
+    best = pool[:result["k"]]
+    for evaluation in best:
+        evaluation["chosen"] = True
+    if best:
+        result["value"] = mean([e["percent"] for e in best])
+
+
+def apply_best_track(result):
+    """The best-track rule.
+
+    A TRACK WITH NOTHING DUE CANNOT BE COMPARED. If a student's work is all in a
+    track with no due dates passed, its average so far beating the other track
+    means the better track is unknown, so the category is left out of the mark and
+    says so. Otherwise that student would be given the other track's 0.
+    """
+    group_tracks(result)
+
     decided = [(info["value"], track) for track, info in result["tracks"].items()
                if info["value"] is not None]
     # max() on (value, track) would break a tie by name; this keeps the listed order.
@@ -427,9 +462,6 @@ def apply_best_track(result):
     for value, track in decided:
         if best is None or value > best[0]:
             best = (value, track)
-
-    if sum(info["has_work"] for info in result["tracks"].values()) > 1:
-        result["both_tracks"] = True
 
     best_value = best[0] if best else None
     for info in result["tracks"].values():
@@ -449,6 +481,7 @@ def apply_single(result):
 APPLY_RULE = {
     "ranked-1-2-3": apply_ranked,
     "best-track": apply_best_track,
+    "best-k-pooled": apply_best_k_pooled,
     "single": apply_single,
 }
 
@@ -464,7 +497,7 @@ def standing(grades, day, assessments, scheme, export_items, progress, as_of):
         categories[category] = {
             "weight": entry["weight"], "rule": entry["rule"], "evaluations": [],
             "value": None, "average": None, "tracks": None, "best_track": None,
-            "undetermined": False, "both_tracks": False,
+            "undetermined": False, "both_tracks": False, "k": None,
         }
 
     for assessment in assessments:
