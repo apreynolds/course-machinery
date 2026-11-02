@@ -389,8 +389,9 @@ def points(value):
 def describe(evaluation, record, course, counts=True):
     """One assessment's line: what they got, and how that compares.
 
-    `counts' is False for a homework track that is not the student's better one.
-    A blank there is no cause for alarm, since nobody is meant to do both.
+    `counts' is False for a homework item the student's mark doesn't use: one in
+    the track that isn't their better one, or outside their best k. A blank there
+    is no cause for alarm, since nobody is meant to do both systems.
     """
     item, status = evaluation["item"], evaluation["status"]
     label = f"  {item:<34}"
@@ -415,6 +416,8 @@ def describe(evaluation, record, course, counts=True):
             + shade(f"{percent(evaluation['percent']):>6}", evaluation["percent"]))
     if status == "not-due":
         text += paint("  still open", "dim")
+    elif not counts:
+        text += paint("  not counted", "dim")
     if "times" in evaluation:
         text += f"  x{evaluation['times']}"
 
@@ -447,15 +450,25 @@ def render_grades(record, course):
                 heading += "   " + paint("left out: its better track is not due yet", "yellow")
             elif category["best_track"]:
                 heading += f"   {category['best_track']} {percent(category['value'])}"
+        elif category["rule"] == "best-k-pooled":
+            if category["k"]:
+                heading += f"   best {category['k']} of both {percent(category['value'])}"
+            else:
+                heading += "   " + paint("left out: not every track has something due", "yellow")
         else:
             heading += f"   {percent(category['value'])}"
         lines.append(paint(heading, "heading"))
 
-        if category["rule"] == "best-track":
+        if category["rule"] in gradebook.TRACK_RULES:
+            pooled = category["rule"] == "best-k-pooled"
             for track, info in category["tracks"].items():
-                lines.append(f" {track}: {percent(info['value'])}, {info['due']} due so far")
-                counts = track == category["best_track"]
-                lines.extend(describe(e, record, course, counts) for e in info["evaluations"])
+                if pooled:
+                    lines.append(f" {track}: {info['due']} due so far")
+                else:
+                    lines.append(f" {track}: {percent(info['value'])}, {info['due']} due so far")
+                for e in info["evaluations"]:
+                    counts = e.get("chosen", False) if pooled else track == category["best_track"]
+                    lines.append(describe(e, record, course, counts))
             if category["both_tracks"]:
                 lines.append(" " + paint("Has work in more than one track.", "yellow"))
         else:
@@ -636,7 +649,7 @@ SHEET_KEY = (
     "Exempt: left out, and the rest of the category is calculated without it.",
     "Not marked: the test's marks have not been entered, so it is left out for now.",
     "Not due: left out. A grey score on one of these can still change.",
-    "A homework item is grey or empty when its system is not the student's higher one.",
+    "A homework item is grey or empty when it is not one of the scores counted.",
 )
 
 
@@ -693,7 +706,8 @@ def spreadsheet_row(record, course, titles):
 
     # A student who isn't in D2L still gets a row, with nothing in the marks.
     if not record["d2l"]:
-        blanks = 1 + sum(1 + (e["rule"] == "best-track") for e in course.scheme.values()) + len(titles)
+        blanks = (1 + sum(1 + (e["rule"] in gradebook.TRACK_RULES) for e in course.scheme.values())
+                  + len(titles))
         return cells + [(None, None)] * blanks
 
     result = course.standing_of(record)
@@ -715,6 +729,14 @@ def spreadsheet_row(record, course, titles):
                 for evaluation in details["evaluations"]:
                     items[evaluation["assessment"]["title"]] = spreadsheet_item(
                         evaluation, track == category["best_track"])
+        elif category["rule"] == "best-k-pooled":
+            if category["k"]:
+                cells.append((f"Best {category['k']} of both", None))
+            else:
+                cells.append(("Not decided yet", SHEET_GREY))
+            for evaluation in category["evaluations"]:
+                items[evaluation["assessment"]["title"]] = spreadsheet_item(
+                    evaluation, evaluation.get("chosen", False))
         else:
             for evaluation in category["evaluations"]:
                 items[evaluation["assessment"]["title"]] = spreadsheet_item(evaluation, True)
@@ -740,7 +762,7 @@ def write_spreadsheet(course, path):
                 "SAC list", "Writes at SAC", "Mark so far (%)"]
     for name, entry in course.scheme.items():
         headings.append(f"{name} (%)")
-        if entry["rule"] == "best-track":
+        if entry["rule"] in gradebook.TRACK_RULES:
             headings.append(f"{name}: counted")
     headings += titles
 

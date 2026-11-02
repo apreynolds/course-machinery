@@ -42,6 +42,7 @@ Module 3,,Online homework,ALEKS,Module 3 - Derivatives
 Final Exam,2026-12-15,Final Exam,,
 """)
 (work / "scheme.csv").write_text("category,weight,rule\nTests,40,ranked-1-2-3\nOnline homework,10,best-track\nFinal Exam,50,single\n")
+(work / "pooled.csv").write_text("category,weight,rule\nTests,40,ranked-1-2-3\nOnline homework,10,best-k-pooled\nFinal Exam,50,single\n")
 
 COLUMNS = {
     "T1U": ("Test 1 (Tue)", 30, "Tests"), "T1H": ("Test 1 (Thu)", 30, "Tests"),
@@ -92,6 +93,9 @@ S = {
                 dict(T1H=15, T2H=15, T3H=15)),
     "1000013": (f"Nu, Nia cross-listed as MATH*1003*{thu}", "Nu", "Nia",
                 dict(T1H=15, T2H=15, T3H=15, T4H=15)),
+    # Switched from ALEKS to WeBWorK, and no tests. Best track: WW 35, ALEKS 40.
+    "1000014": (f"Xi, Xia cross-listed as MATH*1003*{thu}", "Xi", "Xia",
+                dict(M1=80, G2=70)),
 }
 
 roster_name = f"section-rosters_MATH_1003_{nominal}_2026-10-25_9_06 PM.csv"
@@ -137,11 +141,11 @@ sheet.append(["Nobody", "Here", thu, None, "no"])        # matches nobody
 book.save(work / "sac.xlsx")
 
 
-def course(as_of):
+def course(as_of, scheme="scheme.csv"):
     args = argparse.Namespace(
         as_of=as_of, roster_dir=work / "rosters", sac_workbook=work / "sac.xlsx",
         staff=work / "no-staff-file.csv",
-        grades_dir=work / "grades", assessments=work / "assessments.csv", scheme=work / "scheme.csv",
+        grades_dir=work / "grades", assessments=work / "assessments.csv", scheme=work / scheme,
     )
     return sr.Course(args)
 
@@ -233,6 +237,34 @@ h = early.standing_of(early.records["1000002"])
 check("undetermined: left out", h["categories"]["Online homework"]["undetermined"], True)
 check("undetermined: mark from tests alone", h["mark"], 60.0)
 check("undetermined: due weight", h["due_weight"], 40.0)
+
+check("switched: best track penalises", home("1000014")["value"], 40.0)
+
+# The pooled rule. On 30 Oct two are due in each track, so k = 2.
+pooled = course(date(2026, 10, 30), "pooled.csv")
+ph = lambda k: pooled.standing_of(pooled.records[k])["categories"]["Online homework"]
+check("pooled: k from the tracks", ph("1000001")["k"], 2)
+check("pooled: WeBWorK only", ph("1000001")["value"], 82.0)
+check("pooled: ALEKS only", ph("1000002")["value"], 60.0)
+check("pooled: some of each", ph("1000003")["value"], (50 + 10) / 2)
+check("pooled: switched loses nothing", ph("1000014")["value"], 75.0)
+chosen = [e["assessment"]["title"] for e in ph("1000014")["evaluations"] if e.get("chosen")]
+check("pooled: which counted", chosen, ["Gateway Quiz 2", "Module 1"])
+check("pooled: mark", pooled.standing_of(pooled.records["1000002"])["mark"], (40 * 82.5 + 10 * 60) / 50)
+# Never below best-track, for anyone with a value under both.
+lower = [k for k in c.records if c.records[k]["d2l"]
+         and home(k)["value"] is not None and ph(k)["value"] < home(k)["value"] - 1e-9]
+check("pooled: never below best-track", lower, [])
+
+# 25 Nov: three Gateways due but two Modules (Module 3 is undated), so k stays 2.
+pooled = course(date(2026, 11, 25), "pooled.csv")
+check("pooled: k is the smaller track", ph("1000001")["k"], 2)
+check("pooled: best two of three", ph("1000001")["value"], 95.0)
+
+# 28 Sep: a Gateway is due but no Module, so nothing can be counted yet.
+pooled = course(date(2026, 9, 28), "pooled.csv")
+check("pooled: k 0 before every track is due", ph("1000002")["k"], 0)
+check("pooled: left out", ph("1000002")["value"], None)
 
 print("\nFAILURES:", failures)
 sys.exit(1 if failures else 0)
