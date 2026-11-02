@@ -275,6 +275,7 @@ DEFAULT_ROSTER_DIR = SHARED_DIR / "exported-classlists"
 RECORDS_DIR = SHARED_DIR / "student-records-that-we-maintain"
 SAC_STUDENTS_XLSX = RECORDS_DIR / "sac-students.xlsx"
 STAFF_CSV = RECORDS_DIR / "TAs-and-other-staff.csv"
+GRADES_SPREADSHEET = RECORDS_DIR / "grades-thus-far.xlsx"
 GRADES_DIR = SHARED_DIR / "grades-exported-from-d2l"
 
 # Where the finished paperwork goes: the Team's Tests/ADMIN, beside the tests

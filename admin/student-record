@@ -9,7 +9,8 @@
 #        student-record --class [SECTION]   how the class, or one section, is doing
 #        student-record --emails SECTION    copy the emails of everyone in a section
 #        student-record --check             what was read, and every warning
-#        student-record --d2l-import        write the file that updates D2L's grade so far
+#        student-record --d2l-import        write the file that updates D2L's grade so far,
+#                                           and the spreadsheet for colleagues
 #        student-record --exemptions        compare the exemption form with D2L, and write
 #                                           the files that record what is approved
 #
@@ -21,12 +22,14 @@
 #   --scheme F          (default: course-info/grading-scheme.csv)
 #   --staff F           (default: the Team's TAs-and-other-staff.csv)
 #   --exemption-workbook F  (default: exemption_workbook in admin-settings.csv)
+#   --spreadsheet F     (default: the Team's grades-thus-far.xlsx)
 #
 # In the interactive search, Tab marks several students and Enter copies all of
 # their emails, separated by semicolons, ready for Outlook's To line.
 #
 # IT WRITES NOTHING, except the files --d2l-import and --exemptions are asked for,
-# which it puts beside the D2L exports. Every file is read fresh on each run and there is no cache,
+# which go beside the D2L exports, and the Team's spreadsheet, which --d2l-import
+# replaces. Every file is read fresh on each run and there is no cache,
 # because a cache would be one more copy of names and grades on disk. The preview
 # text travels inside fzf's input for the same reason.
 #
@@ -50,6 +53,7 @@
 
 import argparse
 import csv
+import os
 import re
 import shutil
 import subprocess
@@ -58,15 +62,19 @@ import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 import courseadmin
 import gradebook
 from courseadmin import (
     ASSESSMENTS_CSV,
     COURSE_NUMBER,
+    DATA_DIR,
     DEFAULT_ROSTER_DIR,
     GRADES_DIR,
+    GRADES_SPREADSHEET,
     GRADING_SCHEME_CSV,
     INSTRUCTORS_CSV,
     SAC_STUDENTS_XLSX,
@@ -615,8 +623,192 @@ def run_emails(course, section):
     return 0
 
 
-def run_d2l_import(course, grades_dir):
+# The spreadsheet's colours, which stand in for the terminal's.
+SHEET_RED = Font(color="C00000")
+SHEET_GREY = Font(color="808080")
+SHEET_BOLD = Font(bold=True)
+SHEET_HEADER_FILL = PatternFill("solid", fgColor="DDEBF7")
+
+SHEET_KEY = (
+    "What the cells mean",
+    "Each score is a percentage. Grey means it is not counting towards the mark.",
+    "Missing: past due and blank, so it counts as 0.",
+    "Exempt: left out, and the rest of the category is calculated without it.",
+    "Not marked: the test's marks have not been entered, so it is left out for now.",
+    "Not due: left out. A grey score on one of these can still change.",
+    "A homework item is grey or empty when its system is not the student's higher one.",
+)
+
+
+def spreadsheet_score(value):
+    """A percentage for its cell -> (value, font), red if it is failing."""
+    return round(value, 1), (SHEET_RED if value < 50 else None)
+
+
+def spreadsheet_item(evaluation, counts):
+    """One assessment's cell -> (value, font). `counts' as in describe()."""
+    status = evaluation["status"]
+    if status == "exempt":
+        return "Exempt", None
+    if status == "not-in-export":
+        return "Not in D2L", SHEET_GREY
+    if status == "pending":
+        return "Not marked", SHEET_GREY
+    if status == "not-due" and evaluation["score"] is None:
+        return "Not due", SHEET_GREY
+    if status == "not-due" or not counts:
+        # An uncounted blank is left empty, since nobody is meant to do both systems.
+        if evaluation["score"] is None:
+            return None, None
+        return round(evaluation["percent"], 1), SHEET_GREY
+    if status == "missing":
+        return "Missing", SHEET_RED
+    return spreadsheet_score(evaluation["percent"])
+
+
+def spreadsheet_status(record):
+    if record["dropped"]:
+        return f"Dropped {record['dropped']}"
+    status = "Registered"
+    for section, when in record["moved"]:
+        status += f", moved from {section} on {when}"
+    if record["other_sections"]:
+        status += f", also listed in {', '.join(record['other_sections'])}"
+    return status if record["d2l"] else status + ", not in D2L"
+
+
+def spreadsheet_row(record, course, titles):
+    """One student's cells, in the order spreadsheet_headings gives -> [(value, font)]."""
+    info = course.sections.get(record["section"]) or {}
+    sac = record["sac"]
+    if sac:
+        on_list, where = "Yes", sac["where"]
+    else:
+        on_list, where = ("No" if course.sac_read else "Could not read"), ""
+    cells = [(value, None) for value in (
+        record["name"], record["id"], record["email"], record["section"], info.get("day"),
+        info.get("room"), info.get("ta"), info.get("instructor"), spreadsheet_status(record),
+        on_list, where,
+    )]
+
+    # A student who isn't in D2L still gets a row, with nothing in the marks.
+    if not record["d2l"]:
+        blanks = 1 + sum(1 + (e["rule"] == "best-track") for e in course.scheme.values()) + len(titles)
+        return cells + [(None, None)] * blanks
+
+    result = course.standing_of(record)
+    mark = result["mark"]
+    cells.append(spreadsheet_score(mark) if mark is not None else (None, None))
+
+    items = {}
+    for category in result["categories"].values():
+        if category["value"] is not None:
+            cells.append(spreadsheet_score(category["value"]))
+        else:
+            cells.append((None, None))
+        if category["rule"] == "best-track":
+            if category["undetermined"]:
+                cells.append(("Not decided yet", SHEET_GREY))
+            else:
+                cells.append((category["best_track"], None))
+            for track, details in category["tracks"].items():
+                for evaluation in details["evaluations"]:
+                    items[evaluation["assessment"]["title"]] = spreadsheet_item(
+                        evaluation, track == category["best_track"])
+        else:
+            for evaluation in category["evaluations"]:
+                items[evaluation["assessment"]["title"]] = spreadsheet_item(evaluation, True)
+    return cells + [items[title] for title in titles]
+
+
+def write_spreadsheet(course, path):
+    """Replace the colleagues' spreadsheet: one row per student on a class list.
+
+    The same figures as --show, for people who won't run this. Registered students
+    come first and dropped ones last, and staff aren't on a class list, so aren't here.
+
+    NOBODY'S EDITS SURVIVE, and the top of the sheet says so. Saved under a temporary
+    name and then swapped in, so a failure can't leave half a file for OneDrive to sync.
+    """
+    # A category of one assessment, such as the final, would only repeat its own score.
+    in_category = {}
+    for assessment in course.assessments:
+        in_category.setdefault(assessment["category"], []).append(assessment["title"])
+    titles = [a["title"] for a in course.assessments if len(in_category[a["category"]]) > 1]
+
+    headings = ["Name", "ID", "Email", "Section", "Day", "Room", "TA", "Instructor", "Status",
+                "SAC list", "Writes at SAC", "Mark so far (%)"]
+    for name, entry in course.scheme.items():
+        headings.append(f"{name} (%)")
+        if entry["rule"] == "best-track":
+            headings.append(f"{name}: counted")
+    headings += titles
+
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "Grades thus far"
+    lists = ", ".join(f"{who} {exported.strftime('%Y-%m-%d')}"
+                      for who, (_path, _section, exported) in sorted(course.current.items()))
+    sheet["A1"] = f"MATH {COURSE_NUMBER} grades thus far, as of {course.as_of}"
+    sheet["A1"].font = Font(bold=True, size=14)
+    sheet["A2"] = (f"From the D2L export of {course.export_stamp.strftime('%Y-%m-%d')} "
+                   f"and the class lists of {lists}.")
+    sheet["A3"] = "This file is replaced by a script at each update, so any edits made here will be lost."
+    sheet["A3"].font = SHEET_RED
+
+    top = 5
+    for at, heading in enumerate(headings, start=1):
+        cell = sheet.cell(row=top, column=at, value=heading)
+        cell.font = SHEET_BOLD
+        cell.fill = SHEET_HEADER_FILL
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+    sheet.row_dimensions[top].height = 62
+
+    people = [r for r in sorted_records(course) if r["class_rows"]]
+    people.sort(key=lambda r: bool(r["dropped"]))
+    for row, record in enumerate(people, start=top + 1):
+        for at, (value, font) in enumerate(spreadsheet_row(record, course, titles), start=1):
+            cell = sheet.cell(row=row, column=at, value=value)
+            if font:
+                cell.font = font
+            if isinstance(value, float):
+                cell.number_format = "0.0"
+
+    # Keeps the headings and the name in view, and turns the filter buttons on.
+    sheet.freeze_panes = sheet.cell(row=top + 1, column=2)
+    last = get_column_letter(len(headings))
+    sheet.auto_filter.ref = f"A{top}:{last}{top + len(people)}"
+    widths = {"Name": 28, "ID": 10, "Email": 28, "Status": 18, "TA": 18, "Room": 12, "Instructor": 10}
+    for at, heading in enumerate(headings, start=1):
+        sheet.column_dimensions[get_column_letter(at)].width = widths.get(heading, 11)
+
+    # The wording is about this offering's scheme, so it lives with its other facts.
+    about = book.create_sheet("How this is calculated")
+    about.column_dimensions["A"].width = 100
+    explanation = DATA_DIR / "grade-thus-far-explanation.txt"
+    lines = []
+    if explanation.is_file():
+        lines = explanation.read_text(encoding="utf-8").splitlines() + [""]
+    else:
+        warn(f"{explanation} not found, so the spreadsheet doesn't explain the mark.")
+    lines += SHEET_KEY
+    for row, line in enumerate(lines, start=1):
+        cell = about.cell(row=row, column=1, value=line)
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+        if line == SHEET_KEY[0]:
+            cell.font = SHEET_BOLD
+
+    temporary = path.with_name(f".{path.stem}-being-written{path.suffix}")
+    book.save(temporary)
+    os.replace(temporary, path)
+    return len(people)
+
+
+def run_d2l_import(course, grades_dir, spreadsheet):
     """Write a file for D2L's grade import, holding each student's mark so far.
+
+    Also replaces the colleagues' spreadsheet, so the two can't disagree. If that
+    can't be saved, it warns and the import file still stands.
 
     The format is D2L's: an identifier, "<item> Points Grade", and an End-of-Line
     Indicator of #. The item is named by grade_so_far_item in admin-settings.csv,
@@ -689,8 +881,17 @@ def run_d2l_import(course, grades_dir):
     if clear:
         print(paint("  every test and exam that has come due is fully recorded", "green"))
 
+    # A colleague can have it open, or the folder may not have synced.
+    written = None
+    try:
+        written = write_spreadsheet(course, spreadsheet)
+    except OSError as error:
+        warn(f"could not update {spreadsheet} ({error}). Run this again to retry.")
+
     flush_report(tally=False)
     print(paint(f"\nWrote {path}", "green"))
+    if written is not None:
+        print(paint(f"Wrote {spreadsheet}, {written} students", "green"))
     return 0
 
 
@@ -1177,7 +1378,8 @@ def main():
                         help="copy the emails of everyone registered in a section")
     parser.add_argument("--check", action="store_true", help="what was read, and every warning")
     parser.add_argument("--d2l-import", action="store_true",
-                        help="write the file that updates D2L's grade so far, beside the exports")
+                        help="write the file that updates D2L's grade so far, beside the exports, "
+                             "and replace the Team's spreadsheet of everyone's marks")
     parser.add_argument("--exemptions", action="store_true",
                         help="compare the exemption form with D2L, and write import files for "
                              "what is approved and not yet there, beside the exports")
@@ -1196,6 +1398,9 @@ def main():
                          help="D2L exports (default: the Team's grades-exported-from-d2l)")
     sources.add_argument("--staff", type=Path, default=STAFF_CSV, metavar="F",
                          help="staff list (default: the Team's TAs-and-other-staff.csv)")
+    sources.add_argument("--spreadsheet", type=Path, default=GRADES_SPREADSHEET, metavar="F",
+                         help="where --d2l-import puts the spreadsheet "
+                              "(default: the Team's grades-thus-far.xlsx)")
     sources.add_argument("--exemption-workbook", type=Path, metavar="F",
                          help="the exemption form's workbook, only ever read "
                               "(default: exemption_workbook in admin-settings.csv)")
@@ -1209,7 +1414,7 @@ def main():
     if args.check:
         return run_check(course)
     if args.d2l_import:
-        return run_d2l_import(course, args.grades_dir)
+        return run_d2l_import(course, args.grades_dir, args.spreadsheet)
     if args.exemptions:
         return run_exemptions(course, args.grades_dir, args.exemption_workbook)
     if args.class_section is not None:
