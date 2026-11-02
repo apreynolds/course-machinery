@@ -1,0 +1,34 @@
+#!/bin/bash
+# run-tests — run student-record's tests, on the invented students in fixtures/
+# Usage: run-tests [-h|--help]
+#
+# Each test prints ok or FAIL per check and ends with "FAILURES: N"; this prints
+# only the failures and that last line, then exits 1 if anything failed.
+# Anything a test writes goes to a temporary folder, never the Team's.
+#
+# The tests read this course's course-info/ (sections, instructors, settings),
+# so they were written against MATH 1003's and may need adjusting elsewhere.
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
+here="$(cd "$(dirname "$0")" && pwd)"
+failed=0
+for test in "$here"/test-*.py; do
+    printf '== %s\n' "$(basename "$test")"
+    # openpyxl through uv, as the scripts themselves get it; NO_COLOR keeps the output plain.
+    output="$(NO_COLOR=1 uv run --quiet --with openpyxl python3 "$test" 2>&1)"
+    printf '%s\n' "$output" | grep -E '^FAIL|^FAILURES|Traceback|Error:'
+    # A test that crashes never prints its FAILURES line, which counts as failing.
+    if ! printf '%s\n' "$output" | grep -q '^FAILURES: 0$'; then
+        failed=1
+    fi
+done
+
+if (( failed )); then
+    echo "Some tests failed."
+    exit 1
+fi
+echo "All tests passed."

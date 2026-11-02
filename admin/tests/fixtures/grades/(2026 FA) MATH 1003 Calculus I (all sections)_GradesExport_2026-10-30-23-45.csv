@@ -1,0 +1,13 @@
+﻿OrgDefinedId,Last Name,First Name,Email,Test 1 (Tue) Points Grade <Numeric MaxPoints:30 Category:Tests>,Test 1 (Tue) Scheme Symbol,Test 1 (Thu) Points Grade <Numeric MaxPoints:30 Category:Tests>,Test 1 (Thu) Scheme Symbol,Test 2 (Tue) Points Grade <Numeric MaxPoints:30 Category:Tests>,Test 2 (Tue) Scheme Symbol,Test 2 (Thu) Points Grade <Numeric MaxPoints:30 Category:Tests>,Test 2 (Thu) Scheme Symbol,Test 3 (Tue) Points Grade <Numeric MaxPoints:30 Category:Tests>,Test 3 (Tue) Scheme Symbol,Test 3 (Thu) Points Grade <Numeric MaxPoints:30 Category:Tests>,Test 3 (Thu) Scheme Symbol,Test 4 (Tue) Points Grade <Numeric MaxPoints:30 Category:Tests>,Test 4 (Tue) Scheme Symbol,Test 4 (Thu) Points Grade <Numeric MaxPoints:30 Category:Tests>,Test 4 (Thu) Scheme Symbol,Gateway Quiz 1 Points Grade <Numeric MaxPoints:100 Category:WeBWorK>,Gateway Quiz 1 Scheme Symbol,Gateway Quiz 2 Points Grade <Numeric MaxPoints:100 Category:WeBWorK>,Gateway Quiz 2 Scheme Symbol,Gateway_Quiz_3 Points Grade <Numeric MaxPoints:100 Category:WeBWorK>,Gateway_Quiz_3 Scheme Symbol,Module 1 - Functions Points Grade <Numeric MaxPoints:100 Category:ALEKS>,Module 1 - Functions Scheme Symbol,Module 2 - Limits Points Grade <Numeric MaxPoints:100 Category:ALEKS>,Module 2 - Limits Scheme Symbol,Module 3 - Derivatives Points Grade <Numeric MaxPoints:100 Category:ALEKS>,Module 3 - Derivatives Scheme Symbol,OS1.1_Practice Points Grade <Numeric MaxPoints:100 Category:WeBWorK practice>,OS1.1_Practice Scheme Symbol,Final Exam Points Grade <Numeric MaxPoints:100>,Final Exam Scheme Symbol,Tests Subtotal Numerator,End-of-Line Indicator
+#1000001,Alpha,Ann,1000001@d2l.invalid,,,21,,,,18,,,,24,,,,,,90,,74,,100,,,,,,,,5,,,,,#
+#1000002,Beta,Bo,1000002@d2l.invalid,,,18,,,,Exempt,,,,27,,,,,,,,,,,,50,,70,,40,,,,,,,#
+#1000003,Gamma,Gil,1000003@d2l.invalid,,,30,,,,15,,,,,,,,,,50,,,,,,10,,,,,,,,,,,#
+#1000004,Delta,Dee,1000004@d2l.invalid,,,0,,,,0,,,,0,,,,,,,,,,,,,,,,,,,,,,,#
+#1000005,Epsilon,Eve,1000005@d2l.invalid,24,,,,24,,,,24,,,,24,,,,,,,,,,,,,,,,,,,,,#
+#1000006,Zeta,Zed,1000006@d2l.invalid,30,,15,,,,15,,,,15,,,,,,,,,,,,,,,,,,,,,,,#
+#1000007,Eta,Élodie,1000007@d2l.invalid,15,,,,,,15,,,,15,,,,,,,,,,,,,,,,,,,,,,,#
+#1000008,Theta,Tim,1000008@d2l.invalid,,,15,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#
+#1000010,Kappa,Kim,1000010@d2l.invalid,24,,,,24,,,,24,,,,,,,,,,,,,,,,,,,,,,,,,#
+#1000011,Lambda,Lee,1000011@d2l.invalid,24,,,,24,,,,24,,,,24,,,,,,,,,,,,,,,,,,,,,#
+#1000012,Mu,Max,1000012@d2l.invalid,,,15,,,,15,,,,15,,,,,,,,,,,,,,,,,,,,,,,#
+#1000013,Nu,Nia,1000013@d2l.invalid,,,15,,,,15,,,,15,,,,15,,,,,,,,,,,,,,,,,,,#

@@ -274,6 +274,7 @@ The sources are joined on student ID, and a SAC row with no ID falls back to its
 The D2L grade item it fills is named by an optional \texttt{grade\_so\_far\_item} row in \file{admin-settings.csv}.
 It also replaces \file{grades-thus-far.xlsx} in the Team's \file{student-records-that-we-maintain}, one row per student on a class list, for colleagues who won't run the script, so edits made in that file are lost at the next update.
 Its second sheet explains the mark, using the wording in \file{course-info/grade-thus-far-explanation.txt}.
+\file{admin/tests/run-tests} runs its tests on invented students in \file{admin/tests/fixtures/}, and should pass before and after any change to it.
 \texttt{-{}-exemptions} compares a Microsoft Forms exemption workbook with the newest D2L export, and it only ever reads the workbook, which an optional \texttt{exemption\_workbook} row in \file{admin-settings.csv} names relative to your home.
 The workbook needs columns \texttt{Student ID}, \texttt{Email}, \texttt{First name}, \texttt{Last name}, \texttt{APPROVED}, \texttt{RECORDED} and one whose heading contains ``select the test'', and the student's explanation is never read.
 For a response that is approved, with \texttt{RECORDED} blank and nothing in D2L for that test, it writes \texttt{Exempt} to a file for the version the student's section writes, one file per grade item, beside the exports.

@@ -1,0 +1,14 @@
+﻿Student Name,Student ID,Email Address
+"Alpha, Ann cross-listed as MATH*1003*FR01A",1000001,1000001@example.invalid
+"Beta, Bo cross-listed as MATH*1003*FR01A",1000002,1000002@example.invalid
+"Gamma, Gil cross-listed as MATH*1003*FR01A",1000003,1000003@example.invalid
+"Delta, Dee (Dropped 2026-10-20) cross-listed as MATH*1003*FR01A",1000004,1000004@example.invalid
+"Epsilon, Eve cross-listed as MATH*1003*FR05A",1000005,1000005@example.invalid
+"Zeta, Zed cross-listed as MATH*1003*FR01A",1000006,1000006@example.invalid
+"Eta, Élodie cross-listed as MATH*1003*FR01A",1000007,1000007@example.invalid
+"Iota, Ian cross-listed as MATH*1003*FR01A",1000009,1000009@example.invalid
+"Kappa, Kim cross-listed as MATH*1003*FR05A",1000010,1000010@example.invalid
+"Lambda, Lee cross-listed as MATH*1003*FR05A",1000011,1000011@example.invalid
+"Mu, Max cross-listed as MATH*1003*FR01A",1000012,1000012@example.invalid
+"Nu, Nia cross-listed as MATH*1003*FR01A",1000013,1000013@example.invalid
+"Epsilon, Eve (Dropped 2026-10-01) cross-listed as MATH*1003*FR01A",1000005,1000005@example.invalid

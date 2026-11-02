@@ -1,0 +1,12 @@
+title,due-date,category,track,d2l-items
+Test 1,2026-09-24,Tests,,Test 1 (Tue)|Test 1 (Thu)
+Test 2,2026-10-08,Tests,,Test 2 (Tue)|Test 2 (Thu)
+Test 3,2026-10-22,Tests,,Test 3 (Tue)|Test 3 (Thu)
+Test 4,2026-11-05,Tests,,Test 4 (Tue)|Test 4 (Thu)
+Gateway Quiz 1,2026-09-25,Online homework,WeBWorK,
+Gateway Quiz 2,2026-10-15,Online homework,WeBWorK,
+Gateway Quiz 3,2026-11-20,Online homework,WeBWorK,Gateway_Quiz_3
+Module 1,2026-10-01,Online homework,ALEKS,Module 1 - Functions
+Module 2,2026-10-20,Online homework,ALEKS,Module 2 - Limits
+Module 3,,Online homework,ALEKS,Module 3 - Derivatives
+Final Exam,2026-12-15,Final Exam,,
