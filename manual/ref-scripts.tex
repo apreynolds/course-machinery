@@ -291,7 +291,7 @@ The D2L gradebook cannot calculate this mark, since it does not know who writes 
 
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}l Y@{}}
-\file{grading-scheme.csv} & columns \texttt{category}, \texttt{weight}, \texttt{rule}, where the rule is \texttt{ranked-1-2-3}, \texttt{best-track} or \texttt{single}.\\
+\file{grading-scheme.csv} & columns \texttt{category}, \texttt{weight}, \texttt{rule}, where the rule is \texttt{ranked-1-2-3}, \texttt{best-track}, \texttt{best-k-pooled} or \texttt{single}.\\
 \file{assessments.csv} & columns \texttt{title}, \texttt{due-date}, \texttt{category}, \texttt{track}, \texttt{d2l-items}: every assessment that counts. The last names its gradebook items, separated by \texttt{|}, and may be empty when the only item has the assessment's title.\\
 \end{tabularx}
 \end{center}
@@ -300,6 +300,9 @@ A gradebook item in neither file is ignored, which is how practice sets stay out
 An assessment counts once the day after its due date has arrived.
 A blank then counts as 0, unless the item is hand-marked and fewer than half of the students expected to write it have anything recorded, in which case it is taken to be unmarked and left out.
 An \texttt{Exempt} is left out, and the category's rule applies to what remains.
+Two rules are for a choice between homework systems, each system a \texttt{track}.
+\texttt{best-track} averages each track and takes the higher, which punishes a student who switched part way.
+\texttt{best-k-pooled} averages the best $k$ scores from all tracks together, where $k$ is the number due in the track with the fewest, so it never gives less than \texttt{best-track}.
 The header of \file{gradebook.py} gives the rules in full.
 
 \subsection*{admin/crowdmark-no-zero}
