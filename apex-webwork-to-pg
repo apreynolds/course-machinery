@@ -582,7 +582,22 @@ def main():
 
     XREFS[root.get(XMLID)] = f"Section {args.number}"
 
+    # The section's numbered blocks, so a direction line can cite one: 2.7's
+    # 9-14 say "Using <xref ref="thm_deriv_inverse_functions"/>", which the
+    # book prints as "Theorem 2.7.4". Figures, tables, theorems and examples
+    # share one counter, in document order. A block with a component (the
+    # videos, the PROTEUS exercises) is not in the web build and takes no
+    # number, which is what makes 2.7's count match the printed book.
     exercises = root.find("exercises")
+    in_exercises = set(exercises.iter())
+    count = 0
+    for block in root.iter():
+        if block.tag not in NUMBERED or block in in_exercises or block.get("component"):
+            continue
+        count += 1
+        if block.get(XMLID):
+            XREFS[block.get(XMLID)] = f"{block.tag.capitalize()} {args.number}.{count}"
+
     # ElementTree has no parent pointers, so build the map once.
     parent = {child: el for el in exercises.iter() for child in el}
     # Every exercise's book number under its xml:id, so that a direction line
@@ -622,6 +637,10 @@ def main():
 
 
 XMLID = "{http://www.w3.org/XML/1998/namespace}id"
+
+# The PreTeXt blocks that share a section's counter (Figure 2.7.1, Table 2.7.3,
+# Theorem 2.7.4, Example 2.7.5), for an <xref> to one of them.
+NUMBERED = {"figure", "table", "theorem", "example", "definition", "corollary", "lemma", "proposition"}
 
 PREAMBLE_COMMENT = '# The book\'s image styles (docinfo.ptx). A q^...^ string, not a <<\'...\' heredoc:\n# PG doubles every backslash before Perl runs, and only a quoted string\n# collapses them again -- a single-quoted heredoc is fully literal, so TeX\n# got \\\\usepackage, a line break and the word "usepackage".\n'
 
