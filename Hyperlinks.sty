@@ -1,7 +1,8 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{Hyperlinks}[2026/08/13 hyperref (loaded last) + \string\demo]
+\ProvidesPackage{Hyperlinks}[2026/11/06 hyperref (loaded last) + \string\demo, \string\interactive]
 
-% hyperref for the course classes, plus \demo (links out to an interactive tool).
+% hyperref for the course classes, plus \demo (links out to an interactive tool)
+% and \interactive (the same, with a catalogue entry behind it).
 %
 % Requires the loading class to have done, before \ProcessOptions:
 %     \PassOptionsToPackage{dvipsnames}{xcolor}
@@ -146,3 +147,112 @@
 \newcommand{\Demo@check}[1]{\Demo@scan#1://\Demo@nil}
 
 \NewDocumentCommand{\demo}{o m}{\Demo@check{#2}\DemoFormat{#2}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \interactive -- A \demo WITH A CATALOGUE ENTRY BEHIND IT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   \interactive{evt-closed-interval}
+%   \interactive[../../interactives/]{evt-closed-interval}   from a deeper file
+%
+% Prints a thumbnail of the graph, the same student-facing link label \demo
+% prints, and a one-line caption saying WHAT the graph shows. Everything comes
+% from one catalogue entry, a directory per graph:
+%
+%   <topic>/interactives/<slug>/meta.tex        \InteractiveMeta{...}, below
+%   <topic>/interactives/<slug>/thumbnail.png   exported from the tool
+%   (and, for GeoGebra/Jupyter, the substantive file itself)
+%
+% WHY A CATALOGUE AND NOT JUST \demo. Three things a bare URL cannot do: be
+% SEARCHED before you build a graph that already exists (the duplicated Desmos
+% graph that started this); say where the graph came from (mine, or an outdated
+% book link); and tell the student what they are about to see. The uniform
+% label principle above still holds for the tool's identity -- the caption is
+% the new, student-facing part, and it says what moves, not which tool moves it.
+%
+% PER TOPIC, deliberately, beside figures/ and problems/: a graph belongs to
+% the mathematics it shows, which is a topic repo's business.
+%
+% THE DIRECTORY ARGUMENT is literal, like \importproblem's, resolved against
+% the file doing the calling (\import@path is prepended, so a problem file
+% pulled in by \import or \subimport works too). The default suits a lecture,
+% which sits one level below its topic root (ARCHITECTURE.md, "Import paths
+% stay literal").
+%
+% PENDING ENTRIES BUILD CLEANLY. An entry is usually written before its graph
+% exists -- the URL is empty and there is no thumbnail yet -- and a lecture
+% that cites it must still meet the zero-warning bar. So a pending entry is NOT
+% a warning: the thumbnail's place shows a plain frame, the label prints
+% unlinked, and the instructor copy alone says "pending". The two things that
+% ARE warnings are a slug with no meta.tex at all (a typo, never a plan) and a
+% URL without a scheme (\demo's check, reused).
+
+% \InteractiveMeta{url = ..., tool = ..., source = ..., shows = ..., tags = ...,
+% section = ...} -- STORE-ONLY everywhere, the same idiom as \ProblemMeta: it
+% compiles to nothing, and find tools grep it. Only inside \interactive is it
+% given a meaning, locally, so the call can read the url and shows fields.
+% Wrap any value containing a comma in braces.
+\providecommand{\InteractiveMeta}[1]{}
+
+% Knobs. Thumbnail width as a fraction of the line; the gap between the
+% thumbnail and the text; the instructor-copy note for a pending entry.
+\providecommand{\InteractiveDir}{../interactives/}
+\providecommand{\InteractiveThumbWidth}{0.32\linewidth}
+\providecommand{\InteractiveGap}{1em}
+\providecommand{\InteractivePendingNote}{pending: no graph built yet}
+
+% The fields \interactive reads. Every documented key is defined, so a
+% misspelt one stops the build and names itself (keyval's own error), rather
+% than being quietly ignored.
+\RequirePackage{keyval}
+\define@key{intmeta}{url}{\def\Int@url{#1}}
+\define@key{intmeta}{shows}{\def\Int@shows{#1}}
+\define@key{intmeta}{tool}{}
+\define@key{intmeta}{source}{}
+\define@key{intmeta}{tags}{}
+\define@key{intmeta}{section}{}
+\newcommand{\Int@read}[1]{\setkeys{intmeta}{#1}}
+
+% The thumbnail, or a frame of the same width standing in for it.
+\newcommand{\Int@thumb}{%
+  \IfFileExists{\Int@path thumbnail.png}%
+    {\includegraphics[width=\linewidth]{\Int@path thumbnail.png}}%
+    {\fbox{\parbox[c][0.6\linewidth][c]{\dimexpr\linewidth-2\fboxsep-2\fboxrule}%
+       {\centering\DemoMarker\,\DemoLabel}}}%
+}
+
+% The whole rendering, in one hook like \DemoFormat: thumbnail on the left,
+% link label and caption on the right, both vertically centred. Inside it,
+% \Int@url and \Int@shows hold the entry's fields (either may be empty).
+\providecommand{\InteractiveFormat}{%
+  \par\noindent
+  \begin{minipage}[c]{\InteractiveThumbWidth}%
+    \ifdefempty{\Int@url}{\Int@thumb}{\href{\Int@url}{\Int@thumb}}%
+  \end{minipage}%
+  \hspace{\InteractiveGap}%
+  \begin{minipage}[c]{\dimexpr\linewidth-\InteractiveThumbWidth-\InteractiveGap\relax}%
+    \raggedright
+    \ifdefempty{\Int@url}{\DemoMarker\,\DemoLabel}{\DemoFormat{\Int@url}}%
+    \ifdefempty{\Int@shows}{}{\par\Int@shows}%
+    \ifdefempty{\Int@url}
+      {\ifdef{\InstructorInline}{\par\InstructorInline{\InteractivePendingNote}}{}}%
+      {}%
+  \end{minipage}%
+  \par
+}
+
+\NewDocumentCommand{\interactive}{O{\InteractiveDir} m}{%
+  \begingroup
+    \def\Int@url{}%
+    \def\Int@shows{}%
+    \edef\Int@path{\import@path #1#2/}%
+    \IfFileExists{\Int@path meta.tex}%
+      {\let\InteractiveMeta\Int@read
+       \input{\Int@path meta.tex}%
+       % Expanded first: \Demo@scan is string surgery on its argument's
+       % TOKENS, and would see one macro, not the "://" inside it.
+       \ifdefempty{\Int@url}{}{\expandafter\Demo@check\expandafter{\Int@url}}}%
+      {\PackageWarning{Hyperlinks}{\string\interactive: no catalogue entry
+         `#2' -- \Int@path meta.tex does not exist}}%
+    \InteractiveFormat
+  \endgroup
+}
