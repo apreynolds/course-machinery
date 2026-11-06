@@ -77,6 +77,17 @@ loads too, not merely after the class
 \cs{DemoLabel}, \cs{DemoMarker} & the student-facing wording
   (\texttt{interactive graph}) and its cue ($\triangleright$).\\
 \cs{DemoFormat}\texttt{\{URL\}} & the whole rendering, in one hook.\\
+\cs{interactive}\texttt{[dir]\{slug\}} & a \cs{demo} with a catalogue
+  entry behind it: thumbnail, label and caption; see below.\\
+\cs{InteractiveMeta}\texttt{\{keys\}} & a catalogue entry's metadata;
+  store-only outside \cs{interactive}.\\
+\cs{InteractiveDir} & the default \texttt{dir}
+  (\texttt{../interactives/}, right for a lecture).\\
+\cs{InteractiveThumbWidth}, \cs{InteractiveGap} & thumbnail width
+  (default \texttt{0.32\textbackslash linewidth}) and the gap after it.\\
+\cs{InteractivePendingNote} & the instructor-copy note under a pending
+  entry.\\
+\cs{InteractiveFormat} & the whole rendering, in one hook.\\
 \end{tabularx}
 \end{center}
 
@@ -123,3 +134,50 @@ deliberately: a demo has nothing to do with the textbook -- it is as often
 your own Desmos page -- and Hyperlinks is loaded by LectureNotes and
 CourseDocument alike, so a syllabus gets \cs{demo} too. Assessment loads
 no hyperref and therefore has none.
+
+\subsection*{\texorpdfstring{\cs{interactive}}{\textbackslash interactive}}
+
+A bare URL cannot be searched before you build a graph that already
+exists, cannot say where it came from, and cannot tell a student what
+they are about to see. \cs{interactive} adds the three, from a
+\emph{catalogue entry}: one directory per graph, in the topic repo beside
+\file{figures/} and \file{problems/}.
+
+\begin{manexsource}
+<topic>/interactives/evt-closed-interval/meta.tex       the metadata
+<topic>/interactives/evt-closed-interval/thumbnail.png  exported from the tool
+\end{manexsource}
+
+\file{meta.tex} holds one block, store-only like \cs{ProblemMeta} -- it
+compiles to nothing anywhere but inside \cs{interactive}, which reads
+\texttt{url} and \texttt{shows} from it. Brace any value with a comma in it;
+a misspelt key stops the build.
+
+\begin{manexsource}
+\InteractiveMeta{
+  url     = {https://www.desmos.com/calculator/xxxxxxxxxx},
+  tool    = {desmos},
+  source  = {own},
+  shows   = {Drag the endpoints of the interval: on a closed interval
+             the maximum and minimum are always there.},
+  tags    = {extreme-values},
+  section = {3.1},
+}
+\end{manexsource}
+
+In a lecture, \cs{interactive}\texttt{\{evt-closed-interval\}} prints the
+thumbnail on the left (linked), and on the right the same
+\emph{interactive graph} label \cs{demo} prints, with the \texttt{shows}
+line under it as a caption. The uniform label still keeps the tool's
+identity off the page; the caption is new, and says \emph{what} moves.
+The optional argument is the catalogue directory, written literally and
+resolved against the calling file like \cs{importproblem}'s; the default,
+\texttt{../interactives/}, suits a lecture one level below its topic root.
+
+\textbf{A pending entry builds cleanly.} Entries are usually written before
+their graph exists, and a lecture citing one must still build with zero
+warnings. So an empty \texttt{url} or a missing \file{thumbnail.png} is not
+a warning: a plain frame stands in for the thumbnail, the label prints
+unlinked, and the instructor copy alone says \emph{pending}. A slug with
+no \file{meta.tex} at all \emph{is} a warning -- that is a typo, never a
+plan -- and a URL without a scheme gets \cs{demo}'s warning.
