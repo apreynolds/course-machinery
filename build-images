@@ -4,7 +4,7 @@
 # Usage: build-images [OPTIONS] FILE.tex ...
 #
 #   -o, --out DIR       write outputs here                    (default: cwd)
-#   -r, --dpi N         PNG resolution                        (default: 300)
+#   -r, --dpi N         PNG resolution                        (default: 200)
 #       --width LEN     typeset measure, any TeX length       (default: 2.6\alphabet)
 #       --margins N     white border in TeX pt                (default: 10)
 #       --no-question   skip the question-only variant
@@ -75,6 +75,14 @@
 # images to fit its column. So the horizontal bounds are the page (which is
 # exactly the measure plus margins) and only the vertical bounds follow the ink.
 #
+# WHY 200 DPI. D2L displays an image at its pixel size, at roughly 96 px to the
+# inch, and there is no way to set a display width through its CSV import. At
+# 300 dpi the measure came out 1398 px wide -- about three times print size --
+# and scrolled sideways in both the question editor and a laptop's quiz view.
+# 200 dpi gives about 930 px: acceptably sharp on a Retina screen, and it fits.
+# Pixel width = (measure + margins, in inches) x dpi, so to aim at a width W,
+# pass -r W/4.66 at the default measure; 150 gives about 700 px.
+#
 # Requires: pdflatex, pdfcrop, ghostscript (gs), and pdftoppm for the PNG.
 
 set -uo pipefail
@@ -86,7 +94,7 @@ usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 # ---------------------------------------------------------------------------
 
 out_dir="."
-dpi=300
+dpi=200
 width='2.6\alphabet'
 margins=10
 want_question=1
