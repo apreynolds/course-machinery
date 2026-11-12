@@ -83,8 +83,11 @@ loads too, not merely after the class
   store-only outside \cs{interactive}.\\
 \cs{InteractiveDir} & the default \texttt{dir}
   (\texttt{../interactives/}, right for a lecture).\\
-\cs{InteractiveThumbWidth}, \cs{InteractiveGap} & thumbnail width
-  (default \texttt{0.32\textbackslash linewidth}) and the gap after it.\\
+\cs{InteractiveImage} & the image file an entry with no \texttt{image}
+  key uses (default \texttt{desmos-graph.png}).\\
+\cs{InteractiveThumbWidth} & thumbnail width
+  (default \texttt{0.32\textbackslash linewidth}).\\
+\cs{InteractiveGap} & the gap after the thumbnail.\\
 \cs{InteractivePendingNote} & the instructor-copy note under a pending
   entry.\\
 \cs{InteractiveFormat} & the whole rendering, in one hook.\\
@@ -144,14 +147,20 @@ they are about to see. \cs{interactive} adds the three, from a
 \file{figures/} and \file{problems/}.
 
 \begin{manexsource}
-<topic>/interactives/evt-closed-interval/meta.tex       the metadata
-<topic>/interactives/evt-closed-interval/thumbnail.png  exported from the tool
+<topic>/interactives/evt-closed-interval/meta.tex          metadata
+<topic>/interactives/evt-closed-interval/desmos-graph.png  the export
 \end{manexsource}
 
 \file{meta.tex} holds one block, store-only like \cs{ProblemMeta} -- it
 compiles to nothing anywhere but inside \cs{interactive}, which reads
-\texttt{url} and \texttt{shows} from it. Brace any value with a comma in it;
-a misspelt key stops the build.
+\texttt{url}, \texttt{shows} and \texttt{image} from it. Brace any value
+with a comma in it; a misspelt key stops the build.
+
+The image is \file{desmos-graph.png} unless the entry says otherwise,
+because that is the name Desmos gives its PNG export: drop the export in
+the directory and it is found. To use another name -- a renamed export,
+or a GeoGebra one -- add an optional \texttt{image} key naming the file
+in the entry's directory, \texttt{image = \{tangent-sweep.png\}}.
 
 \begin{manexsource}
 \InteractiveMeta{
@@ -176,7 +185,7 @@ resolved against the calling file like \cs{importproblem}'s; the default,
 
 \textbf{A pending entry builds cleanly.} Entries are usually written before
 their graph exists, and a lecture citing one must still build with zero
-warnings. So an empty \texttt{url} or a missing \file{thumbnail.png} is not
+warnings. So an empty \texttt{url} or a missing image file is not
 a warning: a plain frame stands in for the thumbnail, the label prints
 unlinked, and the instructor copy alone says \emph{pending}. A slug with
 no \file{meta.tex} at all \emph{is} a warning -- that is a typo, never a
