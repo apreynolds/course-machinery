@@ -192,13 +192,29 @@ it for you}: the checkout directory is the course's own choice, and courses
 differ (\file{teaching/} and \file{reusable-teaching-stuff/} are both in use).
 Run bare from a course root, with no block to tell a passage from any other
 \file{.tex}, it would report every lecture and assessment as a passage --- so it
-refuses instead of defaulting to the current directory the way the other four
+refuses instead of defaulting to the current directory the way the others
 do.
 
-Under the hood all six commands are thin shims over one shared engine,
-\file{find-meta} (\file{find-problems}/\file{find-facts}/\file{find-passages})
-and \file{pick-meta}
-(\file{pick-problems}/\file{pick-facts}/\file{pick-passages}): a
+\subsection*{find-interactives and pick-interactives (the catalogue twins)}
+
+The interactives catalogue (section~\ref{sec:ref-titleblock}) is one
+directory per graph, \file{<topic>/interactives/<slug>/meta.tex}, and its
+\cs{InteractiveMeta} block is read like any other bank's. The filters are
+\texttt{-{}-tag}, \texttt{-{}-section}, \texttt{-{}-tool} and
+\texttt{-{}-source}; \texttt{-{}-vocab} reports tags and tools; and
+\texttt{-{}-tsv} columns are (path, folder, section, url, tool, tags, shows),
+where the folder is the slug. What \texttt{-{}-import} emits is
+\cs{interactive}\texttt{\{slug\}}, with the catalogue directory as the
+optional argument unless it is \file{../interactives/} from
+\texttt{-{}-from}. There is no \texttt{-{}-with}: \cs{interactive} reads the
+entry itself at build time. The picker shows an entry with an empty
+\texttt{url} as \texttt{(pending)}, so a graph still to be built is
+visible, and searchable, in the list.
+
+Under the hood all eight commands are thin shims over one shared engine,
+\file{find-meta} (behind \file{find-problems}, \file{find-facts},
+\file{find-passages} and \file{find-interactives}) and \file{pick-meta}
+(behind the four \file{pick-} twins): a
 \texttt{-{}-kind} selects the block
 macro (empty for a passage, which has none), the emitted import command and the
 key schema; the reading, matching and emitting are written once. A blockless
