@@ -1,4 +1,4 @@
-\ProvidesPackage{InstructorNotes}[2026/07/17 instructor-only notes layer]
+\ProvidesPackage{InstructorNotes}[2026/11/12 instructor-only notes layer]
 
 %%% ===========================================================================
 %%% InstructorNotes -- the INSTRUCTOR-NOTES content layer: \InstructorInline
@@ -126,24 +126,76 @@
 %%%     in slate: it is the book talking, not a note to self, so it must not be
 %%%     mistaken for an InstructorBox.
 %%%
-%%% ONE KEY, print: \begin{textprose}[print=false] (or the flag form, [noprint])
-%%% keeps a passage in the source and off every copy -- the key every box takes
-%%% (PrintKey.sty). It is the editing verdict "read, not wanted on the page":
-%%% the passage stays foldable in the source without being deleted.
+%%% ONE KEY, print, with THREE values (the third added 2026-11-12):
+%%%
+%%%   [print=instructor]  the instructor copy only, as described above. Also
+%%%                       what a bare \begin{textprose} means.
+%%%   [print=true]        EVERY copy, as ordinary body text: the passage has
+%%%                       been kept as lecture text. Bare [print] means the same.
+%%%   [print=false]       no copy (or the flag form, [noprint]) -- the editing
+%%%                       verdict "read, not wanted on the page": the passage
+%%%                       stays foldable in the source without being deleted.
+%%%
+%%% Until 2026-11-12 print=true meant "the default, said out loud", i.e. the
+%%% instructor copy; lectures written then were migrated to print=instructor.
+%%% Any other value is an error, so a typo cannot quietly pick a copy.
+%%%
+%%% A PRINTED PASSAGE IS PLAIN, IN EVERY VIEW: no rule, no slate, no indent. It
+%%% has to be, for the overlay contract -- the instructor copy must break lines
+%%% and pages exactly as the student copy does, and an 8pt indent would rewrap
+%%% every line. What marks it on the instructor copy is a margin tag
+%%% (\TextProseTag, via \InstructorMargin), which takes no room on the page.
+%%%
+%%% print=false and print=true come from PrintKey, the key every box shares;
+%%% `instructor' is this environment's own, so it reaches us in \PrintKeyRest
+%%% and is compared there with its spaces taken out.
+\RequirePackage{xstring}   % \StrDel: strip spaces before comparing the key
+\providecommand{\TextProseTag}{text}
+
+% The instructor-only rendering: the thin slate rule and slate serif.
+\newcommand{\tp@instructor}{%
+  \ifinstructornotes
+    \begin{tcolorbox}[enhanced, breakable, parbox=false,
+      frame hidden, boxrule=0pt, sharp corners,
+      colback=white,
+      borderline west={1.5pt}{0pt}{InstructorInk},  % the thin slate rule
+      left=8pt, right=0pt, top=2pt, bottom=2pt,
+      before upper={\color{InstructorInk}}]
+      \BODY
+    \end{tcolorbox}%
+  \fi
+}
+
+% The every-copy rendering: plain paragraphs, tagged in the instructor margin.
+% The tag is hung on the START OF THE FIRST PARAGRAPH (LaTeX's one-shot
+% para/begin hook), so it sits beside the passage's first line rather than in
+% the gap above it -- and without starting a paragraph of its own, which would
+% leave an empty line on the instructor copy alone when a passage opens with a
+% display or a figure.
+\newcommand{\tp@all}{%
+  \par
+  \ifinstructornotes
+    \AddToHookNext{para/begin}{\InstructorMargin{\TextProseTag}}%
+  \fi
+  \BODY
+  \par
+}
+
 \NewEnviron{textprose}[1][]{%
   \PrintKeyParse{#1}%
-  \ifinstructornotes
-    \PrintKeyIfPrint{%
-      \begin{tcolorbox}[enhanced, breakable, parbox=false,
-        frame hidden, boxrule=0pt, sharp corners,
-        colback=white,
-        borderline west={1.5pt}{0pt}{InstructorInk},  % the thin slate rule
-        left=8pt, right=0pt, top=2pt, bottom=2pt,
-        before upper={\color{InstructorInk}}]
-        \BODY
-      \end{tcolorbox}%
-    }{}%
-  \fi
+  \StrDel{\PrintKeyRest}{ }[\tp@rest]%
+  \PrintKeyIfPrint{%
+    \ifx\tp@rest\@empty
+      % No `instructor': bare means instructor, an explicit print word means all.
+      \ifblank{#1}{\tp@instructor}{\tp@all}%
+    \else
+      \ifdefstring{\tp@rest}{print=instructor}{\tp@instructor}{%
+        \PackageError{InstructorNotes}%
+          {textprose takes print=false, print=instructor or print=true\MessageBreak
+           (got `#1')}%
+          {A bare \string\begin{textprose} means print=instructor.}}%
+    \fi
+  }{}%
 }
 
 %%% --- margin note: slate bold sans in the margin (unified with the layer) -----
