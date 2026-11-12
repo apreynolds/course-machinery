@@ -30,6 +30,9 @@ assessment. Workflow: section~\ref{sec:lectures}.
   (default \emph{Example}); redefine per \emph{text}, in
   \file{textbook.tex}. Routed into \cs{ProblemLabelWord} so a
   shared text layer cannot disturb Assessment's fixed ``Q''.\\
+\cs{ProblemInteractiveDefault} & \texttt{compact} here (Exercises'
+  own default is \texttt{false}): a problem whose metadata names a graph
+  shows its link unless the import says \texttt{interactive=false}.\\
 \cs{lecturetoc} & the lecture's title and table of contents, then a page
   break. The title (``1.2\quad Basic Classes of Functions'', with a rule
   under it) is read from \cs{booksection} or \cs{lecturetitle}; there is no

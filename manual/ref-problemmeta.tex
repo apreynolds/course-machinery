@@ -11,6 +11,7 @@ of the exercise system (Exercises works without it). One command:
   source     = {stewart-8e},
   number     = {3.1.2},
   name       = {},
+  interactive= {apex-ex3.1.4-approx-extreme-values},
 }
 \end{manexsource}
 
@@ -19,6 +20,8 @@ Keys: \env{topics}, \env{type}, \env{difficulty}, \env{source},
 touches (and echoes its folder); \env{type} is its form or character;
 \env{source}/\env{number} are a clean provenance origin and its locator;
 \env{name} is an optional short content label, sparse by design.
+\env{interactive}, also optional, names the problem's graph in its topic's
+\file{interactives/} catalogue (section~\ref{sec:ref-titleblock}).
 
 \env{name} was called \env{desc} until 2026-08-13. Same key, same job --
 renamed because FactMeta had grown a \env{name} doing exactly this, and one
@@ -27,7 +30,10 @@ import. The old name also invited provenance into a slot that was never for it
 (\env{source}/\env{number} own that). A stale \texttt{desc=} is now an
 unknown-key error, deliberately -- loud, and it names the line.
 On the LaTeX side the block is \emph{validated but discarded}: a mistyped
-key errors at compile time; nothing is typeset. The real reader is
+key errors at compile time; nothing is typeset. The one exception is
+\env{interactive}, whose value is kept so that Exercises can show the graph
+at the end of the statement when the importing document asks for it ---
+the \texttt{interactive} import key, section~\ref{sec:ref-exercises}. The real reader is
 \file{find-problems}, which parses the block textually off disk -- hence
 the two disciplines (one key per line with braced values, and \texttt{\#}
 written \texttt{\char`\\\#}) explained in section~\ref{sec:problemmeta}.
