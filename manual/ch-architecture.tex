@@ -47,9 +47,10 @@ exercise stack; TextRef -- and the text layer it auto-loads -- reaches all
 three). The scripts sit beside the LaTeX entirely: \file{build-pdfs} drives
 latexmk and injects layer flags; \file{find-meta} reads bank files off disk
 behind its per-kind shims \file{find-problems} / \file{find-facts} /
-\file{find-passages}; and
+\file{find-passages} / \file{find-interactives}; and
 \file{pick-meta} threads those searches through fzf behind
-\file{pick-problems} / \file{pick-facts} / \file{pick-passages}
+\file{pick-problems} / \file{pick-facts} / \file{pick-passages} /
+\file{pick-interactives}
 (section~\ref{sec:build-and-find}).
 
 The honest description of the packages' relationship: \emph{not

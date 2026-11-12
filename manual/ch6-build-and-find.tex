@@ -3,11 +3,13 @@
 One executable builds; a small family searches. \file{build-pdfs} compiles
 course documents (with their views, and with output routed where you want
 it). The searchers are per-kind faces of one shared engine:
-\file{find-problems} searches the problem bank, \file{find-facts} the fact bank
-and \file{find-passages} the passage bank -- each a two-line shim that hands the
+\file{find-problems} searches the problem bank, \file{find-facts} the fact bank,
+\file{find-passages} the passage bank and \file{find-interactives} the
+interactives catalogue -- each a two-line shim that hands the
 right \texttt{-{}-kind} to \file{find-meta}, where all the real logic lives once
 -- and their interactive twins \file{pick-problems} / \file{pick-facts} /
-\file{pick-passages} (shims over \file{pick-meta} the same way) thread those
+\file{pick-passages} / \file{pick-interactives} (shims over \file{pick-meta}
+the same way) thread those
 searches through fzf. Every one of them prints its full reference with
 \texttt{-{}-help}.
 
@@ -227,6 +229,8 @@ $ find-problems [--topic PAT] [--type PAT] [--difficulty PAT]
 $ find-facts    [--topic PAT] [--source PAT] [--untagged] [--vocab]
                 [--import] [--tsv] [PATH ...]
 $ find-passages [--import] [--tsv] PATH ...
+$ find-interactives [--tag PAT] [--section PAT] [--tool PAT]
+                    [--source PAT] [--vocab] [--import] [--tsv] [PATH ...]
 \end{manexsource}
 
 Reads the \cs{ProblemMeta} (resp.\ \cs{FactMeta}) block off every \file{.tex}
@@ -272,7 +276,24 @@ keeping (\file{well-written-solutions.tex} yields ``Well Written Solutions'').
 Delete the \cs{section} line when the passage lands under a heading that
 already exists.
 
-Everything below holds for all three unless it says otherwise.
+\textbf{\file{find-interactives} reads a catalogue of directories.} Its
+block is an ordinary one, \cs{InteractiveMeta} in
+\file{<topic>/interactives/<slug>/meta.tex}, so it filters, lists and feeds a
+picker like the problem bank. Only \texttt{-{}-import} differs, because
+\cs{interactive} names the \emph{slug}, not a file:
+
+\begin{manexsource}
+$ find-interactives --import --from 3-graphical/lectures 3-graphical
+\interactive{critical-numbers}
+\end{manexsource}
+
+\noindent The catalogue directory is left off when it is the default,
+\file{../interactives/}, which is what a lecture needs; from anywhere else
+it comes out as the optional argument. There is no
+\texttt{-{}-with}, since \cs{interactive} reads \file{meta.tex} itself at
+build time.
+
+Everything below holds for all four unless it says otherwise.
 
 Filters combine with AND. \env{PAT} is an extended regular
 expression matched case-insensitively against each comma-separated item, so
@@ -317,14 +338,15 @@ a reflowed block still compiles, but this script no longer sees it.
 
 \subsection{Picking from a bank interactively}
 
-\file{pick-problems} (and \file{pick-facts} / \file{pick-passages}, identically)
+\file{pick-problems} (and \file{pick-facts} / \file{pick-passages} /
+\file{pick-interactives}, identically)
 threads those two
 machine modes through
 \href{https://github.com/junegunn/fzf}{fzf}: it feeds \texttt{-{}-tsv} into the
 picker (fuzzy-search the metadata, \file{bat}-preview the \file{.tex},
 multi-select with Tab), then pipes the chosen files back through
 \texttt{-{}-import} so the accepted set comes out as \cs{importproblem} (or
-\cs{importfact}, or a \cs{section} and \cs{import} pair) on
+\cs{importfact}, or a \cs{section} and \cs{import} pair, or \cs{interactive}) on
 standard output. Its \texttt{-{}-from} and any \file{find-problems} filters pass
 straight through, e.g.\ \texttt{pick-problems -{}-from \_assessment -{}-type
 multiple-choice derivatives/}. The Vim commands \texttt{:ImportProblem}

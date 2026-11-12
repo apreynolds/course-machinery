@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# pick-interactives — fzf picker over the interactives catalogue; emits
+# \interactive lines.
+# A thin shim over pick-meta (the shared picker). Forwards find-interactives'
+# filters and PATH operands; `--from DIR' makes the emitted catalogue path
+# relative to DIR, and drops it altogether when it is ../interactives/ (the
+# default a lecture needs). An entry with no url yet is shown as `(pending)'.
+# See pick-meta and find-interactives.
+exec "$(dirname -- "$0")/pick-meta" --kind interactive --as pick-interactives "$@"
