@@ -79,6 +79,10 @@ loads too, not merely after the class
 \cs{DemoFormat}\texttt{\{URL\}} & the whole rendering, in one hook.\\
 \cs{interactive}\texttt{[dir]\{slug\}} & a \cs{demo} with a catalogue
   entry behind it: thumbnail, label and caption; see below.\\
+\cs{interactive}\texttt{*} & the compact form: the label alone, flush
+  right.\\
+\cs{InteractiveForProblem} & how Exercises shows the graph a problem's
+  metadata names; not called by hand.\\
 \cs{InteractiveMeta}\texttt{\{keys\}} & a catalogue entry's metadata;
   store-only outside \cs{interactive}.\\
 \cs{InteractiveDir} & the default \texttt{dir}
@@ -90,7 +94,8 @@ loads too, not merely after the class
 \cs{InteractiveGap} & the gap after the thumbnail.\\
 \cs{InteractivePendingNote} & the instructor-copy note under a pending
   entry.\\
-\cs{InteractiveFormat} & the whole rendering, in one hook.\\
+\cs{InteractiveFormat} & the full rendering, in one hook.\\
+\cs{InteractiveCompactFormat} & the compact one, likewise.\\
 \end{tabularx}
 \end{center}
 
@@ -136,7 +141,8 @@ It lives in Hyperlinks rather than TextRef (section~\ref{sec:ref-textref})
 deliberately: a demo has nothing to do with the textbook -- it is as often
 your own Desmos page -- and Hyperlinks is loaded by LectureNotes and
 CourseDocument alike, so a syllabus gets \cs{demo} too. Assessment loads
-no hyperref and therefore has none.
+it as well, for the on-screen solutions and instructor copies: put a
+\cs{demo} in a solution, not in a question a student reads on paper.
 
 \subsection*{\texorpdfstring{\cs{interactive}}{\textbackslash interactive}}
 
@@ -192,3 +198,27 @@ a warning: a plain frame stands in for the thumbnail, the label prints
 unlinked, and the instructor copy alone says \emph{pending}. A slug with
 no \file{meta.tex} at all \emph{is} a warning -- that is a typo, never a
 plan -- and a URL without a scheme gets \cs{demo}'s warning.
+
+\cs{interactive}\texttt{*} is the \textbf{compact form}: the label alone,
+flush right on a line of its own, with no thumbnail and no caption. It is for
+a graph whose content the page already shows.
+
+\textbf{A graph that belongs to a problem} is named in the problem file's
+metadata, not called from it, so the file stays importable anywhere:
+
+\begin{manexsource}
+\ProblemMeta{
+  ...
+  interactive= {apex-ex3.1.4-approx-extreme-values},
+}
+\end{manexsource}
+
+\noindent The importing document then decides whether to show it, using
+the \texttt{interactive} key of \cs{importproblem}: \texttt{compact} (or bare
+\texttt{interactive}), \texttt{full} or \texttt{false} (see
+section~\ref{sec:ref-exercises}). Lecture notes default to compact, so a
+lecture shows the link without being asked; an assessment defaults to
+nothing. The link goes at the end of the statement, before the solution and
+workspace. The catalogue is the one in the \emph{problem's} topic, found from
+its import path, so a problem imported from another topic still finds its
+own graph.

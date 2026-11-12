@@ -153,6 +153,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %   \interactive{evt-closed-interval}
 %   \interactive[../../interactives/]{evt-closed-interval}   from a deeper file
+%   \interactive*{evt-closed-interval}                       compact: link only
 %
 % Prints a thumbnail of the graph, the same student-facing link label \demo
 % prints, and a one-line caption saying WHAT the graph shows. Everything comes
@@ -160,12 +161,19 @@
 %
 %   <topic>/interactives/<slug>/meta.tex           \InteractiveMeta{...}, below
 %   <topic>/interactives/<slug>/desmos-graph.png   exported from the tool
+%   (and, for GeoGebra/Jupyter, the substantive file itself)
 %
 % THE IMAGE'S NAME defaults to desmos-graph.png because that is what Desmos's
 % PNG export is called, so an export dropped in the directory needs no rename.
 % An `image' key in meta.tex names any other file in the directory (a renamed
 % export, or a GeoGebra one); \InteractiveImage changes the default.
-%   (and, for GeoGebra/Jupyter, the substantive file itself)
+%
+% TWO FORMS. The full one (thumbnail, label, caption) is for a graph that is the
+% point of its spot in a lecture. The STARRED, compact one is the label alone,
+% set flush right on a line of its own: for a graph whose content the page
+% already shows, as when it animates an example's own figure. A problem file
+% reaches it through its metadata, not by calling it -- see
+% \InteractiveForProblem below.
 %
 % WHY A CATALOGUE AND NOT JUST \demo. Three things a bare URL cannot do: be
 % SEARCHED before you build a graph that already exists (the duplicated Desmos
@@ -249,20 +257,73 @@
   \par
 }
 
-\NewDocumentCommand{\interactive}{O{\InteractiveDir} m}{%
+% The compact rendering, \interactive*'s: the link label alone, flush right on
+% a line of its own. A pending entry prints the label unlinked and the
+% instructor-copy note, as the full form does; there is no caption, because
+% the page around a compact link already says what the graph shows.
+\providecommand{\InteractiveCompactFormat}{%
+  \par
+  {\raggedleft
+   \ifdefempty{\Int@url}{\DemoMarker\,\DemoLabel}{\DemoFormat{\Int@url}}%
+   \ifdefempty{\Int@url}
+     {\ifdef{\InstructorInline}{\par\InstructorInline{\InteractivePendingNote}}{}}%
+     {}%
+   \par}%
+}
+
+% Read the entry at \Int@path (already resolved, slash-terminated) and render
+% it with the format hook #1. #2 is the slug, for the warning. Shared by both
+% public commands below, which differ only in how they find the path.
+\newcommand{\Int@show}[2]{%
+  \def\Int@url{}%
+  \def\Int@shows{}%
+  \let\Int@image\InteractiveImage
+  \IfFileExists{\Int@path meta.tex}%
+    {\let\InteractiveMeta\Int@read
+     \input{\Int@path meta.tex}%
+     % Expanded first: \Demo@scan is string surgery on its argument's
+     % TOKENS, and would see one macro, not the "://" inside it.
+     \ifdefempty{\Int@url}{}{\expandafter\Demo@check\expandafter{\Int@url}}}%
+    {\PackageWarning{Hyperlinks}{\string\interactive: no catalogue entry
+       `#2' -- \Int@path meta.tex does not exist}}%
+  #1%
+}
+
+\NewDocumentCommand{\interactive}{s O{\InteractiveDir} m}{%
   \begingroup
-    \def\Int@url{}%
-    \def\Int@shows{}%
-    \let\Int@image\InteractiveImage
-    \edef\Int@path{\import@path #1#2/}%
-    \IfFileExists{\Int@path meta.tex}%
-      {\let\InteractiveMeta\Int@read
-       \input{\Int@path meta.tex}%
-       % Expanded first: \Demo@scan is string surgery on its argument's
-       % TOKENS, and would see one macro, not the "://" inside it.
-       \ifdefempty{\Int@url}{}{\expandafter\Demo@check\expandafter{\Int@url}}}%
-      {\PackageWarning{Hyperlinks}{\string\interactive: no catalogue entry
-         `#2' -- \Int@path meta.tex does not exist}}%
-    \InteractiveFormat
+    \edef\Int@path{\import@path #2#3/}%
+    \IfBooleanTF{#1}
+      {\Int@show{\InteractiveCompactFormat}{#3}}%
+      {\Int@show{\InteractiveFormat}{#3}}%
+  \endgroup
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \InteractiveForProblem -- THE GRAPH A PROBLEM'S METADATA POINTS AT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   \InteractiveForProblem{compact|full}{SLUG}
+%
+% Called by Exercises, never by hand: a problem file names its graph with
+% \ProblemMeta's `interactive' key, and Exercises calls this at the end of the
+% statement when the importing document asks for it (\importproblem's
+% `interactive' key; ref-exercises in the manual).
+%
+% WHICH CATALOGUE: the one belonging to the PROBLEM'S topic, worked out from
+% the problem's own import path. A bank file sits under <topic>/problems/, so
+% everything in \import@path before `problems/' is the topic root, and the
+% catalogue is <that>interactives/. This is what lets a lecture in one topic
+% import a problem from another and still find that problem's graph. With no
+% `problems/' in the path -- a problem written in place in a lecture -- it
+% falls back to \InteractiveDir, exactly as \interactive does.
+\RequirePackage{xstring}
+\NewDocumentCommand{\InteractiveForProblem}{m m}{%
+  \begingroup
+    \IfSubStr{\import@path}{problems/}%
+      {\StrBefore{\import@path}{problems/}[\Int@topic]%
+       \edef\Int@path{\Int@topic interactives/#2/}}%
+      {\edef\Int@path{\import@path\InteractiveDir#2/}}%
+    \IfStrEq{#1}{full}%
+      {\Int@show{\InteractiveFormat}{#2}}%
+      {\Int@show{\InteractiveCompactFormat}{#2}}%
   \endgroup
 }

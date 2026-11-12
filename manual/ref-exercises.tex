@@ -100,6 +100,14 @@ per-import settings (keyval family \env{eximport});
   shared with the aside of the same name) and adds the pen glyph to the
   contents entry. Top-level problems only --- on a check-in or a
   \env{problemgroup} member the heading is never rendered, and it warns.\\
+\texttt{interactive=compact} & show the graph the problem's
+  \cs{ProblemMeta} names (its \env{interactive} key) as a link label, flush
+  right at the end of the statement. Bare \texttt{interactive} and
+  \texttt{interactive=true} mean the same. \texttt{=full} shows the thumbnail
+  and caption instead, \texttt{=false} nothing; any other value is an
+  error. Unset, \cs{ProblemInteractiveDefault} decides: \texttt{false}
+  here, \texttt{compact} in LectureNotes. Does nothing for a problem
+  that names no graph.\\
 \end{tabularx}
 \end{center}
 
