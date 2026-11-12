@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{Hyperlinks}[2026/11/06 hyperref (loaded last) + \string\demo, \string\interactive]
+\ProvidesPackage{Hyperlinks}[2026/11/12 hyperref (loaded last) + \string\demo, \string\interactive]
 
 % hyperref for the course classes, plus \demo (links out to an interactive tool)
 % and \interactive (the same, with a catalogue entry behind it).
@@ -158,8 +158,13 @@
 % prints, and a one-line caption saying WHAT the graph shows. Everything comes
 % from one catalogue entry, a directory per graph:
 %
-%   <topic>/interactives/<slug>/meta.tex        \InteractiveMeta{...}, below
-%   <topic>/interactives/<slug>/thumbnail.png   exported from the tool
+%   <topic>/interactives/<slug>/meta.tex           \InteractiveMeta{...}, below
+%   <topic>/interactives/<slug>/desmos-graph.png   exported from the tool
+%
+% THE IMAGE'S NAME defaults to desmos-graph.png because that is what Desmos's
+% PNG export is called, so an export dropped in the directory needs no rename.
+% An `image' key in meta.tex names any other file in the directory (a renamed
+% export, or a GeoGebra one); \InteractiveImage changes the default.
 %   (and, for GeoGebra/Jupyter, the substantive file itself)
 %
 % WHY A CATALOGUE AND NOT JUST \demo. Three things a bare URL cannot do: be
@@ -179,7 +184,7 @@
 % stay literal").
 %
 % PENDING ENTRIES BUILD CLEANLY. An entry is usually written before its graph
-% exists -- the URL is empty and there is no thumbnail yet -- and a lecture
+% exists -- the URL is empty and there is no image yet -- and a lecture
 % that cites it must still meet the zero-warning bar. So a pending entry is NOT
 % a warning: the thumbnail's place shows a plain frame, the label prints
 % unlinked, and the instructor copy alone says "pending". The two things that
@@ -187,15 +192,18 @@
 % URL without a scheme (\demo's check, reused).
 
 % \InteractiveMeta{url = ..., tool = ..., source = ..., shows = ..., tags = ...,
-% section = ...} -- STORE-ONLY everywhere, the same idiom as \ProblemMeta: it
-% compiles to nothing, and find tools grep it. Only inside \interactive is it
-% given a meaning, locally, so the call can read the url and shows fields.
+% section = ..., image = ...} -- STORE-ONLY everywhere, the same idiom as
+% \ProblemMeta: it compiles to nothing, and find tools grep it. Only inside
+% \interactive is it given a meaning, locally, so the call can read the url,
+% shows and image fields. `image' is optional; the rest are expected.
 % Wrap any value containing a comma in braces.
 \providecommand{\InteractiveMeta}[1]{}
 
-% Knobs. Thumbnail width as a fraction of the line; the gap between the
-% thumbnail and the text; the instructor-copy note for a pending entry.
+% Knobs. The image file an entry without an `image' key uses; thumbnail width
+% as a fraction of the line; the gap between the thumbnail and the text; the
+% instructor-copy note for a pending entry.
 \providecommand{\InteractiveDir}{../interactives/}
+\providecommand{\InteractiveImage}{desmos-graph.png}
 \providecommand{\InteractiveThumbWidth}{0.32\linewidth}
 \providecommand{\InteractiveGap}{1em}
 \providecommand{\InteractivePendingNote}{pending: no graph built yet}
@@ -206,6 +214,7 @@
 \RequirePackage{keyval}
 \define@key{intmeta}{url}{\def\Int@url{#1}}
 \define@key{intmeta}{shows}{\def\Int@shows{#1}}
+\define@key{intmeta}{image}{\def\Int@image{#1}}
 \define@key{intmeta}{tool}{}
 \define@key{intmeta}{source}{}
 \define@key{intmeta}{tags}{}
@@ -214,8 +223,8 @@
 
 % The thumbnail, or a frame of the same width standing in for it.
 \newcommand{\Int@thumb}{%
-  \IfFileExists{\Int@path thumbnail.png}%
-    {\includegraphics[width=\linewidth]{\Int@path thumbnail.png}}%
+  \IfFileExists{\Int@path\Int@image}%
+    {\includegraphics[width=\linewidth]{\Int@path\Int@image}}%
     {\fbox{\parbox[c][0.6\linewidth][c]{\dimexpr\linewidth-2\fboxsep-2\fboxrule}%
        {\centering\DemoMarker\,\DemoLabel}}}%
 }
@@ -244,6 +253,7 @@
   \begingroup
     \def\Int@url{}%
     \def\Int@shows{}%
+    \let\Int@image\InteractiveImage
     \edef\Int@path{\import@path #1#2/}%
     \IfFileExists{\Int@path meta.tex}%
       {\let\InteractiveMeta\Int@read
