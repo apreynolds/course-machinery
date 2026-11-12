@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# find-meta — search a bank of .tex files (problems, facts or passages) and write
-# its import lines
+# find-meta — search a bank of .tex files (problems, facts, passages or
+# interactives) and write its import lines
 #
-# The shared engine behind find-problems, find-facts and find-passages. A "kind"
-# (chosen with --kind) fixes three things: the block macro it reads (\ProblemMeta
-# / \FactMeta), the import command it emits (\importproblem / \importfact /
-# \import), and the key schema (which filters exist, which columns --tsv prints).
+# The shared engine behind find-problems, find-facts, find-passages and
+# find-interactives. A "kind" (chosen with --kind) fixes three things: the block
+# macro it reads (\ProblemMeta / \FactMeta / \InteractiveMeta), the import
+# command it emits (\importproblem / \importfact / \import / \interactive), and
+# the key schema (which filters exist, which columns --tsv prints).
 # Everything else -- reading a block off disk, matching, emitting -- is shared and
 # lives here, in one place.
 #
@@ -16,10 +17,16 @@
 # block_macro and takes its own path through the walk, never reaching either of
 # the two block parsers -- see "A BANK WITH NO BLOCK" below.
 #
+# AN INTERACTIVE IS A BLOCK KIND WITH A DIFFERENT SHAPE OF ENTRY. Its block is
+# an ordinary one, so it shares the parsers, filters and --tsv; but the entry is
+# a DIRECTORY (interactives/<slug>/meta.tex), and \interactive names the slug,
+# not the file -- so it takes its own branch in the --import emitter only. See
+# "AN INTERACTIVE'S IMPORT LINE" there.
+#
 # This file is not meant to be called directly: invoke the per-kind shims
-# find-problems / find-facts / find-passages, which each `exec' this with the
-# right --kind. See ProblemMeta.sty / FactMeta.sty for the block format this
-# parses.
+# find-problems / find-facts / find-passages / find-interactives, which each
+# `exec' this with the right --kind. See ProblemMeta.sty / FactMeta.sty /
+# Hyperlinks.sty for the block formats this parses.
 #
 # Usage: find-meta --kind KIND [--as NAME] [FILTER ...] [--untagged] [--vocab]
 #                  [--tsv] [--import [--with LIST] [--from DIR]] [PATH ...]
@@ -138,8 +145,23 @@ case $kind in
     # document" but "there is no metadata here to inject". See the guard below.
     with_keys=()
     ;;
-  '') echo "$prog: --kind is required (problem|fact|passage)" >&2; exit 2 ;;
-  *)  echo "$prog: unknown --kind: $kind (want problem|fact|passage)" >&2; exit 2 ;;
+  interactive)
+    # A catalogue entry: interactives/<slug>/meta.tex, read by \interactive
+    # (Hyperlinks.sty). The SLUG is the directory name, which --tsv already
+    # prints as its derived folder column -- so it is not repeated in tsv_cols.
+    # url comes second so the picker shows at a glance which entries are still
+    # pending (pick-meta marks an empty one); shows is last because it is the
+    # long one, and fzf truncates from the right.
+    noun="interactive"; block_macro="InteractiveMeta"; emit_macro="interactive"
+    filter_specs=(tag:tags section:section tool:tool source:source)
+    tsv_cols=(section url tool tags shows)
+    vocab_keys=(tags tool)
+    # Empty: \interactive takes no options from the entry -- it reads meta.tex
+    # itself at build time, so there is nothing to copy into the call.
+    with_keys=()
+    ;;
+  '') echo "$prog: --kind is required (problem|fact|passage|interactive)" >&2; exit 2 ;;
+  *)  echo "$prog: unknown --kind: $kind (want problem|fact|passage|interactive)" >&2; exit 2 ;;
 esac
 
 # flag -> key map (for the option loop) and the filter store (key -> pattern,
@@ -236,10 +258,14 @@ usage() {
   echo "  --untagged  invert: list .tex files with NO \\$block_macro block."
   echo "  --vocab     ignore filters; print the ${vocab_keys[*]} vocabulary with counts."
   echo "  --import    print matches as paste-ready \\$emit_macro lines."
+  if [[ $kind == interactive ]]; then
+    echo "              \\interactive{slug} when the entry sits at ../interactives/"
+    echo "              from --from (a lecture's default), else \\interactive[DIR/]{slug}."
+  fi
   if (( ${#with_keys[@]} )); then
     echo "    --with LIST   subset of {$(IFS=,; echo "${with_keys[*]}")}: inject those as options where set."
   else
-    echo "    --with        not accepted: a $noun has no injectable keys."
+    echo "    --with        not accepted: the $noun bank has no injectable keys."
   fi
   echo "    --from DIR    rewrite each directory argument relative to DIR."
   cols="path<TAB>folder"; for c in "${tsv_cols[@]}"; do cols+="<TAB>$c"; done
@@ -297,11 +323,16 @@ fi
 # not a narrower request but a meaningless one -- say so, rather than falling into
 # the loop below and reporting "accepts only  for a passage".
 if [[ -n $with_request && ${#with_keys[@]} -eq 0 ]]; then
-  printf '%s: a %s has no injectable keys, so --with is not accepted\n' \
+  printf '%s: the %s bank has no injectable keys, so --with is not accepted\n' \
     "$prog" "$noun" >&2
-  echo "       a $noun carries no metadata at all -- its title and label are" >&2
-  echo "       computed from its file name -- so there is nothing to inject into" >&2
-  echo "       the emitted line. Edit the heading after pasting." >&2
+  if [[ -z $block_macro ]]; then
+    echo "       a $noun carries no metadata at all -- its title and label are" >&2
+    echo "       computed from its file name -- so there is nothing to inject into" >&2
+    echo "       the emitted line. Edit the heading after pasting." >&2
+  else
+    echo "       \\$emit_macro reads its entry's metadata itself at build time," >&2
+    echo "       so there is nothing to copy into the emitted line." >&2
+  fi
   exit 2
 fi
 
@@ -755,6 +786,24 @@ case $mode in
     # relative to the search root and usually need a ../ or two (paste and
     # adjust); --from does the ../ for you.
     for f in "${matches[@]}"; do
+      # AN INTERACTIVE'S IMPORT LINE names a directory, not a file:
+      # interactives/<slug>/meta.tex becomes \interactive{slug}, and the
+      # optional argument is the directory ABOVE the slug (the catalogue). It
+      # is left off when that is ../interactives/, Hyperlinks.sty's
+      # \InteractiveDir default -- what a lecture one level below its topic
+      # root needs. Without --from the catalogue path is relative to the
+      # search root, as every kind's is, so expect to adjust it.
+      if [[ $kind == interactive ]]; then
+        slugdir=$(dirname "$f")
+        catalogue=$(import_dir "$slugdir")
+        if [[ $catalogue == ../interactives ]]; then
+          printf '\\%s{%s}\n' "$emit_macro" "${slugdir##*/}"
+        else
+          printf '\\%s[%s/]{%s}\n' "$emit_macro" "$catalogue" "${slugdir##*/}"
+        fi
+        continue
+      fi
+
       file=$(basename "$f")
       dir=$(import_dir "$f")
 

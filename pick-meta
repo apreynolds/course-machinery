@@ -60,8 +60,10 @@ case $kind in
   # \section/\label built from the file name, a blank, then a plain \import. The
   # --with pair below must be omitted entirely rather than passed empty.
   passage) noun="passage"; inject_keys="";                  emit_desc="\\section + \\import" ;;
-  '') echo "$prog: --kind is required (problem|fact|passage)" >&2; exit 2 ;;
-  *)  echo "$prog: unknown --kind: $kind (want problem|fact|passage)" >&2; exit 2 ;;
+  # Empty too, but because \interactive reads its own meta.tex at build time.
+  interactive) noun="interactive"; inject_keys="";          emit_desc="\\interactive" ;;
+  '') echo "$prog: --kind is required (problem|fact|passage|interactive)" >&2; exit 2 ;;
+  *)  echo "$prog: unknown --kind: $kind (want problem|fact|passage|interactive)" >&2; exit 2 ;;
 esac
 
 usage() {
@@ -155,12 +157,26 @@ if [[ -z $inject_keys && $kind == passage && ${#feed_args[@]} -eq 0 ]]; then
   exit 2
 fi
 
+# A PENDING INTERACTIVE -- one whose graph is not built yet -- has an empty url,
+# and an empty column is invisible in fzf. So for that kind alone, write
+# `(pending)' into the url column (column 4: path, folder, section, url) on the
+# way to the display. Only the display: column 1, the path, is what goes back to
+# --import, so the marker never reaches an emitted line.
+mark_pending() {
+  if [[ $kind == interactive ]]; then
+    awk -F'\t' -v OFS='\t' '$4 == "" { $4 = "(pending)" } { print }'
+  else
+    cat
+  fi
+}
+
 selection=$(
   # feed_args may legitimately be empty for a problem or fact (a bare run
   # defaults to `.'), and a bare "${a[@]}" on an empty array is an unbound-
   # variable error under `set -u' on bash 4.0-4.3, which is the floor this
   # script advertises. Guarded the way find-meta guards the same shape.
   "${engine[@]}" --tsv ${feed_args[@]+"${feed_args[@]}"} \
+    | mark_pending \
     | fzf --multi \
           --delimiter='\t' --with-nth=2.. \
           --preview='bat --color=always --language=tex --style=numbers {1}' \

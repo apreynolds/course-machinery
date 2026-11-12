@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# find-interactives — search the interactives catalogue by its \InteractiveMeta
+# metadata.
+# A thin shim over find-meta (the shared engine); `--help' lists the concrete
+# filters (--tag/--section/--tool/--source). Each entry is a directory,
+# <topic>/interactives/<slug>/meta.tex, and --import writes \interactive{slug}.
+# See find-meta and Hyperlinks.sty.
+exec "$(dirname -- "$0")/find-meta" --kind interactive --as find-interactives "$@"
