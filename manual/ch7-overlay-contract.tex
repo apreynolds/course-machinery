@@ -71,7 +71,7 @@ the answer key \emph{is} page 9 of the student paper, with answers painted
 into its blank space. A quick check after any layout change: a source's
 views must all have the same page count. If they differ, something has broken the
 contract. (One deliberate exception: a lecture that carries the textbook's
-prose in \env{textprose} has a longer instructor copy --
+prose in instructor-only \env{textprose} has a longer instructor copy --
 section~\ref{sec:ref-instructornotes}.)
 
 Seeing it live -- this example flips the manual back to overlay mode
@@ -110,7 +110,7 @@ The whole inventory, so that nothing has to be rediscovered.
   \item \textbf{Zero footprint:} \env{studentonly}, described next, and the frame drawn round the correct choice in a solutions build.
     Neither is zero-height, but each takes exactly the room the student copy gives it: the first keeps its space and drops its ink, the second reports the bare option's size and lets the frame overflow into the surrounding whitespace.
   \item \textbf{Natural height, on purpose:} \env{hint}, \env{textprose} and \cs{InstructorInline}.
-    A hint pushes content down, a \env{textprose} passage makes the instructor copy longer, and an inline note is running text that reflows its paragraph.
+    A hint pushes content down, an instructor-only \env{textprose} passage makes the instructor copy longer, and an inline note is running text that reflows its paragraph.
 \end{itemize}
 
 \subsection{Space the key reclaims: \env{studentonly}}

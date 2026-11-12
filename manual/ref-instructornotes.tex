@@ -39,17 +39,35 @@ fold per passage:
 \end{textprose}
 \end{manexample}
 
-One key, \texttt{print}: \verb|\begin{textprose}[print=false]| (or the flag
-form, \texttt{[noprint]}) keeps a passage in the source and off every copy --
-the key every box takes (section~\ref{sec:print-key}); \env{InstructorBox}
-takes it too, beside its bar word. It is for the editing pass:
+One key, \texttt{print}, with three values. It is for the editing pass:
 read each passage, lift what belongs in the lecture into ordinary text or an
-\env{InstructorBox}, and switch off what is left without deleting it.
+\env{InstructorBox}, keep a passage whole where the book says it best, and
+switch off what is left without deleting it.
 
-It looks different on purpose -- no fill, a thin slate rule, the document's
-own serif in slate -- because it is the book talking, not a note to self.
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l Y@{}}
+\texttt{print=instructor} & the instructor copy only, as above. A bare
+  \cs{begin}\texttt{\{textprose\}} means the same.\\
+\texttt{print=true} & every copy, as ordinary body text. Bare
+  \texttt{[print]} means the same.\\
+\texttt{print=false} & no copy (or the flag form, \texttt{[noprint]}) -- the
+  key every box takes (section~\ref{sec:print-key}).\\
+\end{tabularx}
+\end{center}
 
-Unlike \env{InstructorBox} it prints at \textbf{natural height}: a passage is
+\noindent Any other value is an error. Until 2026-11-12 \texttt{print=true}
+meant the instructor copy; a lecture written before then needs
+\texttt{print=instructor} in its place.
+
+On the instructor copy alone, a passage looks different on purpose -- no
+fill, a thin slate rule, the document's own serif in slate -- because it is
+the book talking, not a note to self. A passage printed on \emph{every} copy
+is plain body text in every view, the instructor's included: an indent would
+rewrap its lines and break the overlay contract (section~\ref{sec:overlay}).
+What marks it there is a tag in the instructor margin, \cs{TextProseTag}
+(default \emph{text}), which takes no room on the page.
+
+Unlike \env{InstructorBox}, an instructor-only passage prints at \textbf{natural height}: a passage is
 paragraphs long and has no workspace under it, so as an overlay it would print
 over whatever follows. Two consequences:
 
