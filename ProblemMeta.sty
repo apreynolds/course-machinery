@@ -1,4 +1,4 @@
-\ProvidesPackage{ProblemMeta}[2026/07/18 Greppable problem metadata (store only)]
+\ProvidesPackage{ProblemMeta}[2026/11/12 Greppable problem metadata (store only, bar interactive)]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % WHY THIS EXISTS
@@ -19,6 +19,7 @@
 %     number     = {3.1.2},
 %     seed       = {1234},     (only for a problem frozen from a random original)
 %     name       = {},
+%     interactive= {apex-ex3.1.4-approx-extreme-values},  (only with a graph)
 %   }
 %
 % `name' WAS CALLED `desc' until 2026-08-13. Same key, same job -- a short content
@@ -35,7 +36,8 @@
 % one way to get the two readers out of step, so it is worth the discipline.
 %
 % The LaTeX side is now STORE-ONLY: \ProblemMeta accepts the block (so the file
-% compiles and a mistyped key is caught) but typesets nothing. It used to ALSO
+% compiles and a mistyped key is caught) but typesets nothing. The one
+% exception is `interactive', whose value is kept for Exercises (below). It used to ALSO
 % print the metadata in the margin under \def\ShowProblemMeta{}; that DISPLAY
 % layer was removed 2026-07-18 once no build view still wanted it. To bring
 % printed metadata back, restore a display section that reads the key values --
@@ -63,5 +65,12 @@
 % problem with no random original.
 \define@key{ProblemMeta}{seed}      {}
 \define@key{ProblemMeta}{name}      {}
+% `interactive' names the problem's graph in its topic's interactives/ catalogue
+% (Hyperlinks.sty) -- the one key whose value IS kept, because something reads
+% it at build time: Exercises shows the graph at the end of the statement when
+% the importing document asks for it (\importproblem's `interactive' key, on by
+% default in LectureNotes). Stored globally because the block sits inside the
+% problem environment's group; the problem environment clears it.
+\define@key{ProblemMeta}{interactive}{\gdef\CurrentProblemInteractive{#1}}
 
 \newcommand{\ProblemMeta}[1]{\setkeys{ProblemMeta}{#1}\ignorespaces}

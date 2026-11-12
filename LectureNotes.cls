@@ -82,6 +82,12 @@
 \RequirePackage{TitleBlock}
 \RequirePackage{Hyperlinks}
 
+% A problem whose metadata names a graph (\ProblemMeta's `interactive') shows
+% it in lecture notes unless its import says interactive=false: the compact
+% link, at the end of the statement. Exercises' own default is `false', so an
+% assessment shows none unless asked.
+\renewcommand{\ProblemInteractiveDefault}{compact}
+
 % \textbookref -- links into the course text. Mechanism only: the base URL and the
 % section manifest are course data, declared in the course's own text layer
 % (texts/ here, or a course's own file in its course-info/).

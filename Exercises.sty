@@ -163,6 +163,35 @@
 % that is what source/number are for, and they stay store-only.
 \newcommand{\CurrentProblemName}{}
 
+% THE PROBLEM'S GRAPH. Two halves, deliberately in two places:
+%
+%   the problem file  \ProblemMeta{..., interactive = {SLUG}}: WHICH graph.
+%                     Intrinsic, so it travels with the problem, and it is only
+%                     metadata -- a test importing the file shows nothing.
+%   the import        \importproblem[..., interactive=MODE]: WHETHER and HOW,
+%                     since that is the document's choice, not the problem's.
+%
+% MODE is one of
+%   compact (or bare `interactive', or true)  the link label alone, flush right
+%   full                                      thumbnail, label and caption
+%   false                                     nothing
+% and an import that says nothing gets \ProblemInteractiveDefault: `false' here,
+% so an assessment shows no graph unless asked, and `compact' in LectureNotes.
+%
+% The graph goes AT THE END OF THE STATEMENT: just before the first solution
+% or hint box, or at \end{problem} if there is neither -- once per problem. Not
+% on the heading line, which prints before \ProblemMeta has said what the slug
+% is. In a problem with parts that carry their own solutions, that is after the
+% first part's statement.
+%
+% The slug is written by ProblemMeta's key (ProblemMeta.sty); this package only
+% reads it, and renders through Hyperlinks' \InteractiveForProblem when that is
+% loaded (both classes load it) -- so Exercises still does not REQUIRE either.
+\newcommand{\CurrentProblemInteractive}{}
+\newcommand{\CurrentProblemInteractiveMode}{default}
+\providecommand{\ProblemInteractiveDefault}{false}
+\newif\ifEx@interactivedone
+
 % The NOUN for this one import, set by \importproblem's `label' key -- "Checkpoint"
 % where the rest of the lecture says "Example". The per-COURSE noun
 % (\NotesProblemLabelWord) remains the default and the usual answer; this is for a
@@ -424,6 +453,19 @@
 % because the heading renders inside the imported file's own groups.
 \newif\ifyourturnmode
 \define@key{eximport}{yourturn}[true]{\global\yourturnmodetrue}
+% `interactive' -- whether and how to show the graph the problem's metadata
+% names (see THE PROBLEM'S GRAPH above). A closed set, so a typo stops the
+% build rather than quietly showing the default. Bare `interactive' and
+% `interactive=true' both mean compact.
+\define@key{eximport}{interactive}[compact]{%
+  \ifstrequal{#1}{compact}{\gdef\CurrentProblemInteractiveMode{compact}}{%
+  \ifstrequal{#1}{true}   {\gdef\CurrentProblemInteractiveMode{compact}}{%
+  \ifstrequal{#1}{full}   {\gdef\CurrentProblemInteractiveMode{full}}{%
+  \ifstrequal{#1}{false}  {\gdef\CurrentProblemInteractiveMode{false}}{%
+    \PackageError{Exercises}%
+      {interactive=#1 is not one of compact, full, false}%
+      {Bare `interactive' means compact.}}}}}%
+}
 
 \newcommand{\importproblem@reset}{%
   \gdef\CurrentProblemPoints{}%
@@ -438,6 +480,7 @@
   \global\CurrentProblemPrinttrue
   \global\checkinmodefalse
   \global\yourturnmodefalse
+  \gdef\CurrentProblemInteractiveMode{default}%
   \global\CurrentProblemBonusfalse
   % Case-2 multipart points (\ifPartsSeen is per-PROBLEM, reset there, not here).
   \global\PartsListModefalse
@@ -777,6 +820,25 @@
   \noindent\textbf{\ProblemNumberText.}\quad\ignorespaces#1%
 }
 
+% Show the problem's graph, once, if it has one and the import wants it (see
+% THE PROBLEM'S GRAPH). Called at the start of solution, hint and
+% \end{problem}; the first call does the work and the rest find it done.
+% \Ex@imode is \let rather than compared directly, because \ProblemInteractiveDefault
+% is itself a macro and \ifdefstring wants one to look inside.
+\newcommand{\Ex@interactive@emit}{%
+  \ifEx@interactivedone\else
+    \global\Ex@interactivedonetrue
+    \ifdefempty{\CurrentProblemInteractive}{}{%
+      \ifdefstring{\CurrentProblemInteractiveMode}{default}%
+        {\let\Ex@imode\ProblemInteractiveDefault}%
+        {\let\Ex@imode\CurrentProblemInteractiveMode}%
+      \ifdefstring{\Ex@imode}{false}{}{%
+        \ifdefined\InteractiveForProblem
+          \InteractiveForProblem{\Ex@imode}{\CurrentProblemInteractive}%
+        \fi}}%
+  \fi
+}
+
 % The environment separates BOOKKEEPING (counter + running total -- never
 % overridable, so a restyled heading can never disturb the point count) from
 % PRESENTATION (the heading). A part inside a \problemgroup always renders as a
@@ -792,6 +854,10 @@
   \fi
   % --- Bookkeeping.
   \ifinproblemgroup\refstepcounter{subproblem}\else\refstepcounter{problem}\fi
+  % Each problem starts with no graph; its own \ProblemMeta, read just below
+  % this, sets one if it has one.
+  \gdef\CurrentProblemInteractive{}%
+  \global\Ex@interactivedonefalse
   % Case-2: cleared here (per problem) so \end below can tell whether a `qparts'
   % environment actually ran to consume any multipart points spec.
   \global\PartsSeenfalse
@@ -849,6 +915,7 @@
   \fi
   \ignorespaces
 }{%
+  \Ex@interactive@emit
   \par
   % A case-2 points spec must be consumed by a `qparts' environment. If one was
   % given (positional list or broadcast) but no parts ran, the points would
@@ -1351,6 +1418,9 @@
 % \ex@boxkeys exists so \PrintKeyRest can be expanded into \setkeys' argument.
 \newcommand{\ex@boxkeys}[1]{\setkeys{exbox}{#1}}
 \NewEnviron{solution}[1][]{%
+  % Before anything else, and on every copy whether or not the solution shows:
+  % the graph belongs to the statement, and the two copies must line up.
+  \Ex@interactive@emit
   \PrintKeyParse{#1}%
   \ex@notitlefalse
   \expandafter\ex@boxkeys\expandafter{\PrintKeyRest}%
@@ -1460,6 +1530,8 @@
 % in the source and on no copy, the key every box takes (PrintKey.sty). It still
 % counts as "this file has a hint" for the warning below.
 \NewEnviron{hint}[1][]{%
+  % The problem's graph comes first, as at \begin{solution}.
+  \Ex@interactive@emit
   % Record that the imported file HAS a hint, shown or not -- \importproblem
   % reads this to warn when [hint] is forced on a hint-less file.
   \global\Ex@hintseentrue
