@@ -59,3 +59,11 @@ and InstructorNotes each carry an \cs{AtBeginDocument}
 section~\ref{sec:architecture}. Two properties follow from the mechanism:
 an overlay box never page-breaks (it is a fixed stamp), and one taller
 than its workspace overprints -- the intended alarm.
+
+\cs{WSOverlayNextPage}\texttt{\{$\langle$a complete tcolorbox$\rangle$\}},
+called straight after a \cs{WSZeroHeight} stamp, continues it: the box is
+painted at the top of the text block of the next page shipped out, and each
+further call one page later. The page is found at shipout, from a mark left
+beside the stamp, so no second run is needed. It reserves nothing -- the
+document supplies the blank pages -- and in solid mode it is a
+pass-through. Exercises' \cs{solutionbreak} is its one user.

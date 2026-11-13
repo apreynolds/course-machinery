@@ -147,6 +147,39 @@ nothing warns: the key just looks wrong. Note also that the body is measured
 by typesetting it, and in the key that box is then discarded -- so keep
 \cs{label}s out of a \env{studentonly} body.
 
+\subsection{A solution longer than its page: \cs{solutionbreak}}
+
+A stamp is fixed to the page it lands on, so no workspace can hold a solution longer than a page, and \texttt{scale} only rescues one a little too long.
+\cs{solutionbreak}, written in the solution body between paragraphs, cuts it there: the first part is the usual stamp, and each later part is painted at the top of the next page, under a ``solution, continued'' tab (plain, if the solution is \texttt{notitle}).
+The document gives the student copy those pages, one \cs{FreshPage}\texttt{[blank]} per break:
+
+\begin{manexsource}
+% in the problem file
+\begin{solution}[notitle]
+  ...the critical numbers...
+  \solutionbreak
+  ...the sign chart and the conclusion...
+\end{solution}
+
+% in the lecture
+\importproblem{../problems/...}{example.tex}
+\workspace*
+\FreshPage[blank]   % blank for the student; the rest of the answer in the key
+\end{manexsource}
+
+The two halves sit where they do for the same reason as the workspace key declined above.
+Where a solution falls naturally in two is a fact about the solution, so the break is in the problem file; how much room a page gives is a fact about the layout, so the blank page is in the document.
+Both copies keep the same pages, and the contract holds.
+
+Everywhere else \cs{solutionbreak} does nothing: under \cs{collapseworkspace} the solution is one box that breaks across pages on its own, without Workspace (\file{CourseDocument}) likewise, and a student copy prints no solution at all.
+So a problem with a break imports safely into any document.
+Two things to know:
+\begin{itemize}
+  \item \textbf{Forget the blank page and the continuation overprints} whatever starts the next page -- the same alarm as a stamp that is too tall.
+  \item \textbf{Break between paragraphs only}, never inside a list, a display or any other environment: the body is cut at the command, so each part must stand on its own.
+    A long \env{description} of cases takes its break before or after the list.
+\end{itemize}
+
 \subsection{Solid mode: the compact answer key}
 
 Sometimes the spaced layout is wrong: an answer-key handout to post online,
