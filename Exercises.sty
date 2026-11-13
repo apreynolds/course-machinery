@@ -1345,9 +1345,20 @@
 % parbox=false so display math and multiple paragraphs in the body set normally;
 % breakable so a long body can cross a page. The tab fill is a strong tint (!80)
 % so the white tab text keeps its contrast.
+% list first: with parbox=false, tcolorbox calls \OmitIndent on the box's first
+% paragraph (tcolorbox.sty, \tcb@set@parbox@indent@). When that paragraph is a list's
+% first \item, LaTeX's \item code then finds no indent box and kerns by -\itemindent
+% instead: a description label that opens the box lands a list margin too far right.
+% With \parindent 0pt the omitted indent is zero-width anyway, so the one-shot hook is
+% cancelled there; a document with a real indent keeps tcolorbox's behaviour. Defined
+% identically in InstructorNotes.sty, whose boxes are parbox=false too.
+\tcbset{
+  list first/.style={before upper app={\ifdim\parindent=\z@ \ClearHookNext{para/begin}\fi}},
+}
+
 \tcbset{
   ex/answerbox/.style={
-    enhanced, breakable, parbox=false,
+    enhanced, breakable, parbox=false, list first,
     colback=#1!5, colframe=#1!60,
     sharp corners, boxrule=0.2mm,
     left=6pt, right=6pt, top=10pt, bottom=6pt,
