@@ -10,6 +10,7 @@
 %   \begin{problemgroup}{STEM} ...         "Problem N." + stem; parts render (a),(b)
 %   \begin{solution}[notitle] ...          printed only in the solutions build; a
 %                                          colour box, [notitle] drops its corner tab
+%     \solutionbreak                       continue it on the next (blank) page
 %   \begin{hint} ... \end{hint}            printed only in the hints build; a plain
 %                                          "HINT:" run-in, italic body (no box)
 %   \begin{choices}[stacked|onepar|grid]   lettered MC options in that layout;
@@ -1374,6 +1375,8 @@
   },
   ex/solution/.style     ={ex/answerbox=SolutionColor, ex/answertab={SolutionColor}{solution}},
   ex/solutionplain/.style={ex/answerbox=SolutionColor, top=6pt},
+  % the overleaf part of a solution split by \solutionbreak
+  ex/solutioncont/.style ={ex/answerbox=SolutionColor, ex/answertab={SolutionColor}{solution, continued}},
 }
 
 % Zero-height overlay routing. Workspace.sty (loaded by Assessment/LectureNotes) defines
@@ -1427,14 +1430,90 @@
   \ifsolutions
     \PrintKeyIfPrint{%
       \par
-      \ifex@notitle
-        \WSZeroHeight{\begin{tcolorbox}[ex/solutionplain]\BODY\end{tcolorbox}}%
+      \ex@solution@styles
+      \ex@checkoverlay
+      \ifex@overlay
+        \ex@solution@parts
       \else
-        \WSZeroHeight{\begin{tcolorbox}[ex/solution]\BODY\end{tcolorbox}}%
+        \WSZeroHeight{\begin{tcolorbox}[ex/sol@first]\BODY\end{tcolorbox}}%
       \fi
     }{}%
   \fi
 }
+
+% The box styles for THIS solution, chosen once by [notitle]: ex/sol@first for the
+% stamp, ex/sol@cont for any part continued overleaf. Local to the environment.
+\newcommand{\ex@solution@styles}{%
+  \ifex@notitle
+    \tcbset{ex/sol@first/.style={ex/solutionplain}, ex/sol@cont/.style={ex/solutionplain}}%
+  \else
+    \tcbset{ex/sol@first/.style={ex/solution}, ex/sol@cont/.style={ex/solutioncont}}%
+  \fi
+}
+
+% \solutionbreak -- a PAGE BREAK INSIDE A SOLUTION, for one too long for the page
+% its problem is on. Written in the solution body, between steps:
+%
+%   \begin{solution}[notitle]
+%     ... first steps ...
+%     \solutionbreak
+%     ... the rest ...
+%   \end{solution}
+%
+% In OVERLAY mode the solution is cut there into separate boxes: the first is the
+% usual zero-height stamp, and each later part is painted at the top of the next
+% page (\WSOverlayNextPage, Workspace.sty), under a "solution, continued" tab --
+% plain if the solution is [notitle]. The DOCUMENT must provide those pages in the
+% student copy, one \FreshPage[blank] per break after the problem's \workspace*:
+%
+%   \importproblem{...}{example.tex}
+%   \workspace*
+%   \FreshPage[blank]      % the student's blank page; the key's continuation
+%
+% so both copies keep the same pages. The break is in the problem file (where a
+% sensible break falls is a fact about the solution) and the blank page in the
+% document (how much room to give is a fact about the layout).
+%
+% Everywhere else \solutionbreak does NOTHING: in SOLID mode (\collapseworkspace)
+% the solution is one box that breaks across pages on its own; without Workspace
+% (CourseDocument) likewise; in a student copy the solution is not printed at all.
+% So a problem with a \solutionbreak imports safely into any document -- only an
+% overlay key that forgets the blank page shows it, by overprinting.
+%
+% Put a break between paragraphs, not inside a list, display or other environment:
+% the body is cut at the token, so each part must stand on its own.
+\newcommand{\solutionbreak}{\par}
+
+% Overlay mode is on only when Workspace is loaded and its flag is true; looked up by
+% name for the same reason as \ex@so@blank below (Workspace may be absent), and in a
+% macro of its own so a skipped \ifsolutions branch never meets the bare \fi's.
+\newif\ifex@overlay
+\newcommand{\ex@checkoverlay}{%
+  \ex@overlayfalse
+  \ifcsname ifWorkspaceOverlay\endcsname
+    \csname ifWorkspaceOverlay\endcsname \ex@overlaytrue \fi
+  \fi
+}
+
+% Split \BODY at each \solutionbreak (expl3's sequence split does the cutting) and
+% send the first part to the stamp, the rest to the following pages. With no break
+% in the body this is exactly one \WSZeroHeight box, as before.
+\ExplSyntaxOn
+\seq_new:N \l__ex_solparts_seq
+\tl_new:N \l__ex_solpart_tl
+\cs_new_protected:Npn \ex@solution@parts
+  {
+    \seq_set_split:NnV \l__ex_solparts_seq { \solutionbreak } \BODY
+    \seq_pop_left:NN \l__ex_solparts_seq \l__ex_solpart_tl
+    \WSZeroHeight
+      { \begin { tcolorbox } [ ex/sol@first ] \l__ex_solpart_tl \end { tcolorbox } }
+    \seq_map_inline:Nn \l__ex_solparts_seq
+      {
+        \WSOverlayNextPage
+          { \begin { tcolorbox } [ ex/sol@cont ] ##1 \end { tcolorbox } }
+      }
+  }
+\ExplSyntaxOff
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STUDENT-ONLY CONTENT
