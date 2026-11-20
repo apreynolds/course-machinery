@@ -371,6 +371,7 @@ def find_test_files(test_number, pages_override):
       no PDF            the test has not been built; nothing to measure
       PDF older than    the .tex was edited after the build, so the PDF -- and
       its .tex          the one already uploaded anywhere -- is not the test
+                        (unless the save changed nothing; see the check)
       no -SOLUTIONS     wanted eventually, but the order does not wait on it
 
     A MISSING PDF IS FATAL unless --pages was given, because the page count is
@@ -419,6 +420,12 @@ def find_test_files(test_number, pages_override):
 
         # The .tex has the PDF's name. Edited after the build means the PDF is
         # not the current test -- the commonest way to print the wrong thing.
+        # This compares timestamps, but latexmk compares contents: a save that
+        # changes nothing trips this check, and the rebuild then does nothing
+        # and leaves the PDF's time alone, so the warning stays. The message
+        # says how to recognise that case. Checking contents here instead would
+        # mean finding latexmk's record in the aux dir, i.e. a sixth copy of the
+        # LATEXMK-AUX-CONTRACT -- not worth it for a rare false alarm.
         tex = (REPO_ROOT / "TESTS" / pdf.with_suffix(".tex").name) if REPO_ROOT else None
         if tex is None or not tex.exists():
             notes.append(paint("no .tex in the repo's TESTS/", "yellow"))
@@ -426,7 +433,8 @@ def find_test_files(test_number, pages_override):
         elif modified(tex) > built:
             notes.append(paint(
                 f".tex EDITED SINCE ({modified(tex).strftime('%-d %b %H:%M')}) "
-                f"-- rebuild", "red"))
+                f"-- rebuild; if latexmk says \"Nothing to do\", the edit "
+                f"changed nothing and this PDF is fine", "red"))
             count_warning()
 
         solutions = pdf.with_name(pdf.stem + "-SOLUTIONS.pdf")

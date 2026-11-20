@@ -234,6 +234,10 @@ Run it once per test, from the course's own checkout:
 \texttt{-{}-dry-run} goes through every step and writes nothing; \texttt{-{}-yes} answers every question with its default.
 The script is Python and declares its one dependency inline, so \texttt{uv} builds its environment on first run.
 
+Before anything is ordered, it asks whether each day's test PDF is the one to print, and warns in red when the \file{.tex} was saved after the PDF was built.
+That check compares timestamps, while latexmk compares contents, so a save that changed nothing also trips it.
+Rebuilding is then a no-op --- latexmk reports \texttt{Nothing to do} --- and the warning stays, but the PDF is current.
+
 Instructors drop their class-list exports in the shared folder and delete nothing, and the script reads the newest export per instructor.
 Once it has been told to carry on with those lists, it moves the exports they supersede into a \file{zzzzz/} subfolder, which it does not read.
 Nothing is deleted, so moving a file back out undoes it.
